@@ -56,7 +56,9 @@ const CallScreen = () => {
 
       // Убеждаемся что аудио не отключено
       remoteAudioRef.current.muted = false
-      remoteAudioRef.current.volume = 1.0
+      if (remoteAudioRef.current.volume !== undefined) {
+        remoteAudioRef.current.volume = 1.0
+      }
 
       console.log('Remote audio element configured:', {
         muted: remoteAudioRef.current.muted,
@@ -65,15 +67,47 @@ const CallScreen = () => {
         readyState: remoteAudioRef.current.readyState
       })
 
-      // Пробуем запустить воспроизведение
+      // Принудительно запускаем воспроизведение с дополнительными проверками
       const playPromise = remoteAudioRef.current.play()
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
             console.log('Remote audio playback started successfully')
+            
+            // Дополнительная проверка что звук действительно играет
+            setTimeout(() => {
+              if (remoteAudioRef.current) {
+                console.log('Remote audio status after 1s:', {
+                  paused: remoteAudioRef.current.paused,
+                  currentTime: remoteAudioRef.current.currentTime,
+                  volume: remoteAudioRef.current.volume,
+                  muted: remoteAudioRef.current.muted,
+                  readyState: remoteAudioRef.current.readyState
+                })
+                
+                // Если все еще на паузе, пробуем снова
+                if (remoteAudioRef.current.paused) {
+                  console.log('Audio still paused, trying to play again...')
+                  remoteAudioRef.current.play().catch(console.error)
+                }
+              }
+            }, 1000)
           })
           .catch((error) => {
             console.error('Remote audio playback failed:', error)
+            
+            // Пробуем альтернативные способы запуска
+            if (error.name === 'NotAllowedError') {
+              console.log('Autoplay blocked, waiting for user interaction...')
+              // Добавляем обработчик клика для запуска аудио
+              const startAudio = () => {
+                if (remoteAudioRef.current) {
+                  remoteAudioRef.current.play().catch(console.error)
+                  document.removeEventListener('click', startAudio)
+                }
+              }
+              document.addEventListener('click', startAudio)
+            }
           })
       }
     } else {
@@ -186,13 +220,32 @@ const CallScreen = () => {
       <audio
         ref={remoteAudioRef}
         autoPlay
+        playsInline
+        controls={false}
+        muted={false}
         style={{ display: 'none' }}
         onLoadedData={() => console.log('Remote audio loaded data')}
-        onCanPlay={() => console.log('Remote audio can play')}
+        onCanPlay={() => {
+          console.log('Remote audio can play')
+          // Принудительно запускаем воспроизведение когда готово
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.play().catch(console.error)
+          }
+        }}
         onPlay={() => console.log('Remote audio started playing')}
         onPause={() => console.log('Remote audio paused')}
         onError={(e) => console.error('Remote audio error:', e)}
         onVolumeChange={() => console.log('Remote audio volume changed:', remoteAudioRef.current?.volume)}
+        onLoadedMetadata={() => {
+          console.log('Remote audio metadata loaded')
+          if (remoteAudioRef.current) {
+            console.log('Audio duration:', remoteAudioRef.current.duration)
+          }
+        }}
+        onStalled={() => console.log('Remote audio stalled')}
+        onSuspend={() => console.log('Remote audio suspended')}
+        onWaiting={() => console.log('Remote audio waiting')}
+        onEnded={() => console.log('Remote audio ended')}
       />
 
       {/* Audio Call Interface */}

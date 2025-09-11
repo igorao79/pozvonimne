@@ -23,23 +23,24 @@ const useWebRTC = () => {
     endCall
   } = useCallStore()
 
-  // Оптимизированная конфигурация ICE серверов для быстрого соединения
+  // Максимально оптимизированная конфигурация ICE серверов
   const iceServers = [
-    // Быстрые STUN серверы
+    // Основные быстрые STUN серверы Google
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    // Надежные TURN серверы (бесплатные)
+    
+    // Надежные TURN серверы для сложных сетей
     {
-      urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443'],
+      urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turns:openrelay.metered.ca:443'],
       username: 'openrelayproject',
       credential: 'openrelayproject'
     },
-    // Дополнительные STUN серверы
+    
+    // Альтернативные STUN серверы
     { urls: 'stun:stun.freeswitch.org' },
-    { urls: 'stun:stun.xten.com' }
+    { urls: 'stun:stun.voip.blackberry.com:3478' },
+    { urls: 'stun:stun.sipgate.net:3478' }
   ]
 
   const initializePeer = async (isInitiator: boolean) => {
@@ -59,13 +60,23 @@ const useWebRTC = () => {
       console.log('HTTPS check:', window.location.protocol === 'https:')
       console.log('User agent:', navigator.userAgent)
 
-      // Get user media (только аудио)
+      // Оптимизированные ограничения для лучшего качества аудио
       const constraints = {
         video: false,
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
+          autoGainControl: true,
+          googEchoCancellation: true,
+          googAutoGainControl: true,
+          googNoiseSuppression: true,
+          googHighpassFilter: true,
+          googTypingNoiseDetection: true,
+          sampleRate: 48000, // Высокое качество звука
+          sampleSize: 16,
+          channelCount: 1, // Моно для экономии трафика
+          latency: 0.01, // Минимальная задержка
+          volume: 1.0
         }
       }
 
@@ -98,17 +109,17 @@ const useWebRTC = () => {
 
       setLocalStream(stream)
 
-      // Create peer connection с оптимизированной конфигурацией
+      // Максимально оптимизированная конфигурация peer connection
       const peer = new SimplePeer({
         initiator: isInitiator,
-        trickle: true, // Включаем trickle ICE для более быстрого соединения
+        trickle: true, // Включаем trickle ICE для быстрого соединения
         stream,
         config: {
           iceServers,
-          iceTransportPolicy: 'all', // Пробуем все типы соединений
-          bundlePolicy: 'max-bundle', // Оптимизация для лучшего качества
-          rtcpMuxPolicy: 'require', // Требуем RTCP mux для лучшей производительности
-          iceCandidatePoolSize: 10 // Увеличиваем пул кандидатов
+          iceTransportPolicy: 'all',
+          bundlePolicy: 'max-bundle',
+          rtcpMuxPolicy: 'require',
+          iceCandidatePoolSize: 15 // Увеличиваем пул для лучшего соединения
         },
         offerOptions: {
           offerToReceiveAudio: true,
@@ -117,7 +128,10 @@ const useWebRTC = () => {
         answerOptions: {
           offerToReceiveAudio: true,
           offerToReceiveVideo: false
-        }
+        },
+        // Дополнительные оптимизации
+        allowHalfTrickle: true,
+        objectMode: false
       })
 
       peer.on('error', (err) => {
@@ -307,16 +321,15 @@ const useWebRTC = () => {
             const peerState = (peerRef.current as any)._pc?.connectionState || 'unknown'
             console.log('Processing signal from', from, 'Peer state:', peerState, 'Signal type:', signal.type)
 
-            // Не обрабатываем сигналы если соединение уже установлено или закрыто
-            if (peerState === 'connected' || peerState === 'completed') {
-              console.log('Peer already connected, ignoring signal')
+            // Разрешаем обработку сигналов в большинстве состояний для лучшей надежности
+            if (peerState === 'closed') {
+              console.log('Peer connection closed, ignoring signal')
               return
             }
 
-            // Не обрабатываем сигналы если соединение закрыто
-            if (peerState === 'closed' || peerState === 'failed') {
-              console.log('Peer connection closed/failed, ignoring signal')
-              return
+            // Для failed состояния пробуем обработать, возможно поможет восстановиться
+            if (peerState === 'failed') {
+              console.log('Peer connection failed, but trying to process signal for recovery')
             }
 
             peerRef.current.signal(signal)
