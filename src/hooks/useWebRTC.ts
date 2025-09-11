@@ -55,13 +55,46 @@ const useWebRTC = () => {
       }
 
       console.log('Requesting microphone access...')
+      console.log('HTTPS check:', window.location.protocol === 'https:')
+      console.log('User agent:', navigator.userAgent)
+
       // Get user media (только аудио)
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const constraints = {
         video: false,
-        audio: true
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      }
+
+      console.log('Requesting media with constraints:', constraints)
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+
+      console.log('Microphone access granted, stream:', {
+        id: stream.id,
+        tracks: stream.getTracks().map(track => ({
+          kind: track.kind,
+          label: track.label,
+          enabled: track.enabled,
+          muted: track.muted,
+          readyState: track.readyState
+        }))
       })
 
-      console.log('Microphone access granted, stream:', stream)
+      // Проверяем что треки активны
+      const audioTracks = stream.getAudioTracks()
+      console.log('Audio tracks:', audioTracks.length)
+      audioTracks.forEach((track, index) => {
+        console.log(`Audio track ${index}:`, {
+          enabled: track.enabled,
+          muted: track.muted,
+          readyState: track.readyState,
+          constraints: track.getConstraints(),
+          settings: track.getSettings()
+        })
+      })
+
       setLocalStream(stream)
 
       // Create peer connection
@@ -132,7 +165,35 @@ const useWebRTC = () => {
       })
 
       peer.on('stream', (remoteStream) => {
-        console.log('Received remote stream:', remoteStream)
+        console.log('Received remote stream:', {
+          id: remoteStream.id,
+          tracks: remoteStream.getTracks().map(track => ({
+            kind: track.kind,
+            label: track.label,
+            enabled: track.enabled,
+            muted: track.muted,
+            readyState: track.readyState
+          }))
+        })
+
+        // Проверяем remote audio tracks
+        const remoteAudioTracks = remoteStream.getAudioTracks()
+        console.log('Remote audio tracks:', remoteAudioTracks.length)
+        remoteAudioTracks.forEach((track, index) => {
+          console.log(`Remote audio track ${index}:`, {
+            enabled: track.enabled,
+            muted: track.muted,
+            readyState: track.readyState,
+            constraints: track.getConstraints(),
+            settings: track.getSettings()
+          })
+
+          // Добавляем обработчики событий для трека
+          track.onended = () => console.log(`Remote audio track ${index} ended`)
+          track.onmute = () => console.log(`Remote audio track ${index} muted`)
+          track.onunmute = () => console.log(`Remote audio track ${index} unmuted`)
+        })
+
         setRemoteStream(remoteStream)
       })
 
@@ -147,7 +208,28 @@ const useWebRTC = () => {
 
     } catch (err) {
       console.error('Error initializing peer:', err)
-      setError('Не удалось получить доступ к микрофону')
+
+      // Детальная диагностика ошибок
+      if (err instanceof Error) {
+        if (err.name === 'NotAllowedError') {
+          setError('Доступ к микрофону запрещен. Разрешите доступ в настройках браузера.')
+        } else if (err.name === 'NotFoundError') {
+          setError('Микрофон не найден. Проверьте подключение микрофона.')
+        } else if (err.name === 'NotReadableError') {
+          setError('Микрофон занят другим приложением.')
+        } else if (err.name === 'OverconstrainedError') {
+          setError('Запрошенные параметры микрофона не поддерживаются.')
+        } else if (err.name === 'SecurityError') {
+          setError('Требуется HTTPS для доступа к микрофону в продакшене.')
+        } else if (err.name === 'AbortError') {
+          setError('Запрос на доступ к микрофону был отменен.')
+        } else {
+          setError(`Ошибка доступа к микрофону: ${err.message}`)
+        }
+      } else {
+        setError('Неизвестная ошибка при получении доступа к микрофону')
+      }
+
       endCall()
     }
   }
@@ -170,6 +252,22 @@ const useWebRTC = () => {
     }
 
     window.addEventListener('beforeunload', handleBeforeUnload)
+
+    // Обработка изменения видимости страницы
+    const handleVisibilityChange = () => {
+      const isHidden = document.hidden
+      console.log('Page visibility changed:', { hidden: isHidden, visibilityState: document.visibilityState })
+
+      if (isHidden) {
+        console.log('Page hidden during call - maintaining connection')
+        // Можно добавить дополнительную логику если нужно
+      } else {
+        console.log('Page visible again')
+        // Можно добавить дополнительную логику если нужно
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     const webrtcChannel = supabase
       .channel(`webrtc:${userId}`)
@@ -229,6 +327,7 @@ const useWebRTC = () => {
       console.log('Cleaning up WebRTC signal listener')
       supabase.removeChannel(webrtcChannel)
       window.removeEventListener('beforeunload', handleBeforeUnload)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [userId, targetUserId, supabase])
 

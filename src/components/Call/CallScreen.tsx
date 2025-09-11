@@ -44,7 +44,41 @@ const CallScreen = () => {
 
   useEffect(() => {
     if (remoteAudioRef.current && remoteStream) {
+      console.log('Setting remote stream to audio element:', {
+        streamId: remoteStream.id,
+        audioTracks: remoteStream.getAudioTracks().length,
+        audioElement: remoteAudioRef.current
+      })
+
       remoteAudioRef.current.srcObject = remoteStream
+
+      // Убеждаемся что аудио не отключено
+      remoteAudioRef.current.muted = false
+      remoteAudioRef.current.volume = 1.0
+
+      console.log('Remote audio element configured:', {
+        muted: remoteAudioRef.current.muted,
+        volume: remoteAudioRef.current.volume,
+        paused: remoteAudioRef.current.paused,
+        readyState: remoteAudioRef.current.readyState
+      })
+
+      // Пробуем запустить воспроизведение
+      const playPromise = remoteAudioRef.current.play()
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('Remote audio playback started successfully')
+          })
+          .catch((error) => {
+            console.error('Remote audio playback failed:', error)
+          })
+      }
+    } else {
+      console.log('Remote audio setup skipped:', {
+        hasAudioElement: !!remoteAudioRef.current,
+        hasRemoteStream: !!remoteStream
+      })
     }
   }, [remoteStream])
 
@@ -104,6 +138,12 @@ const CallScreen = () => {
         ref={remoteAudioRef}
         autoPlay
         style={{ display: 'none' }}
+        onLoadedData={() => console.log('Remote audio loaded data')}
+        onCanPlay={() => console.log('Remote audio can play')}
+        onPlay={() => console.log('Remote audio started playing')}
+        onPause={() => console.log('Remote audio paused')}
+        onError={(e) => console.error('Remote audio error:', e)}
+        onVolumeChange={() => console.log('Remote audio volume changed:', remoteAudioRef.current?.volume)}
       />
 
       {/* Audio Call Interface */}
