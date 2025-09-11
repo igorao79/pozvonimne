@@ -256,10 +256,25 @@ const CallScreen = () => {
         onLoadedData={() => console.log('Remote audio loaded data')}
         onCanPlay={() => {
           console.log('Remote audio can play')
-          // Принудительно запускаем воспроизведение когда готово
-          if (remoteAudioRef.current) {
-            remoteAudioRef.current.play().catch(console.error)
-          }
+            // Принудительно запускаем воспроизведение когда готово
+            if (remoteAudioRef.current) {
+              console.log('Auto-starting remote audio...')
+              remoteAudioRef.current.play()
+                .then(() => console.log('Remote audio auto-play successful'))
+                .catch((error) => {
+                  console.log('Remote audio auto-play failed:', error.name)
+                  // Добавляем глобальный обработчик клика для запуска аудио
+                  const startAudioOnClick = () => {
+                    if (remoteAudioRef.current) {
+                      remoteAudioRef.current.play().catch(console.error)
+                      document.removeEventListener('click', startAudioOnClick)
+                      document.removeEventListener('touchstart', startAudioOnClick)
+                    }
+                  }
+                  document.addEventListener('click', startAudioOnClick)
+                  document.addEventListener('touchstart', startAudioOnClick)
+                })
+            }
         }}
         onPlay={() => console.log('Remote audio started playing')}
         onPause={() => console.log('Remote audio paused')}
@@ -340,6 +355,22 @@ const CallScreen = () => {
               </span>
             </div>
           </div>
+
+          {/* Audio Autoplay Fix Button */}
+          {remoteStream && (
+            <div className="mb-8">
+              <button
+                onClick={() => {
+                  if (remoteAudioRef.current) {
+                    remoteAudioRef.current.play().catch(console.error)
+                  }
+                }}
+                className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+              >
+                🔊 Включить звук (если не слышно)
+              </button>
+            </div>
+          )}
 
           {/* Audio Status Indicators */}
           <div className="flex justify-center space-x-8 mb-12">

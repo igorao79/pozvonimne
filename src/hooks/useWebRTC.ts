@@ -504,21 +504,26 @@ const useWebRTC = () => {
         }
       }, 50)
     } 
-    // Fallback: если уже в звонке но не caller
+    // ОСНОВНОЙ Fallback: если в звонке, НЕ caller, и нет peer - это receiver!
+    else if (isInCall && !isCalling && isCallActive && !peerRef.current && targetUserId) {
+      console.log(`✅ [User ${userId?.slice(0, 8)}] Initializing peer as receiver (main fallback - call active)`)
+      initializePeer(false) // Receiver is not initiator
+    }
+    // Дополнительный fallback: просто в звонке и не caller
     else if (isInCall && !isCalling && !peerRef.current) {
-      console.log(`✅ [User ${userId?.slice(0, 8)}] Initializing peer as receiver (fallback)`)
+      console.log(`✅ [User ${userId?.slice(0, 8)}] Initializing peer as receiver (simple fallback)`)
       initializePeer(false) // Receiver is not initiator
     } else {
       console.log(`❌ [User ${userId?.slice(0, 8)}] Receiver peer initialization skipped`)
     }
-  }, [isInCall, isCalling, isReceivingCall, callerId])
+  }, [isInCall, isCalling, isCallActive, isReceivingCall, callerId || '', targetUserId || ''])
 
   // Cleanup on unmount or call end
   useEffect(() => {
     return () => {
       if (peerRef.current && !peerRef.current.destroyed) {
         try {
-          console.log('Cleaning up peer connection')
+          console.log('🧹 useWebRTC: Cleaning up peer connection')
 
           // Устанавливаем флаг, что соединение уничтожается
           const peerToDestroy = peerRef.current
@@ -531,11 +536,38 @@ const useWebRTC = () => {
             }
           }, 100)
         } catch (err) {
-          console.log('Peer cleanup error:', err)
+          console.log('🧹 useWebRTC: Peer cleanup error:', err)
         }
       }
     }
   }, [])
+
+  // Принудительная очистка peer при изменении состояния звонка
+  useEffect(() => {
+    if (!isInCall && peerRef.current) {
+      console.log(`🧹 [User ${userId?.slice(0, 8)}] Call ended, force cleanup peer`)
+      try {
+        if (!peerRef.current.destroyed) {
+          peerRef.current.destroy()
+        }
+      } catch (err) {
+        console.log('🧹 Force cleanup error:', err)
+      }
+      peerRef.current = null
+    }
+  }, [isInCall])
+
+  // Дополнительная проверка - принудительная инициализация peer для receiver
+  useEffect(() => {
+    const forceReceiverPeerInit = setTimeout(() => {
+      if (isInCall && !isCalling && !peerRef.current && targetUserId) {
+        console.log(`🔄 [User ${userId?.slice(0, 8)}] FORCE initializing peer as receiver after 2s delay`)
+        initializePeer(false)
+      }
+    }, 2000)
+
+    return () => clearTimeout(forceReceiverPeerInit)
+  }, [isInCall, isCalling, targetUserId || ''])
 
   return {
     peer: peerRef.current

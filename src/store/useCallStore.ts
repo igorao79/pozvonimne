@@ -148,12 +148,45 @@ const useCallStore = create<CallStore>((set, get) => ({
   
   // Call management actions
   startCall: (targetUserId) => {
+    console.log('🚀 StartCall: Starting new call to', targetUserId.slice(0, 8))
+    
+    // Очищаем предыдущее состояние перед новым звонком
+    const { peer, localStream, remoteStream } = get()
+    
+    if (peer && !peer.destroyed) {
+      console.log('🚀 StartCall: Cleaning up old peer')
+      try {
+        peer.destroy()
+      } catch (err) {
+        console.log('🚀 StartCall: Error destroying old peer:', err)
+      }
+    }
+    
+    // Останавливаем старые потоки
+    if (localStream) {
+      console.log('🚀 StartCall: Stopping old local stream')
+      localStream.getTracks().forEach(track => track.stop())
+    }
+    
+    console.log('🚀 StartCall: Setting new call state')
     set({ 
+      // Очищаем все предыдущее состояние
+      peer: null,
+      localStream: null,
+      remoteStream: null,
+      isCallActive: false,
+      isReceivingCall: false,
+      callerId: null,
+      callerName: null,
+      isMicMuted: false,
+      error: null,
+      // Устанавливаем новое состояние
       targetUserId, 
       isCalling: true, 
-      isInCall: true,
-      error: null 
+      isInCall: true
     })
+    
+    console.log('🚀 StartCall: New call initiated')
   },
   
   acceptCall: () => {
@@ -200,27 +233,31 @@ const useCallStore = create<CallStore>((set, get) => ({
   endCall: () => {
     const { peer, localStream } = get()
 
+    console.log('🔚 EndCall: Starting cleanup process')
+
     // Close peer connection safely
     if (peer && !peer.destroyed) {
       try {
-        console.log('Destroying peer connection from store')
+        console.log('🔚 EndCall: Destroying peer connection from store')
         peer.destroy()
       } catch (err) {
-        console.log('Peer already destroyed:', err)
+        console.log('🔚 EndCall: Peer already destroyed:', err)
       }
     }
 
     // Stop local stream
     if (localStream) {
+      console.log('🔚 EndCall: Stopping local stream tracks')
       localStream.getTracks().forEach(track => {
         try {
           track.stop()
         } catch (err) {
-          console.log('Track already stopped:', err)
+          console.log('🔚 EndCall: Track already stopped:', err)
         }
       })
     }
 
+    console.log('🔚 EndCall: Resetting all call state')
     set({
       isInCall: false,
       isCallActive: false,
@@ -231,8 +268,12 @@ const useCallStore = create<CallStore>((set, get) => ({
       peer: null,
       localStream: null,
       remoteStream: null,
-      isMicMuted: false
+      isMicMuted: false,
+      targetUserId: '', // ВАЖНО: очищаем targetUserId
+      error: null
     })
+
+    console.log('🔚 EndCall: Cleanup completed')
   },
   
   // Reset functions

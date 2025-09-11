@@ -8,7 +8,18 @@ interface AudioDiagnosticsProps {
 }
 
 const AudioDiagnostics = ({ onClose }: AudioDiagnosticsProps) => {
-  const { localStream, remoteStream, peer } = useCallStore()
+  const { 
+    localStream, 
+    remoteStream, 
+    peer, 
+    isInCall, 
+    isCalling, 
+    isCallActive, 
+    isReceivingCall, 
+    targetUserId, 
+    callerId,
+    userId 
+  } = useCallStore()
   const [localAudioInfo, setLocalAudioInfo] = useState<any>(null)
   const [remoteAudioInfo, setRemoteAudioInfo] = useState<any>(null)
   const [peerInfo, setPeerInfo] = useState<any>(null)
@@ -144,6 +155,29 @@ const AudioDiagnostics = ({ onClose }: AudioDiagnosticsProps) => {
               ) : (
                 <p className="text-gray-500">Нет данных</p>
               )}
+            </div>
+
+            {/* Call State */}
+            <div className="border rounded-lg p-4 md:col-span-2">
+              <h3 className="text-lg font-semibold mb-3 text-orange-600">Состояние звонка</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <div><strong>В звонке:</strong> <span className={isInCall ? 'text-green-600' : 'text-red-600'}>{isInCall ? 'Да' : 'Нет'}</span></div>
+                  <div><strong>Звонящий:</strong> <span className={isCalling ? 'text-green-600' : 'text-red-600'}>{isCalling ? 'Да' : 'Нет'}</span></div>
+                </div>
+                <div>
+                  <div><strong>Активный звонок:</strong> <span className={isCallActive ? 'text-green-600' : 'text-red-600'}>{isCallActive ? 'Да' : 'Нет'}</span></div>
+                  <div><strong>Входящий:</strong> <span className={isReceivingCall ? 'text-green-600' : 'text-red-600'}>{isReceivingCall ? 'Да' : 'Нет'}</span></div>
+                </div>
+                <div>
+                  <div><strong>User ID:</strong> <span className="font-mono text-xs">{userId?.slice(0, 8) || 'Нет'}...</span></div>
+                  <div><strong>Target ID:</strong> <span className="font-mono text-xs">{targetUserId?.slice(0, 8) || 'Нет'}...</span></div>
+                </div>
+                <div>
+                  <div><strong>Caller ID:</strong> <span className="font-mono text-xs">{callerId?.slice(0, 8) || 'Нет'}...</span></div>
+                  <div><strong>Peer есть:</strong> <span className={peer ? 'text-green-600' : 'text-red-600'}>{peer ? 'Да' : 'Нет'}</span></div>
+                </div>
+              </div>
             </div>
 
             {/* Peer Connection */}
