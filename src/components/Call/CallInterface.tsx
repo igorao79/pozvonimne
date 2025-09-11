@@ -5,6 +5,8 @@ import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
 import useWebRTC from '@/hooks/useWebRTC'
 import { CallControls, IncomingCall, CallScreen, DialPad } from '.'
+import UsersList from '../UsersList/UsersList'
+import MicrophoneTest from '../MicrophoneTest/MicrophoneTest'
 
 const CallInterface = () => {
   const {
@@ -12,6 +14,7 @@ const CallInterface = () => {
     isInCall,
     isReceivingCall,
     isCallActive,
+    remoteStream,
     setIsReceivingCall,
     setIsCallActive,
     setError,
@@ -45,7 +48,8 @@ const CallInterface = () => {
         setError('Звонок отклонен')
         endCall()
       })
-      .on('broadcast', { event: 'call_ended' }, () => {
+      .on('broadcast', { event: 'call_ended' }, (payload) => {
+        console.log('Call ended by other user:', payload)
         endCall()
       })
       .subscribe()
@@ -64,22 +68,28 @@ const CallInterface = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col">
-      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
-          <div className="text-center">
-            <h1 className="text-3xl font-extrabold text-gray-900 mb-2">
-              Аудио звонки
-            </h1>
-            <p className="text-lg text-gray-600 mb-4">
-              Ваш ID: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{userId}</span>
-            </p>
-            <p className="text-sm text-gray-500">
-              Поделитесь своим ID для получения аудио звонков
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-extrabold text-gray-900 mb-2">
+            Позвони.мне
+          </h1>
+          <p className="text-sm text-gray-500">
+            Звоните друг другу по никнеймам
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column */}
+          <div className="space-y-6">
+            <MicrophoneTest />
+            <DialPad />
           </div>
-          
-          <DialPad />
+
+          {/* Right Column */}
+          <div>
+            <UsersList />
+          </div>
         </div>
       </div>
     </div>

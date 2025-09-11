@@ -23,26 +23,44 @@ const useWebRTC = () => {
     endCall
   } = useCallStore()
 
-  // ICE servers configuration
+  // ICE servers configuration (STUN + free TURN)
   const iceServers = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
+    // Бесплатные TURN серверы для лучшей совместимости
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject', 
+      credential: 'openrelayproject'
+    }
   ]
 
   const initializePeer = async (isInitiator: boolean) => {
     try {
+      // Предотвращаем создание нескольких peer соединений
+      if (peerRef.current && !peerRef.current.destroyed) {
+        console.log('Peer already exists, destroying old one')
+        try {
+          peerRef.current.destroy()
+        } catch (err) {
+          console.warn('Error destroying old peer:', err)
+        }
+        peerRef.current = null
+      }
+
       console.log('Requesting microphone access...')
       // Get user media (только аудио)
       const stream = await navigator.mediaDevices.getUserMedia({
         video: false,
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
+        audio: true
       })
-      
+
       console.log('Microphone access granted, stream:', stream)
       setLocalStream(stream)
 
@@ -58,17 +76,42 @@ const useWebRTC = () => {
 
       peer.on('error', (err) => {
         console.error('Peer error:', err)
+
+        // Игнорируем определенные типы ошибок, которые не требуют завершения звонка
+        if (err instanceof Error) {
+          if (err.message.includes('InvalidStateError') ||
+              err.message.includes('wrong state') ||
+              err.message.includes('already have a remote') ||
+              err.message.includes('remote description')) {
+            console.log('Ignoring recoverable peer error:', err.message)
+            return
+          }
+        }
+
         setError('Ошибка соединения: ' + err.message)
         endCall()
       })
 
       peer.on('signal', async (data) => {
         try {
+          // Проверяем что peer не уничтожен и соответствует текущему соединению
+          if (peer.destroyed || peer !== peerRef.current) {
+            console.log('Peer destroyed or outdated, not sending signal')
+            return
+          }
+
+          // Проверяем состояние peer connection
+          const peerState = (peer as any)._pc?.connectionState || 'unknown'
+          if (peerState === 'closed' || peerState === 'failed') {
+            console.log('Peer connection closed/failed, not sending signal')
+            return
+          }
+
           console.log('Sending signal to', targetUserId, ':', data)
           // Send signal to the other user
           const targetChannel = supabase.channel(`webrtc:${targetUserId}`)
           await targetChannel.subscribe()
-          
+
           await targetChannel.send({
             type: 'broadcast',
             event: 'webrtc_signal',
@@ -95,7 +138,8 @@ const useWebRTC = () => {
 
       peer.on('close', () => {
         console.log('Peer connection closed')
-        endCall()
+        // Не вызываем endCall() здесь, чтобы избежать рекурсии
+        // endCall() будет вызван через обработчик события в CallInterface
       })
 
       peerRef.current = peer
@@ -113,24 +157,69 @@ const useWebRTC = () => {
     if (!userId) return
 
     console.log('Setting up WebRTC signal listener for user:', userId)
+
+    // Обработчик для очистки при закрытии/обновлении страницы
+    const handleBeforeUnload = () => {
+      if (peerRef.current && !peerRef.current.destroyed) {
+        try {
+          peerRef.current.destroy()
+        } catch (err) {
+          console.warn('Error destroying peer on page unload:', err)
+        }
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
     const webrtcChannel = supabase
       .channel(`webrtc:${userId}`)
       .on('broadcast', { event: 'webrtc_signal' }, (payload) => {
         console.log('Received WebRTC signal:', payload)
         const { signal, from } = payload.payload
-        
-        if (peerRef.current && from === targetUserId) {
+
+        if (peerRef.current && !peerRef.current.destroyed && from === targetUserId) {
           try {
-            console.log('Processing signal from', from, ':', signal)
+            // Проверяем состояние peer connection
+            const peerState = (peerRef.current as any)._pc?.connectionState || 'unknown'
+            console.log('Processing signal from', from, 'Peer state:', peerState, 'Signal type:', signal.type)
+
+            // Не обрабатываем сигналы если соединение уже установлено или закрыто
+            if (peerState === 'connected' || peerState === 'completed') {
+              console.log('Peer already connected, ignoring signal')
+              return
+            }
+
+            // Не обрабатываем сигналы если соединение закрыто
+            if (peerState === 'closed' || peerState === 'failed') {
+              console.log('Peer connection closed/failed, ignoring signal')
+              return
+            }
+
             peerRef.current.signal(signal)
           } catch (err) {
             console.error('Error processing signal:', err)
+
+            // Игнорируем определенные типы ошибок
+            if (err instanceof Error) {
+              if (err.message.includes('destroyed')) {
+                console.log('Peer already destroyed, ignoring signal')
+              } else if (err.message.includes('InvalidStateError') || err.message.includes('wrong state')) {
+                console.log('Invalid peer state for signal, ignoring')
+              } else if (err.message.includes('already have a remote') || err.message.includes('remote description')) {
+                console.log('Remote description already set, ignoring duplicate signal')
+              } else {
+                // Для других ошибок логируем и игнорируем
+                console.warn('Unexpected peer error:', err.message)
+              }
+            }
           }
         } else {
-          console.log('Ignoring signal - no peer or wrong sender:', { 
-            hasPeer: !!peerRef.current, 
-            from, 
-            expectedFrom: targetUserId 
+          console.log('Ignoring signal - no peer, peer destroyed, or wrong sender:', {
+            hasPeer: !!peerRef.current,
+            peerDestroyed: peerRef.current?.destroyed,
+            peerState: (peerRef.current as any)?._pc?.connectionState,
+            from,
+            expectedFrom: targetUserId
           })
         }
       })
@@ -139,6 +228,7 @@ const useWebRTC = () => {
     return () => {
       console.log('Cleaning up WebRTC signal listener')
       supabase.removeChannel(webrtcChannel)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
     }
   }, [userId, targetUserId, supabase])
 
@@ -163,11 +253,21 @@ const useWebRTC = () => {
     return () => {
       if (peerRef.current && !peerRef.current.destroyed) {
         try {
-          peerRef.current.destroy()
+          console.log('Cleaning up peer connection')
+
+          // Устанавливаем флаг, что соединение уничтожается
+          const peerToDestroy = peerRef.current
+          peerRef.current = null
+
+          // Даем время на завершение текущих операций
+          setTimeout(() => {
+            if (peerToDestroy && !peerToDestroy.destroyed) {
+              peerToDestroy.destroy()
+            }
+          }, 100)
         } catch (err) {
           console.log('Peer cleanup error:', err)
         }
-        peerRef.current = null
       }
     }
   }, [])

@@ -5,9 +5,11 @@ import { createClient } from '@/utils/supabase/client'
 import useCallStore from '@/store/useCallStore'
 import AuthForm from '@/components/Auth/AuthForm'
 import CallInterface from '@/components/Call/CallInterface'
+import { UserProfile } from '@/components/Profile'
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
+  const [showProfile, setShowProfile] = useState(false)
   const supabase = createClient()
   
   const {
@@ -91,13 +93,16 @@ export default function Home() {
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
               <h1 className="text-xl font-semibold text-gray-900">
-                Аудио звонки
+                Позвони.мне
               </h1>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">
+              <button
+                onClick={() => setShowProfile(true)}
+                className="text-sm text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
+              >
                 {user?.email}
-              </span>
+              </button>
               <button
                 onClick={handleSignOut}
                 className="text-sm text-indigo-600 hover:text-indigo-500"
@@ -124,6 +129,11 @@ export default function Home() {
       <main>
         <CallInterface />
       </main>
+
+      {/* Profile Modal */}
+      {showProfile && (
+        <UserProfile onClose={() => setShowProfile(false)} />
+      )}
     </div>
   )
 }

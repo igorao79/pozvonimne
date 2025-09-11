@@ -151,16 +151,17 @@ const useCallStore = create<CallStore>((set, get) => ({
   
   endCall: () => {
     const { peer, localStream } = get()
-    
+
     // Close peer connection safely
     if (peer && !peer.destroyed) {
       try {
+        console.log('Destroying peer connection from store')
         peer.destroy()
       } catch (err) {
         console.log('Peer already destroyed:', err)
       }
     }
-    
+
     // Stop local stream
     if (localStream) {
       localStream.getTracks().forEach(track => {
@@ -171,8 +172,8 @@ const useCallStore = create<CallStore>((set, get) => ({
         }
       })
     }
-    
-    set({ 
+
+    set({
       isInCall: false,
       isCallActive: false,
       isCalling: false,
