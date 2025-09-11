@@ -16,7 +16,16 @@ const IncomingCall = () => {
 
   const handleAccept = async () => {
     try {
-      console.log('Accepting call from:', callerId)
+      console.log('🎯 IncomingCall: Accepting call from:', callerId)
+      console.log('🎯 IncomingCall: Current state before accept:', {
+        callerId,
+        userId,
+        isReceivingCall: useCallStore.getState().isReceivingCall,
+        isInCall: useCallStore.getState().isInCall,
+        isCalling: useCallStore.getState().isCalling,
+        isCallActive: useCallStore.getState().isCallActive
+      })
+      
       // Send accept signal back to caller
       if (callerId) {
         const callerChannel = supabase.channel(`calls:${callerId}`)
@@ -29,10 +38,19 @@ const IncomingCall = () => {
             accepter_id: userId
           }
         })
-        console.log('Call accept signal sent to:', callerId)
+        console.log('🎯 IncomingCall: Call accept signal sent to:', callerId)
       }
       
+      console.log('🎯 IncomingCall: Calling acceptCall() function...')
       acceptCall()
+      
+      console.log('🎯 IncomingCall: State after acceptCall():', {
+        isReceivingCall: useCallStore.getState().isReceivingCall,
+        isInCall: useCallStore.getState().isInCall,
+        isCalling: useCallStore.getState().isCalling,
+        isCallActive: useCallStore.getState().isCallActive,
+        targetUserId: useCallStore.getState().targetUserId
+      })
     } catch (err) {
       console.error('Error accepting call:', err)
     }

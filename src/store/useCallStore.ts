@@ -158,13 +158,34 @@ const useCallStore = create<CallStore>((set, get) => ({
   
   acceptCall: () => {
     const { callerId } = get()
+    console.log('📞 Accepting call - before state change:', {
+      callerId,
+      currentState: {
+        isInCall: get().isInCall,
+        isCallActive: get().isCallActive,
+        isCalling: get().isCalling,
+        isReceivingCall: get().isReceivingCall
+      }
+    })
+    
     set({ 
       isReceivingCall: false, 
       isCallActive: true, 
       isInCall: true,
+      isCalling: false, // Явно устанавливаем в false для принимающей стороны
       targetUserId: callerId || '', // Устанавливаем targetUserId как ID звонящего
       callerId: null,
       callerName: null
+    })
+    
+    console.log('📞 Accepting call - after state change:', {
+      newState: {
+        isInCall: get().isInCall,
+        isCallActive: get().isCallActive,
+        isCalling: get().isCalling,
+        isReceivingCall: get().isReceivingCall,
+        targetUserId: get().targetUserId
+      }
     })
   },
   

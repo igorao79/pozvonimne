@@ -6,6 +6,7 @@ import useAudioAnalyzer from '@/hooks/useAudioAnalyzer'
 import useConnectionHandler from '@/hooks/useConnectionHandler'
 import { createClient } from '@/utils/supabase/client'
 import CallControls from './CallControls'
+import AudioDiagnostics from './AudioDiagnostics'
 
 const CallScreen = () => {
   const localAudioRef = useRef<HTMLAudioElement>(null)
@@ -13,6 +14,7 @@ const CallScreen = () => {
   const [remoteMicMuted, setRemoteMicMuted] = useState(false)
   const [remoteUserName, setRemoteUserName] = useState('')
   const [remoteUserAvatar, setRemoteUserAvatar] = useState('')
+  const [showDiagnostics, setShowDiagnostics] = useState(false)
 
   const {
     localStream,
@@ -74,21 +76,55 @@ const CallScreen = () => {
           .then(() => {
             console.log('Remote audio playback started successfully')
             
-            // Дополнительная проверка что звук действительно играет
+            // Проверяем что аудио элемент получает данные
             setTimeout(() => {
               if (remoteAudioRef.current) {
+                const audioElement = remoteAudioRef.current
                 console.log('Remote audio status after 1s:', {
-                  paused: remoteAudioRef.current.paused,
-                  currentTime: remoteAudioRef.current.currentTime,
-                  volume: remoteAudioRef.current.volume,
-                  muted: remoteAudioRef.current.muted,
-                  readyState: remoteAudioRef.current.readyState
+                  paused: audioElement.paused,
+                  currentTime: audioElement.currentTime,
+                  volume: audioElement.volume,
+                  muted: audioElement.muted,
+                  readyState: audioElement.readyState,
+                  networkState: audioElement.networkState,
+                  buffered: audioElement.buffered.length > 0 ? audioElement.buffered.end(0) : 0
                 })
                 
+                // Проверяем MediaStream
+                if (audioElement.srcObject) {
+                  const stream = audioElement.srcObject as MediaStream
+                  const tracks = stream.getAudioTracks()
+                  console.log('Remote stream tracks:', tracks.map(track => ({
+                    id: track.id,
+                    kind: track.kind,
+                    enabled: track.enabled,
+                    muted: track.muted,
+                    readyState: track.readyState,
+                    label: track.label
+                  })))
+                  
+                  // Проверяем что треки активны
+                  if (tracks.length === 0) {
+                    console.error('Remote stream has no audio tracks!')
+                  } else {
+                    tracks.forEach(track => {
+                      if (track.readyState === 'ended') {
+                        console.error('Remote audio track has ended!')
+                      }
+                      if (track.muted) {
+                        console.warn('Remote audio track is muted')
+                      }
+                      if (!track.enabled) {
+                        console.warn('Remote audio track is disabled')
+                      }
+                    })
+                  }
+                }
+                
                 // Если все еще на паузе, пробуем снова
-                if (remoteAudioRef.current.paused) {
+                if (audioElement.paused) {
                   console.log('Audio still paused, trying to play again...')
-                  remoteAudioRef.current.play().catch(console.error)
+                  audioElement.play().catch(console.error)
                 }
               }
             }, 1000)
@@ -355,7 +391,7 @@ const CallScreen = () => {
                 )}
               </div>
               <p className="text-blue-200 text-sm">
-                {!remoteStream ? 'Ожидание...' : remoteMicMuted ? 'Микрофон выкл.' : 'Собеседник'}
+                {!remoteStream ? 'Аудио не подключено' : remoteMicMuted ? 'Микрофон выкл.' : 'Подключен'}
               </p>
             </div>
           </div>
@@ -364,8 +400,23 @@ const CallScreen = () => {
 
       {/* Controls */}
       <div className="p-6 bg-black bg-opacity-25">
-        <CallControls />
+        <div className="flex flex-col items-center space-y-4">
+          <CallControls />
+          
+          {/* Diagnostics Button */}
+          <button
+            onClick={() => setShowDiagnostics(true)}
+            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors"
+          >
+            🔧 Диагностика аудио
+          </button>
+        </div>
       </div>
+
+      {/* Audio Diagnostics Modal */}
+      {showDiagnostics && (
+        <AudioDiagnostics onClose={() => setShowDiagnostics(false)} />
+      )}
     </div>
   )
 }
