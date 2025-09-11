@@ -23,22 +23,23 @@ const useWebRTC = () => {
     endCall
   } = useCallStore()
 
-  // ICE servers configuration (STUN + free TURN)
+  // Оптимизированная конфигурация ICE серверов для быстрого соединения
   const iceServers = [
+    // Быстрые STUN серверы
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    // Бесплатные TURN серверы для лучшей совместимости
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    // Надежные TURN серверы (бесплатные)
     {
-      urls: 'turn:openrelay.metered.ca:80',
+      urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443'],
       username: 'openrelayproject',
       credential: 'openrelayproject'
     },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject', 
-      credential: 'openrelayproject'
-    }
+    // Дополнительные STUN серверы
+    { urls: 'stun:stun.freeswitch.org' },
+    { urls: 'stun:stun.xten.com' }
   ]
 
   const initializePeer = async (isInitiator: boolean) => {
@@ -97,13 +98,25 @@ const useWebRTC = () => {
 
       setLocalStream(stream)
 
-      // Create peer connection
+      // Create peer connection с оптимизированной конфигурацией
       const peer = new SimplePeer({
         initiator: isInitiator,
-        trickle: false,
+        trickle: true, // Включаем trickle ICE для более быстрого соединения
         stream,
         config: {
-          iceServers
+          iceServers,
+          iceTransportPolicy: 'all', // Пробуем все типы соединений
+          bundlePolicy: 'max-bundle', // Оптимизация для лучшего качества
+          rtcpMuxPolicy: 'require', // Требуем RTCP mux для лучшей производительности
+          iceCandidatePoolSize: 10 // Увеличиваем пул кандидатов
+        },
+        offerOptions: {
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: false
+        },
+        answerOptions: {
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: false
         }
       })
 
@@ -162,6 +175,19 @@ const useWebRTC = () => {
       peer.on('connect', () => {
         console.log('Peer connected!')
         setIsCallActive(true)
+      })
+
+      // Обработчик ICE кандидатов для более быстрого соединения
+      peer.on('iceStateChange', (state) => {
+        console.log('ICE state changed:', state)
+      })
+
+      peer.on('iceCandidate', (candidate) => {
+        console.log('New ICE candidate:', candidate)
+      })
+
+      peer.on('signal', (data) => {
+        console.log('Generated signal:', data.type, data)
       })
 
       peer.on('stream', (remoteStream) => {

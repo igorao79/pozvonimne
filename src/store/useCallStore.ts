@@ -101,12 +101,39 @@ const useCallStore = create<CallStore>((set, get) => ({
   // Media actions
   toggleMic: () => {
     const { isMicMuted, localStream } = get()
+
+    console.log('Toggling mic:', { currentState: isMicMuted, hasStream: !!localStream })
+
     if (localStream) {
       const audioTrack = localStream.getAudioTracks()[0]
       if (audioTrack) {
-        audioTrack.enabled = isMicMuted
+        try {
+          // Если сейчас выключен - включаем, если включен - выключаем
+          const newMutedState = !isMicMuted
+          audioTrack.enabled = !newMutedState // enabled = true когда не muted
+
+          console.log('Audio track state changed:', {
+            wasMuted: isMicMuted,
+            nowMuted: newMutedState,
+            trackEnabled: audioTrack.enabled,
+            trackReadyState: audioTrack.readyState
+          })
+
+          set({ isMicMuted: newMutedState })
+        } catch (error) {
+          console.error('Error toggling mic:', error)
+          // В случае ошибки все равно обновляем состояние UI
+          set({ isMicMuted: !isMicMuted })
+        }
+      } else {
+        console.warn('No audio track found in local stream')
+        // Все равно обновляем состояние UI
         set({ isMicMuted: !isMicMuted })
       }
+    } else {
+      console.warn('No local stream available for mic toggle')
+      // Все равно обновляем состояние UI для лучшего UX
+      set({ isMicMuted: !isMicMuted })
     }
   },
   

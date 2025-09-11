@@ -11,7 +11,9 @@ const CallScreen = () => {
   const localAudioRef = useRef<HTMLAudioElement>(null)
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
   const [remoteMicMuted, setRemoteMicMuted] = useState(false)
-  
+  const [remoteUserName, setRemoteUserName] = useState('')
+  const [remoteUserAvatar, setRemoteUserAvatar] = useState('')
+
   const {
     localStream,
     remoteStream,
@@ -22,13 +24,13 @@ const CallScreen = () => {
   } = useCallStore()
 
   // Use audio analyzer for speaking detection
-  const { isSpeaking: isLocalSpeaking } = useAudioAnalyzer({ 
-    stream: localStream, 
-    isActive: isCallActive && !isMicMuted 
+  const { isSpeaking: isLocalSpeaking } = useAudioAnalyzer({
+    stream: localStream,
+    isActive: isCallActive && !isMicMuted
   })
-  const { isSpeaking: isRemoteSpeaking } = useAudioAnalyzer({ 
-    stream: remoteStream, 
-    isActive: isCallActive && !remoteMicMuted 
+  const { isSpeaking: isRemoteSpeaking } = useAudioAnalyzer({
+    stream: remoteStream,
+    isActive: isCallActive && !remoteMicMuted
   })
 
   // Use connection handler
@@ -101,6 +103,53 @@ const CallScreen = () => {
     }
   }, [userId, targetUserId, supabase])
 
+  // Load remote user info
+  useEffect(() => {
+    const loadRemoteUserInfo = async () => {
+      if (!targetUserId) return
+
+      try {
+        console.log('Loading remote user info for:', targetUserId)
+
+        // Сначала получаем данные из auth.users
+        const { data: authData, error: authError } = await supabase.auth.admin.getUserById(targetUserId)
+        if (authError) {
+          console.error('Error getting auth user:', authError)
+        }
+
+        // Получаем данные из user_profiles
+        const { data: profileData, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('username, display_name, avatar_url')
+          .eq('id', targetUserId)
+          .single()
+
+        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = not found
+          console.error('Error getting user profile:', profileError)
+        }
+
+        // Используем display_name из профиля, или из auth, или username
+        const displayName = profileData?.display_name ||
+                           authData?.user?.user_metadata?.display_name ||
+                           profileData?.username ||
+                           `Пользователь ${targetUserId?.slice(0, 8)}...`
+
+        const avatarUrl = profileData?.avatar_url || ''
+
+        console.log('Remote user info loaded:', { displayName, avatarUrl })
+        setRemoteUserName(displayName)
+        setRemoteUserAvatar(avatarUrl)
+
+      } catch (err) {
+        console.error('Error loading remote user info:', err)
+        setRemoteUserName(`Пользователь ${targetUserId?.slice(0, 8)}...`)
+        setRemoteUserAvatar('')
+      }
+    }
+
+    loadRemoteUserInfo()
+  }, [targetUserId, supabase])
+
   // Send mic status changes to remote user
   useEffect(() => {
     if (!targetUserId || !userId) return
@@ -151,12 +200,25 @@ const CallScreen = () => {
         <div className="max-w-md w-full text-center">
           {/* Avatar with speaking animation */}
           <div className="relative mb-8">
-            <div className={`w-40 h-40 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full mx-auto flex items-center justify-center shadow-2xl transition-all duration-200 ${
+            <div className={`w-40 h-40 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full mx-auto flex items-center justify-center shadow-2xl transition-all duration-200 overflow-hidden ${
               isRemoteSpeaking ? 'ring-4 ring-green-400 ring-opacity-75 animate-pulse' : ''
             }`}>
-              <svg className="w-20 h-20 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7-7h14a7 7 0 00-7-7z" />
-              </svg>
+              {remoteUserAvatar ? (
+                <img
+                  src={remoteUserAvatar}
+                  alt="Avatar"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    console.error('Failed to load remote user avatar:', remoteUserAvatar)
+                    e.currentTarget.style.display = 'none'
+                  }}
+                />
+              ) : null}
+              {!remoteUserAvatar && (
+                <svg className="w-20 h-20 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7-7h14a7 7 0 00-7-7z" />
+                </svg>
+              )}
             </div>
             
             {/* Remote mic status indicator */}
@@ -182,10 +244,10 @@ const CallScreen = () => {
           {/* User Info */}
           <div className="text-white mb-8">
             <h2 className="text-2xl font-bold mb-2">
-              Пользователь {targetUserId?.slice(0, 8)}...
+              {remoteUserName || `Пользователь ${targetUserId?.slice(0, 8)}...`}
             </h2>
             <p className="text-lg text-blue-200 mb-4">
-              ID: {targetUserId}
+              {targetUserId && `ID: ${targetUserId}`}
             </p>
             
             {/* Call Status */}
