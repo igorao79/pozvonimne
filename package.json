@@ -4,9 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "build": "next build",
+    "export": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "predeploy": "npm run export",
+    "deploy": "touch out/.nojekyll && gh-pages -d out"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
@@ -26,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.3",
+    "gh-pages": "^6.1.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
