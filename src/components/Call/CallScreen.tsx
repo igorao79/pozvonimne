@@ -145,13 +145,7 @@ const CallScreen = () => {
       try {
         console.log('Loading remote user info for:', targetUserId)
 
-        // Сначала получаем данные из auth.users
-        const { data: authData, error: authError } = await supabase.auth.admin.getUserById(targetUserId)
-        if (authError) {
-          console.error('Error getting auth user:', authError)
-        }
-
-        // Получаем данные из user_profiles
+        // Получаем данные только из user_profiles (без admin API)
         const { data: profileData, error: profileError } = await supabase
           .from('user_profiles')
           .select('username, display_name, avatar_url')
@@ -162,9 +156,8 @@ const CallScreen = () => {
           console.error('Error getting user profile:', profileError)
         }
 
-        // Используем display_name из профиля, или из auth, или username
+        // Используем display_name из профиля или username
         const displayName = profileData?.display_name ||
-                           authData?.user?.user_metadata?.display_name ||
                            profileData?.username ||
                            `Пользователь ${targetUserId?.slice(0, 8)}...`
 
