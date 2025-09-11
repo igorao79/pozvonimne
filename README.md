@@ -44,6 +44,15 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
+**Для GitHub Actions деплоя** также настройте секреты в репозитории:
+
+1. Перейдите в Settings → Secrets and variables → Actions
+2. Добавьте следующие секреты:
+   - `NEXT_PUBLIC_SUPABASE_URL` - URL вашего Supabase проекта
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Анонимный ключ Supabase
+
+Получить эти значения можно в [настройках API](https://supabase.com/dashboard/project/YOUR_PROJECT/settings/api) вашего проекта Supabase.
+
 ### 3. Запуск в режиме разработки
 
 ```bash
@@ -56,18 +65,22 @@ npm run dev
 
 ### Автоматический деплой (рекомендуется)
 
-1. **Включите GitHub Pages** в настройках репозитория:
+1. **Настройте секреты в GitHub**:
+   - Перейдите в Settings → Secrets and variables → Actions
+   - Добавьте секреты `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+2. **Включите GitHub Pages** в настройках репозитория:
    - Перейдите в Settings → Pages
    - Выберите "GitHub Actions" как источник
 
-2. **Push изменений** в ветку `master`:
+3. **Push изменений** в ветку `master`:
    ```bash
    git add .
    git commit -m "Add GitHub Pages deployment"
    git push origin master
    ```
 
-3. **Дождитесь завершения** GitHub Actions workflow
+4. **Дождитесь завершения** GitHub Actions workflow
 
 Ваше приложение будет доступно по адресу: `https://igorao79.github.io/pozvonimne`
 
