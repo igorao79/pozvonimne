@@ -86,3 +86,4 @@ SELECT 'Функции проверки display_name созданы успешн
 -- В JavaScript/TypeScript:
 -- const { data: isAvailable } = await supabase.rpc('is_display_name_available', { check_display_name: 'myname' });
 -- const { data: uniqueName } = await supabase.rpc('generate_unique_display_name', { base_name: 'myname' });
+

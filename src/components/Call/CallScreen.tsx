@@ -7,6 +7,7 @@ import useConnectionHandler from '@/hooks/useConnectionHandler'
 import { createClient } from '@/utils/supabase/client'
 import CallControls from './CallControls'
 import AudioDiagnostics from './AudioDiagnostics'
+import ConnectionStatus from './ConnectionStatus'
 
 const CallScreen = () => {
   const localAudioRef = useRef<HTMLAudioElement>(null)
@@ -448,6 +449,9 @@ const CallScreen = () => {
       {showDiagnostics && (
         <AudioDiagnostics onClose={() => setShowDiagnostics(false)} />
       )}
+
+      {/* Connection Status */}
+      <ConnectionStatus />
     </div>
   )
 }
