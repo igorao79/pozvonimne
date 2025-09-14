@@ -32,30 +32,98 @@ const UsersList = () => {
     setError(null)
 
     try {
-      // Send call signal to the target user
+      console.log('🔄 Starting call to user:', targetUserId)
+      
+      // Send call signal to the target user with retry logic
       const callChannel = supabase.channel(`calls:${targetUserId}`)
       
-      // Subscribe to channel first
-      await callChannel.subscribe()
-      
-      // Wait a bit for subscription to be ready
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      await callChannel.send({
-        type: 'broadcast',
-        event: 'incoming_call',
-        payload: {
-          caller_id: userId,
-          caller_name: displayName || targetUsername
-        }
+      // Subscribe to channel with error handling
+      const subscriptionStatus = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Subscription timeout'))
+        }, 10000) // 10 second timeout
+
+        callChannel
+          .subscribe((status) => {
+            clearTimeout(timeout)
+            console.log('📡 Call channel subscription status:', status)
+            
+            if (status === 'SUBSCRIBED') {
+              resolve(status)
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              reject(new Error(`Subscription failed: ${status}`))
+            }
+          })
       })
 
-      console.log('Call signal sent to user:', targetUserId)
+      console.log('✅ Call channel subscribed:', subscriptionStatus)
+      
+      // Wait a bit more for subscription to be fully ready
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Send call signal with retry logic
+      let callSent = false
+      let attempts = 0
+      const maxAttempts = 3
+
+      while (!callSent && attempts < maxAttempts) {
+        attempts++
+        console.log(`📞 Attempting to send call signal (attempt ${attempts}/${maxAttempts})`)
+        
+        try {
+          const result = await callChannel.send({
+            type: 'broadcast',
+            event: 'incoming_call',
+            payload: {
+              caller_id: userId,
+              caller_name: displayName || targetUsername,
+              timestamp: Date.now()
+            }
+          })
+
+          console.log('📞 Call signal send result:', result)
+          
+          if (result === 'ok') {
+            callSent = true
+            console.log('✅ Call signal sent successfully to user:', targetUserId)
+          } else {
+            throw new Error(`Send failed with result: ${result}`)
+          }
+        } catch (sendErr) {
+          console.warn(`❌ Call signal send attempt ${attempts} failed:`, sendErr)
+          
+          if (attempts < maxAttempts) {
+            console.log('🔄 Retrying call signal in 1 second...')
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          }
+        }
+      }
+
+      if (!callSent) {
+        throw new Error('Failed to send call signal after all attempts')
+      }
+
+      // Start the call locally
       startCall(targetUserId)
       
+      // Clean up channel after successful call
+      setTimeout(() => {
+        callChannel.unsubscribe()
+      }, 1000)
+      
     } catch (err) {
-      setError('Ошибка при совершении звонка')
-      console.error('Call error:', err)
+      console.error('❌ Call error:', err)
+      
+      let errorMessage = 'Ошибка при совершении звонка'
+      if (err instanceof Error) {
+        if (err.message.includes('Subscription timeout') || err.message.includes('TIMED_OUT')) {
+          errorMessage = 'Проблема с соединением. Проверьте интернет.'
+        } else if (err.message.includes('Failed to send call signal')) {
+          errorMessage = 'Не удалось связаться с пользователем. Попробуйте позже.'
+        }
+      }
+      
+      setError(errorMessage)
     } finally {
       setCallingUserId(null)
       setIsLoading(false)

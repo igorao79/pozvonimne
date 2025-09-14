@@ -12,6 +12,7 @@ import ConnectionStatus from './ConnectionStatus'
 const CallScreen = () => {
   const localAudioRef = useRef<HTMLAudioElement>(null)
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
+  const screenVideoRef = useRef<HTMLVideoElement>(null)
   const [remoteMicMuted, setRemoteMicMuted] = useState(false)
   const [remoteUserName, setRemoteUserName] = useState('')
   const [remoteUserAvatar, setRemoteUserAvatar] = useState('')
@@ -23,7 +24,10 @@ const CallScreen = () => {
     targetUserId,
     isCallActive,
     isMicMuted,
-    userId
+    userId,
+    isScreenSharing,
+    screenStream,
+    remoteScreenStream
   } = useCallStore()
 
   // Use audio analyzer for speaking detection
@@ -46,6 +50,66 @@ const CallScreen = () => {
       localAudioRef.current.srcObject = localStream
     }
   }, [localStream])
+
+  useEffect(() => {
+    console.log('📺 Screen stream useEffect triggered:', {
+      hasVideoRef: !!screenVideoRef.current,
+      hasScreenStream: !!screenStream,
+      hasRemoteScreenStream: !!remoteScreenStream,
+      isScreenSharing,
+      screenStreamId: screenStream?.id,
+      remoteScreenStreamId: remoteScreenStream?.id
+    })
+
+    // Приоритет: сначала показываем remote screen sharing (от собеседника), затем локальный
+    const streamToShow = remoteScreenStream || screenStream
+
+    if (screenVideoRef.current) {
+      if (streamToShow) {
+        // Проверяем что в stream есть активные video треки
+        const videoTracks = streamToShow.getVideoTracks()
+        const activeTracks = videoTracks.filter(track => 
+          track.readyState === 'live' && track.enabled
+        )
+
+        console.log('📺 Setting screen stream to video element:', {
+          streamId: streamToShow.id,
+          totalVideoTracks: videoTracks.length,
+          activeTracks: activeTracks.length,
+          isRemote: !!remoteScreenStream
+        })
+
+        if (activeTracks.length > 0) {
+          // Создаем новый stream только с активными треками
+          const activeStream = new MediaStream(activeTracks)
+          screenVideoRef.current.srcObject = activeStream
+
+          // Запускаем воспроизведение
+          const playPromise = screenVideoRef.current.play()
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                console.log('📺 Screen video playback started successfully')
+              })
+              .catch((error) => {
+                console.error('📺 Screen video playback failed:', error)
+              })
+          }
+        } else {
+          console.log('📺 No active video tracks, clearing screen video')
+          screenVideoRef.current.srcObject = null
+        }
+      } else {
+        console.log('📺 Clearing screen video srcObject - no stream available')
+        screenVideoRef.current.srcObject = null
+        
+        // Принудительно приостанавливаем видео элемент
+        if (!screenVideoRef.current.paused) {
+          screenVideoRef.current.pause()
+        }
+      }
+    }
+  }, [screenStream, remoteScreenStream, isScreenSharing])
 
   useEffect(() => {
     if (remoteAudioRef.current && remoteStream) {
@@ -293,11 +357,55 @@ const CallScreen = () => {
         onEnded={() => console.log('Remote audio ended')}
       />
 
+      {/* Screen sharing video element */}
+      <video
+        ref={screenVideoRef}
+        autoPlay
+        playsInline
+        controls={false}
+        muted={false}
+        style={{
+          display: (() => {
+            // Показываем только если есть активные video треки
+            const hasActiveScreenStream = screenStream?.getVideoTracks().some(track => 
+              track.readyState === 'live' && track.enabled
+            )
+            const hasActiveRemoteScreenStream = remoteScreenStream?.getVideoTracks().some(track => 
+              track.readyState === 'live' && track.enabled
+            )
+            return (hasActiveScreenStream || hasActiveRemoteScreenStream) ? 'block' : 'none'
+          })(),
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          width: '400px',
+          height: '250px',
+          border: '2px solid #10b981',
+          borderRadius: '8px',
+          zIndex: 1000,
+          backgroundColor: '#000',
+          objectFit: 'contain' // Добавляем правильное масштабирование
+        }}
+        onLoadedData={() => console.log('📺 Screen video loaded data')}
+        onPlay={() => console.log('📺 Screen video started playing')}
+        onPause={() => console.log('📺 Screen video paused')}
+        onError={(e) => console.error('📺 Screen video error:', e)}
+        onEmptied={() => console.log('📺 Screen video emptied')}
+        onEnded={() => {
+          console.log('📺 Screen video ended')
+          // При завершении видео скрываем элемент
+        }}
+        onLoadStart={() => console.log('📺 Screen video load start')}
+        onCanPlay={() => console.log('📺 Screen video can play')}
+      />
+
       {/* Audio Call Interface */}
       <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full text-center">
           {/* Avatar with speaking animation */}
-          <div className="relative mb-8">
+          <div className={`relative mb-8 transition-all duration-500 ${
+            isScreenSharing ? 'transform scale-75 translate-y-8 opacity-60' : ''
+          }`}>
             <div className={`w-40 h-40 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full mx-auto flex items-center justify-center shadow-2xl transition-all duration-200 overflow-hidden ${
               isRemoteSpeaking ? 'ring-4 ring-green-400 ring-opacity-75 animate-pulse' : ''
             }`}>
@@ -349,11 +457,25 @@ const CallScreen = () => {
             </p>
             
             {/* Call Status */}
-            <div className="flex items-center justify-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${isCallActive ? 'bg-green-400' : 'bg-yellow-400'} animate-pulse`}></div>
-              <span className="text-blue-100">
-                {isCallActive ? 'Активный звонок' : 'Соединение...'}
-              </span>
+            <div className="flex flex-col items-center space-y-2">
+              <div className="flex items-center justify-center space-x-2">
+                <div className={`w-3 h-3 rounded-full ${isCallActive ? 'bg-green-400' : 'bg-yellow-400'} animate-pulse`}></div>
+                <span className="text-blue-100">
+                  {isCallActive ? 'Активный звонок' : 'Соединение...'}
+                </span>
+              </div>
+
+              {/* Screen Sharing Status */}
+              {(isScreenSharing || remoteScreenStream) && (
+                <div className="flex items-center justify-center space-x-2 bg-green-500 bg-opacity-20 rounded-full px-3 py-1">
+                  <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-green-200 text-sm">
+                    {remoteScreenStream ? 'Собеседник делится экраном' : 'Демонстрация экрана'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

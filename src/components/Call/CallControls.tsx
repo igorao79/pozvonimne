@@ -2,6 +2,7 @@
 
 import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
+import useScreenShare from '@/hooks/useScreenShare'
 
 const CallControls = () => {
   const {
@@ -12,7 +13,9 @@ const CallControls = () => {
     toggleMic,
     endCall
   } = useCallStore()
-  
+
+  const { isScreenSharing, toggleScreenShare } = useScreenShare()
+
   const supabase = createClient()
 
   const handleEndCall = async () => {
@@ -74,12 +77,20 @@ const CallControls = () => {
         </svg>
       </button>
 
-      {/* Placeholder for future features */}
-      <div className="w-14 h-14 rounded-full bg-gray-600 bg-opacity-50 flex items-center justify-center">
-        <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+      {/* Screen Share Button */}
+      <button
+        onClick={toggleScreenShare}
+        className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors duration-200 ${
+          isScreenSharing
+            ? 'bg-green-500 hover:bg-green-600'
+            : 'bg-gray-600 hover:bg-gray-700'
+        }`}
+        title={isScreenSharing ? 'Остановить демонстрацию экрана' : 'Поделиться экраном'}
+      >
+        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
-      </div>
+      </button>
     </div>
   )
 }

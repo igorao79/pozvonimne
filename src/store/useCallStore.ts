@@ -21,6 +21,11 @@ interface CallState {
   localStream: MediaStream | null
   remoteStream: MediaStream | null
   peer: SimplePeer.Instance | null
+
+  // Screen sharing state
+  isScreenSharing: boolean
+  screenStream: MediaStream | null
+  remoteScreenStream: MediaStream | null
   
   // UI state
   targetUserId: string
@@ -45,6 +50,13 @@ interface CallActions {
   setLocalStream: (stream: MediaStream | null) => void
   setRemoteStream: (stream: MediaStream | null) => void
   setPeer: (peer: SimplePeer.Instance | null) => void
+
+  // Screen sharing actions
+  toggleScreenShare: () => void
+  setScreenStream: (stream: MediaStream | null) => void
+  setRemoteScreenStream: (stream: MediaStream | null) => void
+  startScreenShare: () => void
+  stopScreenShare: () => void
   
   // UI actions
   setTargetUserId: (userId: string) => void
@@ -81,6 +93,10 @@ const useCallStore = create<CallStore>((set, get) => ({
   localStream: null,
   remoteStream: null,
   peer: null,
+
+  isScreenSharing: false,
+  screenStream: null,
+  remoteScreenStream: null,
   
   targetUserId: '',
   error: null,
@@ -140,7 +156,82 @@ const useCallStore = create<CallStore>((set, get) => ({
   setLocalStream: (stream) => set({ localStream: stream }),
   setRemoteStream: (stream) => set({ remoteStream: stream }),
   setPeer: (peer) => set({ peer }),
-  
+
+  setScreenStream: (stream) => {
+    console.log('🏪 setScreenStream called:', {
+      hasStream: !!stream,
+      streamId: stream?.id,
+      videoTracks: stream?.getVideoTracks().length
+    })
+    set({ screenStream: stream })
+  },
+
+  setRemoteScreenStream: (stream) => {
+    console.log('🏪 setRemoteScreenStream called:', {
+      hasStream: !!stream,
+      streamId: stream?.id,
+      videoTracks: stream?.getVideoTracks().length
+    })
+    set({ remoteScreenStream: stream })
+  },
+
+  startScreenShare: () => {
+    console.log('🏪 startScreenShare called')
+    set({ isScreenSharing: true })
+  },
+
+  toggleScreenShare: () => {
+    const { isScreenSharing, screenStream } = get()
+
+    console.log('🏪 toggleScreenShare called:', {
+      currentState: isScreenSharing,
+      hasScreenStream: !!screenStream
+    })
+
+    if (isScreenSharing) {
+      // Останавливаем демонстрацию экрана
+      console.log('🏪 Stopping screen share in store')
+      if (screenStream) {
+        screenStream.getTracks().forEach(track => {
+          try {
+            track.stop()
+          } catch (err) {
+            console.log('Screen track already stopped:', err)
+          }
+        })
+      }
+      set({
+        isScreenSharing: false,
+        screenStream: null
+      })
+      console.log('🏪 Screen share stopped in store')
+    } else {
+      // Начинаем демонстрацию экрана - логика будет в компоненте
+      console.log('🏪 Starting screen share in store')
+      set({ isScreenSharing: true })
+      console.log('🏪 Screen share started in store')
+    }
+  },
+
+  stopScreenShare: () => {
+    const { screenStream } = get()
+
+    if (screenStream) {
+      screenStream.getTracks().forEach(track => {
+        try {
+          track.stop()
+        } catch (err) {
+          console.log('Screen track already stopped:', err)
+        }
+      })
+    }
+
+    set({
+      isScreenSharing: false,
+      screenStream: null
+    })
+  },
+
   // UI actions
   setTargetUserId: (userId) => set({ targetUserId: userId }),
   setError: (error) => set({ error }),
@@ -231,7 +322,7 @@ const useCallStore = create<CallStore>((set, get) => ({
   },
   
   endCall: () => {
-    const { peer, localStream } = get()
+    const { peer, localStream, screenStream } = get()
 
     console.log('🔚 EndCall: Starting cleanup process')
 
@@ -257,6 +348,21 @@ const useCallStore = create<CallStore>((set, get) => ({
       })
     }
 
+    // Stop screen sharing
+    if (screenStream) {
+      console.log('🔚 EndCall: Stopping screen sharing tracks')
+      screenStream.getTracks().forEach(track => {
+        try {
+          track.stop()
+        } catch (err) {
+          console.log('🔚 EndCall: Screen track already stopped:', err)
+        }
+      })
+    }
+
+    // Очищаем буфер сигналов в useWebRTC hook
+    // Это нужно сделать через callback или напрямую в hook
+
     console.log('🔚 EndCall: Resetting all call state')
     set({
       isInCall: false,
@@ -269,6 +375,9 @@ const useCallStore = create<CallStore>((set, get) => ({
       localStream: null,
       remoteStream: null,
       isMicMuted: false,
+      isScreenSharing: false,
+      screenStream: null,
+      remoteScreenStream: null,
       targetUserId: '', // ВАЖНО: очищаем targetUserId
       error: null
     })
@@ -278,16 +387,20 @@ const useCallStore = create<CallStore>((set, get) => ({
   
   // Reset functions
   resetCallState: () => {
-    const { peer, localStream } = get()
-    
+    const { peer, localStream, screenStream } = get()
+
     if (peer) {
       peer.destroy()
     }
-    
+
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop())
     }
-    
+
+    if (screenStream) {
+      screenStream.getTracks().forEach(track => track.stop())
+    }
+
     set({
       isInCall: false,
       isCallActive: false,
@@ -299,6 +412,9 @@ const useCallStore = create<CallStore>((set, get) => ({
       localStream: null,
       remoteStream: null,
       peer: null,
+      isScreenSharing: false,
+      screenStream: null,
+      remoteScreenStream: null,
       targetUserId: '',
       error: null
     })

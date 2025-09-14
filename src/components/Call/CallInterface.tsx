@@ -29,32 +29,56 @@ const CallInterface = () => {
   useEffect(() => {
     if (!userId) return
 
-    // Subscribe to incoming calls
+    console.log('📞 Setting up call listener for user:', userId)
+
+    // Subscribe to incoming calls with improved error handling
     const callChannel = supabase
       .channel(`calls:${userId}`)
       .on('broadcast', { event: 'incoming_call' }, (payload) => {
-        console.log('Received incoming call:', payload)
-        const { caller_id, caller_name } = payload.payload
+        console.log('📞 Received incoming call:', payload)
+        const { caller_id, caller_name, timestamp } = payload.payload
+        
+        // Check if this is a recent call (not older than 30 seconds)
+        if (timestamp && Date.now() - timestamp > 30000) {
+          console.log('📞 Ignoring old call signal')
+          return
+        }
+        
+        console.log('📞 Processing incoming call from:', caller_id, 'name:', caller_name)
         setIsReceivingCall(true, caller_id, caller_name)
       })
       .on('broadcast', { event: 'call_accepted' }, (payload) => {
-        console.log('Call was accepted:', payload)
+        console.log('📞 Call was accepted:', payload)
         const { accepter_id } = payload.payload
         // Caller gets notification that call was accepted
         setIsReceivingCall(false)
         setIsCallActive(true)
       })
-      .on('broadcast', { event: 'call_rejected' }, () => {
+      .on('broadcast', { event: 'call_rejected' }, (payload) => {
+        console.log('📞 Call was rejected:', payload)
         setError('Звонок отклонен')
         endCall()
       })
       .on('broadcast', { event: 'call_ended' }, (payload) => {
-        console.log('Call ended by other user:', payload)
+        console.log('📞 Call ended by other user:', payload)
         endCall()
       })
-      .subscribe()
+      .subscribe((status) => {
+        console.log('📞 Call channel subscription status:', status)
+        
+        if (status === 'CHANNEL_ERROR') {
+          console.error('📞 Call channel subscription error')
+          setError('Проблема с соединением для входящих звонков')
+        } else if (status === 'TIMED_OUT') {
+          console.error('📞 Call channel subscription timeout')
+          setError('Таймаут подключения для входящих звонков')
+        } else if (status === 'SUBSCRIBED') {
+          console.log('📞 Successfully subscribed to call channel')
+        }
+      })
 
     return () => {
+      console.log('📞 Cleaning up call listener for user:', userId)
       supabase.removeChannel(callChannel)
     }
   }, [userId, supabase, setIsReceivingCall, endCall, setIsCallActive, setError])

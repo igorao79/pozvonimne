@@ -26,19 +26,47 @@ const IncomingCall = () => {
         isCallActive: useCallStore.getState().isCallActive
       })
       
-      // Send accept signal back to caller
+      // Send accept signal back to caller with proper subscription handling
       if (callerId) {
+        console.log('🎯 IncomingCall: Setting up caller channel...')
         const callerChannel = supabase.channel(`calls:${callerId}`)
-        await callerChannel.subscribe()
         
-        await callerChannel.send({
+        // Wait for subscription to be ready
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Call accept subscription timeout'))
+          }, 5000)
+
+          callerChannel.subscribe((status) => {
+            clearTimeout(timeout)
+            console.log('🎯 IncomingCall: Caller channel subscription status:', status)
+            
+            if (status === 'SUBSCRIBED') {
+              resolve(status)
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              reject(new Error(`Call accept subscription failed: ${status}`))
+            }
+          })
+        })
+        
+        // Wait a bit for subscription to be fully ready
+        await new Promise(resolve => setTimeout(resolve, 200))
+        
+        const result = await callerChannel.send({
           type: 'broadcast',
           event: 'call_accepted',
           payload: {
-            accepter_id: userId
+            accepter_id: userId,
+            timestamp: Date.now()
           }
         })
-        console.log('🎯 IncomingCall: Call accept signal sent to:', callerId)
+        
+        console.log('🎯 IncomingCall: Call accept signal sent to:', callerId, 'Result:', result)
+        
+        // Clean up channel
+        setTimeout(() => {
+          callerChannel.unsubscribe()
+        }, 1000)
       }
       
       console.log('🎯 IncomingCall: Calling acceptCall() function...')
@@ -52,27 +80,59 @@ const IncomingCall = () => {
         targetUserId: useCallStore.getState().targetUserId
       })
     } catch (err) {
-      console.error('Error accepting call:', err)
+      console.error('🎯 IncomingCall: Error accepting call:', err)
+      // Still try to accept the call locally even if signaling fails
+      acceptCall()
     }
   }
 
   const handleReject = async () => {
     try {
+      console.log('🎯 IncomingCall: Rejecting call from:', callerId)
+      
       // Send reject signal back to caller
       if (callerId) {
         const callerChannel = supabase.channel(`calls:${callerId}`)
-        await callerChannel.send({
+        
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Call reject subscription timeout'))
+          }, 3000)
+
+          callerChannel.subscribe((status) => {
+            clearTimeout(timeout)
+            console.log('🎯 IncomingCall: Reject channel subscription status:', status)
+            
+            if (status === 'SUBSCRIBED') {
+              resolve(status)
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              reject(new Error(`Call reject subscription failed: ${status}`))
+            }
+          })
+        })
+        
+        const result = await callerChannel.send({
           type: 'broadcast',
           event: 'call_rejected',
           payload: {
-            rejector_id: userId
+            rejector_id: userId,
+            timestamp: Date.now()
           }
         })
+        
+        console.log('🎯 IncomingCall: Call reject signal sent:', result)
+        
+        // Clean up channel
+        setTimeout(() => {
+          callerChannel.unsubscribe()
+        }, 500)
       }
       
       rejectCall()
     } catch (err) {
-      console.error('Error rejecting call:', err)
+      console.error('🎯 IncomingCall: Error rejecting call:', err)
+      // Still reject locally even if signaling fails
+      rejectCall()
     }
   }
 
