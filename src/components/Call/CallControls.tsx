@@ -11,7 +11,8 @@ const CallControls = () => {
     targetUserId,
     userId,
     toggleMic,
-    endCall
+    endCall,
+    remoteScreenStream
   } = useCallStore()
 
   const { isScreenSharing, toggleScreenShare } = useScreenShare()
@@ -81,12 +82,21 @@ const CallControls = () => {
       {/* Screen Share Button */}
       <button
         onClick={toggleScreenShare}
+        disabled={!!remoteScreenStream && !isScreenSharing}
         className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors duration-200 ${
-          isScreenSharing
+          !!remoteScreenStream && !isScreenSharing
+            ? 'bg-gray-400 cursor-not-allowed opacity-50'
+            : isScreenSharing
             ? 'bg-green-500 hover:bg-green-600'
             : 'bg-gray-600 hover:bg-gray-700'
         }`}
-        title={isScreenSharing ? 'Остановить демонстрацию экрана' : 'Поделиться экраном'}
+        title={
+          !!remoteScreenStream && !isScreenSharing
+            ? 'Другой участник уже демонстрирует экран'
+            : isScreenSharing
+            ? 'Остановить демонстрацию экрана'
+            : 'Поделиться экраном'
+        }
       >
         <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />

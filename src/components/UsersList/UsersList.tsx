@@ -15,6 +15,40 @@ const UsersList = () => {
   const { users, loading, error, refreshUsers } = useUsers()
   const [callingUserId, setCallingUserId] = useState<string | null>(null)
   const [selectedUserProfile, setSelectedUserProfile] = useState<string | null>(null)
+
+  // Функция для форматирования статуса последнего входа
+  const formatLastSeen = (lastSignInAt: string | null, status?: string) => {
+    console.log('🔍 formatLastSeen:', { lastSignInAt, status })
+
+    if (!lastSignInAt) return 'Неизвестно'
+
+    const lastSignIn = new Date(lastSignInAt)
+    const now = new Date()
+    const diffInMinutes = Math.floor((now.getTime() - lastSignIn.getTime()) / (1000 * 60))
+
+    console.log('⏰ Время:', { lastSignIn, now, diffInMinutes, status })
+
+    // Онлайн: активность в последние 5 минут (независимо от статуса в БД)
+    if (diffInMinutes <= 5) {
+      console.log('✅ Онлайн! (активность в последние 5 минут)')
+      return 'онлайн'
+    }
+
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const lastSignInDate = new Date(lastSignIn.getFullYear(), lastSignIn.getMonth(), lastSignIn.getDate())
+
+    if (lastSignInDate.getTime() === today.getTime()) {
+      // Сегодня - показываем время
+      const timeString = lastSignIn.toLocaleTimeString('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+      return `сегодня, ${timeString}`
+    } else {
+      // Не сегодня - показываем дату
+      return lastSignIn.toLocaleDateString('ru-RU')
+    }
+  }
   
   const {
     userId,
@@ -272,13 +306,16 @@ const UsersList = () => {
     )
   }
 
+  // Показываем всех пользователей, включая текущего для диагностики
+  const allUsers = users
+  const currentUser = users.find(user => user.id === userId)
   const otherUsers = users.filter(user => user.id !== userId)
 
   return (
     <div>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-900">
-            Пользователи приложения
+            Пользователи приложения ({allUsers.length})
           </h2>
           <button
             onClick={refreshUsers}
@@ -291,18 +328,65 @@ const UsersList = () => {
           </button>
         </div>
 
-      {otherUsers.length === 0 ? (
+      {allUsers.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           <svg className="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
-          <p>Нет других пользователей</p>
+          <p>Загрузка пользователей...</p>
           <p className="text-sm text-gray-400 mt-1">
-            Зарегистрируйтесь для появления в списке
+            Если список пустой - зарегистрируйте новых пользователей
+          </p>
+          <p className="text-xs text-red-400 mt-2">
+            ⚠️ Решение: выполните ТОЛЬКО supabase_updates.sql в SQL Editor Supabase
+          </p>
+          <p className="text-xs text-orange-400 mt-1">
+            ❌ НЕ выполняйте supabase_setup.sql - он удалит все данные!
+          </p>
+          <p className="text-xs text-blue-600 mt-1">
+            📋 supabase_updates.sql содержит: колонки status/last_seen, функцию set_user_offline, исправленную get_users_with_profiles
           </p>
         </div>
       ) : (
         <div className="space-y-2 max-h-60 overflow-y-auto">
+          {/* Текущий пользователь */}
+          {currentUser && (
+            <div
+              className="flex items-center justify-between p-3 bg-blue-50 border-2 border-blue-200 rounded-lg"
+            >
+              <div className="flex items-center space-x-3 flex-1">
+                <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
+                  {currentUser.avatar_url ? (
+                    <img
+                      src={currentUser.avatar_url}
+                      alt={currentUser.display_name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                      <span className="text-white font-medium text-sm">
+                        {currentUser.display_name?.charAt(0)?.toUpperCase() || currentUser.username?.charAt(0)?.toUpperCase() || '?'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-blue-900 truncate">
+                    {currentUser.display_name || currentUser.username} <span className="text-sm font-normal">(Вы)</span>
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    ● онлайн
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-sm text-blue-600 font-medium">
+                Это вы
+              </div>
+            </div>
+          )}
+
           {otherUsers.map((user) => (
             <div
               key={user.id}
@@ -333,9 +417,15 @@ const UsersList = () => {
                     <p className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors truncate">
                       {user.display_name || user.username}
                     </p>
-                    {user.last_sign_in_at && (
-                      <p className="text-xs text-green-600">
-                        ● Был в сети: {new Date(user.last_sign_in_at).toLocaleDateString('ru-RU')}
+                    {user.last_seen && (
+                      <p className={`text-xs ${
+                        formatLastSeen(user.last_seen, user.status) === 'онлайн'
+                          ? 'text-green-500 font-medium'
+                          : 'text-gray-500'
+                      }`}>
+                        ● {formatLastSeen(user.last_seen, user.status) === 'онлайн'
+                          ? 'онлайн'
+                          : `Был в сети: ${formatLastSeen(user.last_seen, user.status)}`}
                       </p>
                     )}
                   </button>

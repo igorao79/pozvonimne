@@ -5,13 +5,13 @@ import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
 import useWebRTC from '@/hooks/useWebRTC'
 import { CallControls, IncomingCall, CallScreen, DialPad } from '.'
-import UsersList from '../UsersList/UsersList'
-import MicrophoneTest from '../MicrophoneTest/MicrophoneTest'
+import { ChatApp } from '../Chat'
 
 const CallInterface = () => {
   const {
     userId,
     isInCall,
+    isCalling,
     isReceivingCall,
     isCallActive,
     remoteStream,
@@ -149,33 +149,28 @@ const CallInterface = () => {
     return <CallScreen />
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-gray-900 mb-2">
-            Позвони.мне
-          </h1>
-          <p className="text-sm text-gray-500">
-            Звоните друг другу по никнеймам
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column */}
-          <div className="space-y-6">
-            <MicrophoneTest />
-            <DialPad />
-          </div>
-
-          {/* Right Column */}
-          <div>
-            <UsersList />
+  // Показываем лоадер, когда звонок отправлен, но еще не принят
+  if (isInCall && isCalling && !isCallActive) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Звонок отправлен</h3>
+            <p className="text-gray-600 mb-4">Ожидание принятия звонка...</p>
+            <button
+              onClick={endCall}
+              className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Отменить звонок
+            </button>
           </div>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  return <ChatApp />
 }
 
 export default CallInterface

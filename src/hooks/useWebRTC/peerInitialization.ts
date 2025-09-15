@@ -119,8 +119,66 @@ export const initializePeer = async (
 
     // Обработчик получения данных через data channel
     peer.on('data', (data) => {
-      handleKeepAliveMessage(data.toString(), peerRefs, userId)
+      const message = data.toString()
+
+      // Проверяем, является ли сообщение сигналом о прекращении демонстрации экрана
+      try {
+        const parsedMessage = JSON.parse(message)
+        if (parsedMessage.type === 'screen_share_stopped') {
+          console.log('📺 Received explicit screen share stop signal:', parsedMessage)
+          setRemoteScreenStream(null)
+          return
+        }
+      } catch (e) {
+        // Не JSON сообщение, обрабатываем как keep-alive
+      }
+
+      handleKeepAliveMessage(message, peerRefs, userId)
     })
+
+    // Функция для очистки screen stream при отсутствии video треков
+    const clearScreenStreamIfNoVideoTracks = () => {
+      const pc = (peer as any)._pc
+      if (pc && typeof pc.getReceivers === 'function') {
+        const receivers = pc.getReceivers()
+        const videoReceivers = receivers.filter((receiver: any) =>
+          receiver.track && receiver.track.kind === 'video' && receiver.track.readyState === 'live'
+        )
+
+        if (videoReceivers.length === 0) {
+          console.log('📺 No active video receivers found, clearing remote screen stream')
+          setRemoteScreenStream(null)
+        }
+      }
+    }
+
+    // Добавляем обработчик для отслеживания изменений в RTCPeerConnection
+    const pc = (peer as any)._pc
+    if (pc) {
+      // Отслеживаем изменения в remote description
+      const originalSetRemoteDescription = pc.setRemoteDescription
+      pc.setRemoteDescription = async (description: any) => {
+        const result = await originalSetRemoteDescription.call(pc, description)
+
+        // Проверяем, есть ли video треки в новом SDP
+        const hasVideoTracks = description.sdp?.includes('m=video') &&
+                              !description.sdp?.includes('m=video 0') // Проверяем что video не отключен
+
+        console.log('📺 SDP analysis after setRemoteDescription:', {
+          type: description.type,
+          hasVideoInSDP: hasVideoTracks,
+          sdpVideoLines: (description.sdp?.match(/m=video/g) || []).length
+        })
+
+        // Если в новом SDP нет video треков, очищаем screen stream
+        if (!hasVideoTracks) {
+          console.log('📺 No video tracks in new SDP, clearing remote screen stream')
+          setRemoteScreenStream(null)
+        }
+
+        return result
+      }
+    }
 
     // Обработчик получения remote stream
     peer.on('stream', (remoteStream) => {
@@ -171,9 +229,22 @@ export const initializePeer = async (
 
         // ВАЖНО: Добавляем обработчики событий для правильной работы screen sharing
         track.onended = () => {
-          console.log(`📺 Remote video track ${index} ended - cleaning up screen stream`)
-          // Очищаем remote screen stream когда track заканчивается
-          setRemoteScreenStream(null)
+          console.log(`📺 Remote video track ${index} ended - checking remaining tracks`)
+          
+          // Проверяем есть ли еще активные video треки в текущем stream
+          const currentRemoteScreenStream = useCallStore.getState().remoteScreenStream
+          if (currentRemoteScreenStream) {
+            const remainingActiveTracks = currentRemoteScreenStream.getVideoTracks().filter(t => 
+              t.readyState === 'live' && t.enabled && t.id !== track.id
+            )
+            
+            if (remainingActiveTracks.length === 0) {
+              console.log(`📺 No more active video tracks, clearing remote screen stream`)
+              setRemoteScreenStream(null)
+            } else {
+              console.log(`📺 ${remainingActiveTracks.length} active tracks remaining, keeping stream`)
+            }
+          }
         }
         
         track.onmute = () => {
@@ -189,8 +260,22 @@ export const initializePeer = async (
         track.addEventListener('readystatechange', () => {
           console.log(`📺 Remote video track ${index} ready state changed:`, track.readyState)
           if (track.readyState === 'ended') {
-            console.log(`📺 Remote video track ${index} ended via readyState - cleaning up`)
-            setRemoteScreenStream(null)
+            console.log(`📺 Remote video track ${index} ended via readyState - checking remaining tracks`)
+            
+            // Проверяем есть ли еще активные video треки
+            const currentRemoteScreenStream = useCallStore.getState().remoteScreenStream
+            if (currentRemoteScreenStream) {
+              const remainingActiveTracks = currentRemoteScreenStream.getVideoTracks().filter(t => 
+                t.readyState === 'live' && t.enabled && t.id !== track.id
+              )
+              
+              if (remainingActiveTracks.length === 0) {
+                console.log(`📺 No more active video tracks via readyState, clearing remote screen stream`)
+                setRemoteScreenStream(null)
+              } else {
+                console.log(`📺 ${remainingActiveTracks.length} active tracks remaining via readyState, keeping stream`)
+              }
+            }
           }
         })
       })
@@ -205,10 +290,10 @@ export const initializePeer = async (
       // Обрабатываем video tracks для screen sharing
       if (remoteVideoTracks.length > 0) {
         // Проверяем что треки активны
-        const activeTracks = remoteVideoTracks.filter(track => 
+        const activeTracks = remoteVideoTracks.filter(track =>
           track.readyState === 'live' && track.enabled
         )
-        
+
         if (activeTracks.length > 0) {
           const screenStream = new MediaStream(activeTracks)
           setRemoteScreenStream(screenStream)
@@ -224,6 +309,30 @@ export const initializePeer = async (
       } else {
         // Если нет video треков, очищаем screen stream
         console.log('📺 No video tracks in remote stream - clearing screen stream')
+        setRemoteScreenStream(null)
+      }
+
+      // Дополнительная проверка: если все video треки завершились или отключены, очищаем screen stream
+      const allVideoTracksInactive = remoteVideoTracks.every(track =>
+        track.readyState === 'ended' || !track.enabled
+      )
+
+      if (remoteVideoTracks.length > 0 && allVideoTracksInactive) {
+        console.log('📺 All remote video tracks ended/disabled, clearing screen stream')
+        setRemoteScreenStream(null)
+      }
+
+      // Также очищаем screen stream, если это явно указано в track labels (дополнительная проверка)
+      const hasScreenShareLabel = remoteVideoTracks.some(track =>
+        track.label && track.label.toLowerCase().includes('screen')
+      )
+
+      const activeTracks = remoteVideoTracks.filter(track =>
+        track.readyState === 'live' && track.enabled
+      )
+
+      if (remoteVideoTracks.length > 0 && !hasScreenShareLabel && activeTracks.length === 0) {
+        console.log('📺 No screen share tracks detected, clearing screen stream')
         setRemoteScreenStream(null)
       }
     })

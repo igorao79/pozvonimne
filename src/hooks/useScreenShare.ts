@@ -188,65 +188,101 @@ export const useScreenShare = () => {
     }
 
     try {
+      console.log('📺 Removing screen tracks from peer connection...')
+
+      // Для SimplePeer нужно использовать специальный подход
+      // Вместо прямого доступа к RTCPeerConnection, попробуем создать новый offer без видео
       const pc = (peer as any)._pc
-      if (!pc || typeof pc.getSenders !== 'function') {
-        console.warn('📺 RTCPeerConnection or getSenders not available')
-        return false
+
+      if (pc && typeof pc.createOffer === 'function') {
+        try {
+          console.log('📺 Creating new offer without video tracks...')
+
+          // Небольшая задержка для стабилизации
+          await new Promise(resolve => setTimeout(resolve, 100))
+
+          const offer = await pc.createOffer({
+            iceRestart: false,
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: false // Устанавливаем false для видео
+          })
+
+          console.log('📺 Created offer without video:', {
+            type: offer.type,
+            hasVideo: offer.sdp?.includes('m=video'),
+            hasAudio: offer.sdp?.includes('m=audio')
+          })
+
+          await pc.setLocalDescription(offer)
+          console.log('📺 Set local description for track removal')
+
+          // Отправляем сигнал через SimplePeer
+          if (typeof (peer as any).emit === 'function') {
+            console.log('📺 Sending track removal offer signal via SimplePeer')
+            ;(peer as any).emit('signal', offer)
+          }
+
+          return true
+        } catch (offerError) {
+          console.warn('📺 Failed to create offer for track removal:', offerError)
+        }
       }
 
-      console.log('📺 Removing screen tracks from peer connection...')
-      const senders = pc.getSenders()
-      let tracksRemoved = 0
-      
-      // Найдем и удалим все video треки, связанные с screen sharing
-      for (const sender of senders) {
-        if (sender.track && sender.track.kind === 'video') {
-          // Проверяем, принадлежит ли трек нашему screen stream
-          const belongsToScreenStream = screenStream.getTracks().some(track => track === sender.track)
-          
-          if (belongsToScreenStream) {
-            await pc.removeTrack(sender)
-            tracksRemoved++
-            console.log('📺 Removed screen track sender:', {
-              trackId: sender.track.id,
-              trackKind: sender.track.kind
-            })
+      // Fallback: попробуем старый метод с getSenders
+      if (pc && typeof pc.getSenders === 'function') {
+        console.log('📺 Using fallback method with getSenders...')
+        const senders = pc.getSenders()
+        let tracksRemoved = 0
+
+        // Найдем и удалим все video треки, связанные с screen sharing
+        for (const sender of senders) {
+          if (sender.track && sender.track.kind === 'video') {
+            // Проверяем, принадлежит ли трек нашему screen stream
+            const belongsToScreenStream = screenStream.getTracks().some(track => track === sender.track)
+
+            if (belongsToScreenStream) {
+              try {
+                pc.removeTrack(sender)
+                tracksRemoved++
+                console.log('📺 Removed screen track sender:', {
+                  trackId: sender.track.id,
+                  trackKind: sender.track.kind
+                })
+              } catch (removeError) {
+                console.warn('📺 Failed to remove track:', removeError)
+              }
+            }
           }
         }
-      }
-      
-      console.log('📺 Screen tracks removed from peer connection:', tracksRemoved)
-      
-      // Инициируем renegotiation если удалили треки
-      if (tracksRemoved > 0) {
-        console.log('📺 Creating offer after removing screen tracks...')
-        
-        // Небольшая задержка для стабилизации
-        await new Promise(resolve => setTimeout(resolve, 100))
-        
-        const offer = await pc.createOffer({
-          iceRestart: false,
-          offerToReceiveAudio: true,
-          offerToReceiveVideo: true // Оставляем true, на случай если есть другие video треки
-        })
 
-        console.log('📺 Created offer after removing screen tracks:', {
-          type: offer.type,
-          hasVideo: offer.sdp?.includes('m=video'),
-          hasAudio: offer.sdp?.includes('m=audio')
-        })
+        console.log('📺 Screen tracks removed from peer connection:', tracksRemoved)
 
-        await pc.setLocalDescription(offer)
-        console.log('📺 Set local description after track removal')
+        // Если удалили треки, попробуем создать новый offer
+        if (tracksRemoved > 0) {
+          try {
+            await new Promise(resolve => setTimeout(resolve, 100))
+            const offer = await pc.createOffer({
+              iceRestart: false,
+              offerToReceiveAudio: true,
+              offerToReceiveVideo: false
+            })
 
-        // Отправляем сигнал
-        if (typeof (peer as any).emit === 'function') {
-          console.log('📺 Sending track removal offer signal via SimplePeer')
-          ;(peer as any).emit('signal', offer)
+            await pc.setLocalDescription(offer)
+            console.log('📺 Created fallback offer after track removal')
+
+            if (typeof (peer as any).emit === 'function') {
+              ;(peer as any).emit('signal', offer)
+            }
+          } catch (fallbackError) {
+            console.warn('📺 Fallback offer creation failed:', fallbackError)
+          }
         }
+
+        return tracksRemoved > 0
       }
 
-      return true
+      console.warn('📺 No suitable method found for removing screen tracks')
+      return false
 
     } catch (err: any) {
       console.warn('📺 Error removing screen tracks from peer:', err)
@@ -259,9 +295,10 @@ export const useScreenShare = () => {
     console.log('📺 Stopping screen share...')
 
     // Сначала удаляем треки из peer connection
+    let tracksRemoved = false
     if (peer && !peer.destroyed && screenStream) {
       console.log('📺 Removing screen tracks from WebRTC peer...')
-      await removeVideoTrackFromPeer()
+      tracksRemoved = await removeVideoTrackFromPeer()
     }
 
     // Останавливаем все треки в local stream
@@ -272,9 +309,30 @@ export const useScreenShare = () => {
       })
     }
 
+    // Отправляем явный сигнал о прекращении демонстрации экрана
+    if (peer && !peer.destroyed && tracksRemoved) {
+      try {
+        console.log('📺 Sending explicit screen share stop signal...')
+
+        // Создаем специальный сигнал через data channel
+        if (typeof (peer as any).send === 'function') {
+          const stopSignal = {
+            type: 'screen_share_stopped',
+            timestamp: Date.now(),
+            userId
+          }
+          ;(peer as any).send(JSON.stringify(stopSignal))
+          console.log('📺 Explicit stop signal sent via data channel')
+        }
+      } catch (signalError) {
+        console.warn('📺 Failed to send explicit stop signal:', signalError)
+      }
+    }
+
     // Очищаем состояние
     stopScreenShare()
-  }, [peer, screenStream, stopScreenShare, removeVideoTrackFromPeer])
+    setScreenStream(null)
+  }, [peer, screenStream, stopScreenShare, removeVideoTrackFromPeer, setScreenStream, userId])
 
   // Переключить демонстрацию экрана
   const handleToggleScreenShare = useCallback(async () => {

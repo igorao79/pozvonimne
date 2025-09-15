@@ -260,24 +260,24 @@ const useCallStore = create<CallStore>((set, get) => ({
     }
     
     console.log('🚀 StartCall: Setting new call state')
-    set({ 
+    set({
       // Очищаем все предыдущее состояние
       peer: null,
       localStream: null,
       remoteStream: null,
-      isCallActive: false,
+      isCallActive: false, // Оставляем false, чтобы показать лоадер пока второй не примет
       isReceivingCall: false,
       callerId: null,
       callerName: null,
       isMicMuted: false,
       error: null,
       // Устанавливаем новое состояние
-      targetUserId, 
-      isCalling: true, 
+      targetUserId,
+      isCalling: true,
       isInCall: true
     })
-    
-    console.log('🚀 StartCall: New call initiated')
+
+    console.log('🚀 StartCall: New outgoing call initiated, waiting for acceptance...')
   },
   
   acceptCall: () => {
