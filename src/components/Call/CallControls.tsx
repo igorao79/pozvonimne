@@ -24,7 +24,8 @@ const CallControls = () => {
       if (targetUserId) {
         const otherUserChannel = supabase.channel(`calls:${targetUserId}`)
         await otherUserChannel.subscribe()
-        
+
+        // Моментальная отправка сигнала завершения
         await otherUserChannel.send({
           type: 'broadcast',
           event: 'call_ended',

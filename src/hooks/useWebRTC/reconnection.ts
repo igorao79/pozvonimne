@@ -30,7 +30,7 @@ export const attemptReconnection = (
   console.log(`🔄 [User ${userId?.slice(0, 8)}] Attempting reconnection ${currentAttempt}/${maxRetries}`)
   reconnectAttemptsRef.current = currentAttempt
 
-  // Небольшая задержка перед переподключением
+  // Быстрая задержка перед переподключением для ускорения повторных звонков
   reconnectTimeoutRef.current = setTimeout(() => {
     reconnectTimeoutRef.current = null
 
@@ -51,7 +51,7 @@ export const attemptReconnection = (
       const wasInitiator = useCallStore.getState().isCalling
       initializePeer(wasInitiator)
     }
-  }, 2000 * currentAttempt) // Увеличиваем задержку с каждой попыткой
+  }, 100 * currentAttempt) // Минимум для моментальной работы (0.1, 0.2, 0.3 сек)
 }
 
 // Функция для сброса счетчика переподключений

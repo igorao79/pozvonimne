@@ -53,9 +53,8 @@ const DialPad = () => {
       
       // Subscribe to channel first
       await callChannel.subscribe()
-      
-      // Wait a bit for subscription to be ready
-      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Моментальная отправка без задержек
       
       await callChannel.send({
         type: 'broadcast',

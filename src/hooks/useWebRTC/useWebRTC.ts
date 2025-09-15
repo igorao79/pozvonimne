@@ -19,6 +19,9 @@ const useWebRTC = (): WebRTCHooks => {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastKeepAliveRef = useRef<number>(0)
   const reconnectAttemptsRef = useRef<number>(0)
+  
+  // Добавляем дебаунсинг для предотвращения множественных инициализаций
+  const peerInitTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const supabase = createClient()
 
   const peerRefs: PeerRefs = {
@@ -50,6 +53,23 @@ const useWebRTC = (): WebRTCHooks => {
 
   // Функция для обработки буферизованных сигналов с привязкой к текущему контексту
   const processSignals = () => processBufferedSignals(peerRefs, userId)
+
+  // Дебаунсированная функция для инициализации peer
+  const debouncedInitPeer = (isInitiator: boolean, delay = 50) => {
+    // Очищаем предыдущий таймаут для предотвращения множественных инициализаций
+    if (peerInitTimeoutRef.current) {
+      clearTimeout(peerInitTimeoutRef.current)
+    }
+    
+    peerInitTimeoutRef.current = setTimeout(async () => {
+      // Проверяем, что peer все еще нужен
+      if (peerRef.current || !isInCall) return
+      
+      console.log(`🎯 [User ${userId?.slice(0, 8)}] Debounced peer initialization (${isInitiator ? 'caller' : 'receiver'})`)
+      await initializePeer(isInitiator, peerRefs, userId, targetUserId, isCallActive, processSignals)
+      peerInitTimeoutRef.current = null
+    }, delay)
+  }
 
   // Функция для инициализации peer с привязкой к текущему контексту
   const initPeer = (isInitiator: boolean) => initializePeer(
@@ -173,23 +193,19 @@ const useWebRTC = (): WebRTCHooks => {
       // Устанавливаем targetUserId как callerId СНАЧАЛА
       setTargetUserId(callerId)
 
-      // Даем немного времени на обновление состояния
-      setTimeout(() => {
-        if (!peerRef.current) {
-          console.log(`🎯 [User ${userId?.slice(0, 8)}] Delayed peer initialization as receiver`)
-          initPeer(false) // Receiver is not initiator
-        }
-      }, 50)
+      // Используем дебаунсированную инициализацию
+      console.log(`🎯 [User ${userId?.slice(0, 8)}] Scheduling debounced peer initialization as receiver`)
+      debouncedInitPeer(false) // Receiver is not initiator с дебаунсингом
     }
     // ОСНОВНОЙ Fallback: если в звонке, НЕ caller, и нет peer - это receiver!
     else if (isInCall && !isCalling && isCallActive && !peerRef.current && targetUserId) {
       console.log(`✅ [User ${userId?.slice(0, 8)}] Initializing peer as receiver (main fallback - call active)`)
-      initPeer(false) // Receiver is not initiator
+      debouncedInitPeer(false) // Receiver is not initiator с дебаунсингом
     }
     // Дополнительный fallback: просто в звонке и не caller
     else if (isInCall && !isCalling && !peerRef.current) {
       console.log(`✅ [User ${userId?.slice(0, 8)}] Initializing peer as receiver (simple fallback)`)
-      initPeer(false) // Receiver is not initiator
+      debouncedInitPeer(false) // Receiver is not initiator с дебаунсингом
     } else {
       console.log(`❌ [User ${userId?.slice(0, 8)}] Receiver peer initialization skipped`)
     }
@@ -204,6 +220,12 @@ const useWebRTC = (): WebRTCHooks => {
       stopKeepAlive(peerRefs, userId)
       stopConnectionMonitoring(peerRefs, userId)
       resetReconnectionCounter(peerRefs)
+      
+      // Очищаем дебаунс таймаут
+      if (peerInitTimeoutRef.current) {
+        clearTimeout(peerInitTimeoutRef.current)
+        peerInitTimeoutRef.current = null
+      }
 
       if (peerRef.current && !peerRef.current.destroyed) {
         try {
@@ -238,6 +260,12 @@ const useWebRTC = (): WebRTCHooks => {
       stopKeepAlive(peerRefs, userId)
       stopConnectionMonitoring(peerRefs, userId)
       resetReconnectionCounter(peerRefs)
+      
+      // Очищаем дебаунс таймаут
+      if (peerInitTimeoutRef.current) {
+        clearTimeout(peerInitTimeoutRef.current)
+        peerInitTimeoutRef.current = null
+      }
 
       try {
         if (!peerRef.current.destroyed) {
@@ -254,10 +282,10 @@ const useWebRTC = (): WebRTCHooks => {
   useEffect(() => {
     const forceReceiverPeerInit = setTimeout(() => {
       if (isInCall && !isCalling && !peerRef.current && targetUserId) {
-        console.log(`🔄 [User ${userId?.slice(0, 8)}] FORCE initializing peer as receiver after 2s delay`)
-        initPeer(false)
+        console.log(`🔄 [User ${userId?.slice(0, 8)}] FORCE debounced peer initialization as receiver after 1s delay`)
+        debouncedInitPeer(false) // Используем дебаунсированную версию
       }
-    }, 2000)
+    }, 200) // Минимум для моментальной работы
 
     return () => clearTimeout(forceReceiverPeerInit)
   }, [isInCall, isCalling, targetUserId || ''])

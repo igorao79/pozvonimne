@@ -18,9 +18,12 @@ const nextConfig: NextConfig = {
     unoptimized: true, // Required for static export
   },
 
-  // Experimental features for better performance
+  // Experimental features for better performance (disabled tracing for OneDrive compatibility)
   experimental: {
     optimizePackageImports: ['lucide-react'],
+    // Disable tracing to avoid OneDrive permission issues
+    disableOptimizedLoading: true,
+    serverComponentsExternalPackages: [],
   },
 
   // Build optimizations
