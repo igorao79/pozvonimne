@@ -15,7 +15,7 @@ const DialPad = () => {
     setIsLoading,
     isLoading
   } = useCallStore()
-  
+
   const supabase = createClient()
 
   const handleCall = async () => {
@@ -47,62 +47,43 @@ const DialPad = () => {
         setError('Нельзя позвонить самому себе')
         return
       }
-      
-      // Send call signal to the target user
-      const callChannel = supabase.channel(`calls:${user.id}`)
-      
-      // Subscribe to channel first
-      await callChannel.subscribe()
 
-      // Моментальная отправка без задержек
-      
-      await callChannel.send({
-        type: 'broadcast',
-        event: 'incoming_call',
-        payload: {
-          caller_id: userId,
-          caller_name: user.display_name || user.username
-        }
-      })
-
-      console.log('Call signal sent to user:', user.username)
+      console.log('🎯 Starting call to:', user.id)
       startCall(user.id)
-      setInputUsername('') // Clear input after call
-      
     } catch (err: any) {
-      setError(err.message || 'Ошибка при совершении звонка')
       console.error('Call error:', err)
+      setError(err.message || 'Ошибка при звонке')
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="bg-white shadow-xl rounded-lg p-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-4 text-center">
+    <div className="bg-card shadow-xl rounded-lg p-6 border border-border">
+      <h2 className="text-xl font-semibold text-foreground mb-4 text-center">
         Позвонить пользователю
       </h2>
-      
+
       <div className="space-y-4">
         <div>
-          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="username" className="block text-sm font-medium text-foreground mb-2">
             Никнейм пользователя
           </label>
           <input
             id="username"
             type="text"
             value={inputUsername}
-            onChange={(e) => setInputUsername(e.target.value.toLowerCase())}
+            onChange={(e) => setInputUsername(e.target.value)}
+            className="w-full px-3 py-2 border border-border bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring placeholder:text-muted-foreground"
             placeholder="Введите никнейм (например: @username)"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             disabled={isInCall}
           />
         </div>
-        
+
         <button
           onClick={handleCall}
           disabled={isInCall || isLoading || !inputUsername.trim()}
-          className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-white font-medium bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-white font-medium bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isLoading ? (
             <div className="flex items-center">
@@ -111,7 +92,7 @@ const DialPad = () => {
             </div>
           ) : isCalling ? (
             <div className="flex items-center">
-              <div className="animate-pulse w-3 h-3 bg-white rounded-full mr-2"></div>
+              <div className="animate-pulse w-3 h-3 bg-card rounded-full mr-2"></div>
               Вызов...
             </div>
           ) : (

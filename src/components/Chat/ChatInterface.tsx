@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import useCallStore from '@/store/useCallStore'
+import useUsers from '@/hooks/useUsers'
 
 interface Message {
   id: string
@@ -65,6 +66,7 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { userId, startCall, isInCall } = useCallStore()
+  const { users } = useUsers()
   const supabase = createClient()
 
   // Загрузка сообщений
@@ -96,7 +98,9 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
       }
 
       // Сообщения приходят в обратном порядке (новые первые), переворачиваем
-      setMessages((data || []).reverse())
+      const reversedMessages = (data || []).reverse()
+      console.log('📨 Загружено сообщений:', reversedMessages.length)
+      setMessages(reversedMessages)
 
       // Помечаем сообщения как прочитанные
       try {
@@ -115,6 +119,7 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
 
   // Загружаем сообщения при монтировании
   useEffect(() => {
+    console.log('🔄 Загружаем сообщения для чата:', chat.id)
     loadMessages()
   }, [chat.id])
 
@@ -124,14 +129,66 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
   }
 
   useEffect(() => {
+    console.log('📜 Скроллим к низу, сообщений:', messages.length)
     scrollToBottom()
   }, [messages])
+
+  // Получение статуса пользователя (теперь обновляется автоматически через realtime)
+  const getUserStatus = (userId?: string) => {
+    if (!userId) return 'Неизвестно'
+
+    console.log('🔍 Проверяем статус для пользователя:', userId)
+    console.log('👥 Все пользователи:', users.map(u => ({ id: u.id.substring(0, 8), status: u.status, last_seen: u.last_seen })))
+
+    const user = users.find(u => u.id === userId)
+    console.log('🎯 Найден пользователь:', user)
+
+    if (!user) {
+      console.log('⚠️ Пользователь не найден, возвращаем "Загрузка..."')
+      return 'Загрузка...'
+    }
+
+    // Возвращаем статус напрямую из базы данных (теперь обновляется в realtime)
+    console.log('📋 Возвращаем статус из базы данных:', user.status)
+    return user.status === 'online' ? 'онлайн' : 'оффлайн'
+  }
+
+  // Realtime подписка на изменения пользователей (для обновления статуса в реальном времени)
+  useEffect(() => {
+    console.log('📡 Настраиваем realtime подписку на изменения пользователей в чате')
+
+    const userChannel = supabase
+      .channel('chat_user_status_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_profiles'
+        },
+        (payload) => {
+          console.log('👤 Изменение статуса пользователя:', payload)
+          // При изменении любого пользователя обновляем весь список
+          if (payload.eventType === 'UPDATE' && payload.new?.id) {
+            console.log('🔄 Пользователь обновлен:', payload.new.id)
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Статус подписки на изменения пользователей:', status)
+      })
+
+    return () => {
+      console.log('🔌 Отписываемся от изменений пользователей')
+      supabase.removeChannel(userChannel)
+    }
+  }, [])
 
   // Realtime подписка на новые сообщения
   useEffect(() => {
     if (!chat.id || !userId) return
 
-    console.log('📡 Подписываемся на сообщения чата:', chat.id)
+    console.log('📡 Подписываемся на сообщения чата:', chat.id, 'Текущее количество сообщений:', messages.length)
 
     // Создаем стабильное имя канала
     const channelName = `chat_${chat.id}_messages`
@@ -181,6 +238,8 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
           }
 
           setMessages(prev => {
+            console.log('📡 setMessages вызвана с предыдущим состоянием:', prev.length, 'сообщений')
+
             // Проверяем, не добавляли ли уже это сообщение
             const existingMessage = prev.find(msg => msg.id === messageData.id)
             if (existingMessage) {
@@ -197,7 +256,7 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
 
             if (duplicateByContent) {
               console.log('📡 Найден дубликат по содержимому, обновляем ID')
-              return prev.map(msg =>
+              const updatedMessages = prev.map(msg =>
                 msg.id === duplicateByContent.id
                   ? {
                       ...msg,
@@ -207,6 +266,8 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
                     }
                   : msg
               )
+              console.log('📡 Новое состояние после обновления дубликата:', updatedMessages.length, 'сообщений')
+              return updatedMessages
             }
 
             // Добавляем новое сообщение
@@ -225,7 +286,9 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
               metadata: messageData.metadata || {}
             }
 
-            return [...prev, newMessage]
+            const newMessages = [...prev, newMessage]
+            console.log('📡 Новое состояние с добавленным сообщением:', newMessages.length, 'сообщений')
+            return newMessages
           })
 
           // Помечаем как прочитанное, если это не наше сообщение
@@ -256,7 +319,7 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
 
     // Очистка при размонтировании
     return () => {
-      console.log('📡 Компонент ChatInterface размонтирован, закрываем канал сообщений')
+      console.log('📡 Компонент ChatInterface размонтирован, закрываем канал сообщений для чата:', chat.id, 'Сообщений было:', messages.length)
       supabase.removeChannel(messagesChannel)
     }
   }, [chat.id, userId])
@@ -340,13 +403,14 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
       return `вчера ${messageDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
     }
 
-    return messageDate.toLocaleDateString('ru-RU', { 
-      day: '2-digit', 
+    return messageDate.toLocaleDateString('ru-RU', {
+      day: '2-digit',
       month: '2-digit',
       hour: '2-digit',
       minute: '2-digit'
     })
   }
+
 
   // Обработка звонка
   const handleCall = async () => {
@@ -397,16 +461,18 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
     }
   }
 
+  console.log('🎨 ChatInterface рендерится, сообщений:', messages.length, 'чат:', chat.id)
+
   return (
     <div className="h-full flex flex-col">
       {/* Заголовок чата */}
-      <div className="p-4 border-b bg-white">
+      <div className="p-4 border-b bg-card">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             {/* Кнопка назад */}
             <button
               onClick={onBack}
-              className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -414,7 +480,7 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
             </button>
 
             {/* Аватар */}
-            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
               {(chat.avatar_url || chat.other_participant_avatar) ? (
                 <img
                   src={chat.avatar_url || chat.other_participant_avatar}
@@ -432,9 +498,15 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
 
             {/* Имя */}
             <div>
-              <h2 className="font-semibold text-gray-900">{chat.name}</h2>
-              {chat.type === 'private' && (
-                <p className="text-xs text-gray-500">последний раз в сети недавно</p>
+              <h2 className="font-semibold text-foreground">{chat.name}</h2>
+              {chat.type === 'private' && chat.other_participant_id && (
+                <p className="text-xs text-muted-foreground">
+                  {(() => {
+                    const status = getUserStatus(chat.other_participant_id)
+                    console.log('📊 Отображаемый статус для', chat.other_participant_id, ':', status)
+                    return status
+                  })()}
+                </p>
               )}
             </div>
           </div>
@@ -444,7 +516,7 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
             <button
               onClick={handleCall}
               disabled={isInCall}
-              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21L6.16 11.37a11.045 11.045 0 005.516 5.516l1.983-4.064a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -456,21 +528,21 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
       </div>
 
       {/* Область сообщений */}
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-4 bg-background">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto mb-2"></div>
-              <p className="text-sm text-gray-600">Загрузка сообщений...</p>
+              <p className="text-sm text-muted-foreground">Загрузка сообщений...</p>
             </div>
           </div>
         ) : error ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <p className="text-red-600 mb-2">{error}</p>
+                <p className="text-destructive mb-2">{error}</p>
               <button
                 onClick={loadMessages}
-                className="text-indigo-600 hover:text-indigo-500 text-sm"
+                className="text-primary hover:text-primary/80 text-sm transition-colors"
               >
                 Попробовать снова
               </button>
@@ -479,36 +551,37 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <svg className="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-12 h-12 mx-auto text-muted-foreground mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              <p className="text-gray-500 mb-2">Сообщений пока нет</p>
-              <p className="text-sm text-gray-400">Начните переписку</p>
+              <p className="text-muted-foreground mb-2">Сообщений пока нет</p>
+              <p className="text-sm text-muted-foreground/70">Начните переписку</p>
             </div>
           </div>
         ) : (
           <div className="space-y-4">
             {messages.map((message) => {
               const isOwn = message.sender_id === userId
-              
+              console.log('📝 Рендерим сообщение:', message.id, message.content.substring(0, 20) + '...')
+
               return (
                 <div
-                  key={message.id}
+                  key={`${message.id}-${message.updated_at}`}
                   className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                     isOwn 
-                      ? 'bg-indigo-600 text-white' 
-                      : 'bg-white text-gray-900 border'
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-card text-foreground border border-border'
                   }`}>
                     {!isOwn && chat.type === 'group' && (
-                      <p className="text-xs text-gray-500 mb-1">{message.sender_name}</p>
+                      <p className="text-xs text-muted-foreground mb-1">{message.sender_name}</p>
                     )}
                     
                     <p className="text-sm">{message.content}</p>
                     
                     <p className={`text-xs mt-1 ${
-                      isOwn ? 'text-indigo-200' : 'text-gray-500'
+                      isOwn ? 'text-indigo-200 dark:text-indigo-100' : 'text-muted-foreground'
                     }`}>
                       {formatMessageTime(message.created_at)}
                     </p>
@@ -522,7 +595,7 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
       </div>
 
       {/* Форма отправки сообщения */}
-      <div className="p-4 bg-white border-t">
+      <div className="p-4 bg-card border-t border-border">
         <form onSubmit={handleSendMessage} className="flex space-x-2">
           <input
             type="text"
@@ -530,12 +603,12 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Напишите сообщение..."
             disabled={sending}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50"
+            className="flex-1 px-4 py-2 border border-border bg-background text-foreground rounded-lg focus:ring-2 focus:ring-ring focus:border-ring placeholder:text-muted-foreground disabled:opacity-50"
           />
           <button
             type="submit"
             disabled={!newMessage.trim() || sending}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {sending ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

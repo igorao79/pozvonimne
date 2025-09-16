@@ -99,7 +99,7 @@ const ScreenSharingWindow = ({
                 e.stopPropagation()
                 onStopVideo()
               }}
-              className="w-6 h-6 bg-black bg-opacity-50 hover:bg-opacity-75 text-white rounded flex items-center justify-center text-xs transition-colors"
+              className="w-6 h-6 bg-black/50 hover:bg-black/75 text-white rounded flex items-center justify-center text-xs transition-colors"
               title="Остановить просмотр"
             >
               ⏸️
@@ -110,7 +110,7 @@ const ScreenSharingWindow = ({
               e.stopPropagation()
               onToggleFullscreen()
             }}
-            className="w-6 h-6 bg-black bg-opacity-50 hover:bg-opacity-75 text-white rounded flex items-center justify-center text-xs transition-colors"
+            className="w-6 h-6 bg-black/50 hover:bg-black/75 text-white rounded flex items-center justify-center text-xs transition-colors"
             title="На весь экран"
           >
             ⛶
@@ -120,7 +120,7 @@ const ScreenSharingWindow = ({
               e.stopPropagation()
               onResetPosition()
             }}
-            className="w-6 h-6 bg-black bg-opacity-50 hover:bg-opacity-75 text-white rounded flex items-center justify-center text-xs transition-colors"
+            className="w-6 h-6 bg-black/50 hover:bg-black/75 text-white rounded flex items-center justify-center text-xs transition-colors"
             title="Сбросить позицию"
           >
             ↻

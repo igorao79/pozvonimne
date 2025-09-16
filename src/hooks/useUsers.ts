@@ -71,19 +71,28 @@ export const useUsers = () => {
             status: u.status,
             last_seen: u.last_seen,
             created_at: u.created_at,
-            last_sign_in_at: u.last_sign_in_at
+            last_sign_in_at: u.last_sign_in_at,
+            last_seen_type: typeof u.last_seen
           })
         })
 
         // Преобразуем данные с профилями в базовый формат
-        const usersData: UserProfile[] = (data || []).map((user: any) => ({
-          id: user.id,
-          username: user.username,
-          display_name: user.display_name,
-          avatar_url: user.avatar_url,
-          last_seen: user.last_seen,
-          status: user.status
-        }))
+        const usersData: UserProfile[] = (data || []).map((user: any) => {
+          console.log('🔧 Преобразование пользователя:', user.id?.substring(0, 8), {
+            last_seen_raw: user.last_seen,
+            last_seen_type: typeof user.last_seen,
+            status: user.status
+          })
+
+          return {
+            id: user.id,
+            username: user.username,
+            display_name: user.display_name,
+            avatar_url: user.avatar_url,
+            last_seen: user.last_seen,
+            status: user.status
+          }
+        })
 
         console.log('🔄 Преобразованные данные пользователей:', usersData.length)
         console.log('👥 Детали преобразованных пользователей:')
@@ -118,8 +127,54 @@ export const useUsers = () => {
         console.log('🟢 Вызываем update_user_last_seen')
         const result = await supabase.rpc('update_user_last_seen')
         console.log('✅ update_user_last_seen выполнен:', result)
+
+        // После обновления статуса, перезагружаем список пользователей
+        setTimeout(() => {
+          console.log('🔄 Перезагружаем список пользователей после обновления статуса')
+          fetchUsers()
+        }, 1000)
+
       } catch (err) {
         console.error('❌ Ошибка update_user_last_seen:', err)
+      }
+    }
+
+    // Heartbeat механизм для отслеживания активности
+    const heartbeat = async () => {
+      try {
+        console.log('💓 Heartbeat: обновляем активность пользователя')
+
+        // Получаем текущего пользователя
+        const currentUserId = await getCurrentUser()
+
+        if (!currentUserId) {
+          console.log('❌ Текущий пользователь не найден')
+          return
+        }
+
+        // Проверяем, нужно ли обновлять статус
+        const { data: userData } = await supabase
+          .from('user_profiles')
+          .select('last_seen, status')
+          .eq('id', currentUserId)
+          .single()
+
+        if (userData) {
+          const timeSinceLastSeen = Date.now() - new Date(userData.last_seen).getTime()
+          console.log(`⏰ Время с последнего посещения: ${Math.round(timeSinceLastSeen / 1000)} сек`)
+
+          // Если прошло более 25 секунд, обновляем статус
+          if (timeSinceLastSeen > 25000) {
+            console.log('🔄 Время обновлять статус')
+            await updateLastSeen()
+          } else {
+            console.log('✅ Статус еще свежий, пропускаем обновление')
+          }
+        } else {
+          await updateLastSeen()
+        }
+      } catch (err) {
+        console.error('❌ Ошибка heartbeat:', err)
       }
     }
 
@@ -134,27 +189,73 @@ export const useUsers = () => {
       }
     }
 
+
     updateLastSeen()
 
-    // Обновляем каждые 2 минуты для более точного онлайн статуса
-    const interval = setInterval(updateLastSeen, 2 * 60 * 1000)
+    // Heartbeat каждые 30 секунд для поддержания статуса онлайн
+    const heartbeatInterval = setInterval(heartbeat, 30 * 1000)
+
+    // Обновление списка пользователей каждые 15 секунд
+    const fetchInterval = setInterval(() => {
+      fetchUsers()
+    }, 15 * 1000)
+
+    // Переменные для хранения таймеров
+    let inactivityTimer: NodeJS.Timeout | null = null
+    let currentHeartbeatInterval: NodeJS.Timeout | null = null
+
+    // Функции для управления heartbeat
+    const startHeartbeat = () => {
+      if (currentHeartbeatInterval) clearInterval(currentHeartbeatInterval)
+      currentHeartbeatInterval = setInterval(heartbeat, 30 * 1000)
+      console.log('🚀 Heartbeat запущен')
+    }
+
+    const stopHeartbeat = () => {
+      if (currentHeartbeatInterval) {
+        clearInterval(currentHeartbeatInterval)
+        currentHeartbeatInterval = null
+        console.log('⏸️ Heartbeat остановлен')
+      }
+    }
+
+    // Запускаем heartbeat
+    startHeartbeat()
 
     // Обработчик изменения видимости страницы
-    const handleVisibilityChange = () => {
+    const handleVisibilityChange = async () => {
       if (document.hidden) {
         console.log('👁️ Вкладка стала неактивной, document.hidden =', document.hidden)
-        // Устанавливаем таймер для автоматического оффлайн через 3 минуты неактивности
-        setTimeout(() => {
+
+        // Останавливаем heartbeat при неактивности
+        stopHeartbeat()
+
+        // Устанавливаем таймер для автоматического оффлайн через 30 секунд неактивности
+        inactivityTimer = setTimeout(() => {
           if (document.hidden) {
-            console.log('⏰ Вкладка неактивна более 3 минут, вызываем setOffline')
+            console.log('⏰ Вкладка неактивна более 30 секунд, вызываем setOffline')
             setOffline()
           } else {
             console.log('✅ Вкладка снова активна, отменяем setOffline')
           }
-        }, 3 * 60 * 1000)
+        }, 30 * 1000) // 30 секунд для быстрого перехода в оффлайн
       } else {
         console.log('👁️ Вкладка стала активной, document.hidden =', document.hidden)
-        updateLastSeen() // Обновляем статус при возвращении
+
+        // Очищаем таймер неактивности
+        if (inactivityTimer) {
+          clearTimeout(inactivityTimer)
+          inactivityTimer = null
+        }
+
+        // Запускаем heartbeat заново
+        startHeartbeat()
+
+        // Немедленно перезагружаем пользователей при возвращении активности
+        setTimeout(() => {
+          console.log('🔄 Перезагружаем пользователей при возвращении активности')
+          fetchUsers()
+        }, 200)
       }
     }
 
@@ -171,13 +272,44 @@ export const useUsers = () => {
       }
     }
 
+    // Отслеживание активности пользователя (движение мыши, клики, клавиатура)
+    let lastActivity = Date.now()
+    const updateActivity = () => {
+      lastActivity = Date.now()
+    }
+
+    // Добавляем обработчики активности
+    document.addEventListener('mousedown', updateActivity)
+    document.addEventListener('keydown', updateActivity)
+    document.addEventListener('scroll', updateActivity)
+
+    // Проверка активности каждые 10 секунд
+    const activityCheckInterval = setInterval(() => {
+      const now = Date.now()
+      const inactiveTime = now - lastActivity
+
+      // Если неактивен более 2 минут, переходим в оффлайн
+      if (inactiveTime > 2 * 60 * 1000) {
+        console.log('😴 Пользователь неактивен более 2 минут, устанавливаем оффлайн')
+        setOffline()
+      }
+    }, 10 * 1000)
+
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('beforeunload', handleBeforeUnload)
 
     return () => {
-      clearInterval(interval)
+      clearInterval(heartbeatInterval)
+      clearInterval(fetchInterval)
+      clearInterval(activityCheckInterval)
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer)
+      }
       document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('beforeunload', handleBeforeUnload)
+      document.removeEventListener('beforeunload', handleBeforeUnload)
+      document.removeEventListener('mousedown', updateActivity)
+      document.removeEventListener('keydown', updateActivity)
+      document.removeEventListener('scroll', updateActivity)
       // Устанавливаем оффлайн при размонтировании компонента
       setOffline()
     }
@@ -187,7 +319,56 @@ export const useUsers = () => {
     fetchUsers()
   }
 
-  return { users, loading, error, refreshUsers }
+  // Функция для принудительного обновления всех неактивных пользователей
+  const forceUpdateInactiveUsers = async () => {
+    try {
+      console.log('🔧 Принудительное обновление неактивных пользователей')
+      const result = await supabase.rpc('force_update_inactive_users')
+      console.log('✅ force_update_inactive_users выполнен:', result)
+
+      // Перезагружаем список пользователей
+      setTimeout(() => {
+        fetchUsers()
+      }, 500)
+
+      return result
+    } catch (err) {
+      console.error('❌ Ошибка force_update_inactive_users:', err)
+      return null
+    }
+  }
+
+  // Realtime подписка на изменения статусов пользователей
+  useEffect(() => {
+    console.log('📡 Настраиваем realtime подписку на изменения пользователей')
+
+    const channel = supabase
+      .channel('user_profiles_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_profiles'
+        },
+        (payload) => {
+          console.log('🔄 Изменение в user_profiles:', payload)
+
+          // Обновляем список пользователей при любом изменении
+          fetchUsers()
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Статус подписки user_profiles_changes:', status)
+      })
+
+    return () => {
+      console.log('🔌 Отписываемся от изменений user_profiles')
+      supabase.removeChannel(channel)
+    }
+  }, [fetchUsers])
+
+  return { users, loading, error, refreshUsers, forceUpdateInactiveUsers }
 }
 
 export default useUsers

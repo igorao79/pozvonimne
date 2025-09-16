@@ -6,6 +6,7 @@ import useCallStore from '@/store/useCallStore'
 import AuthForm from '@/components/Auth/AuthForm'
 import CallInterface from '@/components/Call/CallInterface'
 import { UserProfile } from '@/components/Profile'
+import { ThemeToggler } from '@/components/ui/theme-toggler'
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
@@ -72,10 +73,10 @@ export default function Home() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Загрузка...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg text-muted-foreground">Загрузка...</p>
         </div>
       </div>
     )
@@ -86,26 +87,27 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="h-screen flex flex-col overflow-hidden bg-background transition-colors">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-card shadow-sm border-b border-border flex-shrink-0 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex justify-between items-center py-2">
             <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">
+              <h1 className="text-lg font-semibold text-foreground">
                 Позвони.мне
               </h1>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
+              <ThemeToggler />
               <button
                 onClick={() => setShowProfile(true)}
-                className="text-sm text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
+                className="text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer"
               >
                 {user?.email}
               </button>
               <button
                 onClick={handleSignOut}
-                className="text-sm text-indigo-600 hover:text-indigo-500"
+                className="text-sm text-primary hover:text-primary/80 transition-colors"
               >
                 Выйти
               </button>
@@ -116,17 +118,17 @@ export default function Home() {
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+        <div className="bg-destructive/10 border-l-4 border-destructive p-2 flex-shrink-0">
           <div className="flex">
             <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm text-destructive">{error}</p>
             </div>
           </div>
         </div>
       )}
 
       {/* Main Content */}
-      <main>
+      <main className="flex-1 overflow-hidden">
         <CallInterface />
       </main>
 

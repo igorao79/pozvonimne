@@ -171,24 +171,24 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-2"></div>
-          <p className="text-sm text-gray-600">Загрузка чатов...</p>
+          <p className="text-sm text-muted-foreground">Загрузка чатов...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Заголовок */}
-      <div className="p-4 border-b bg-white">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-gray-900">Чаты</h1>
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Ультракомпактный заголовок */}
+      <div className="px-2 py-1 border-b border-border bg-card flex-shrink-0">
+        <div className="flex items-center justify-between min-h-[32px]">
+          <h1 className="text-sm font-semibold text-foreground">Чаты</h1>
           <button
             onClick={onCreateNewChat}
-            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            className="p-1 text-primary hover:bg-primary/10 rounded-md transition-colors"
             title="Создать новый чат"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           </button>
@@ -199,11 +199,11 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       <div className="flex-1 overflow-y-auto">
         {error && (
           <div className="p-4">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="bg-destructive/10 border border-destructive rounded-lg p-3">
+              <p className="text-sm text-destructive">{error}</p>
               <button
                 onClick={loadChats}
-                className="text-xs text-red-500 hover:text-red-700 mt-1"
+                className="text-xs text-destructive hover:text-destructive/80 mt-1 transition-colors"
               >
                 Попробовать снова
               </button>
@@ -212,15 +212,15 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
         )}
 
         {chats.length === 0 && !error ? (
-          <div className="p-4 text-center">
-            <div className="py-8">
-              <svg className="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="px-3 py-4 text-center">
+            <div className="py-6">
+              <svg className="w-8 h-8 mx-auto text-muted-foreground mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              <p className="text-gray-500 mb-2">У вас пока нет чатов</p>
+              <p className="text-muted-foreground text-sm mb-2">У вас пока нет чатов</p>
               <button
                 onClick={onCreateNewChat}
-                className="text-indigo-600 hover:text-indigo-500 text-sm font-medium"
+                className="text-primary hover:text-primary/80 text-sm font-medium transition-colors"
               >
                 Создать первый чат
               </button>
@@ -232,13 +232,13 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
               <div
                 key={chat.id}
                 onClick={() => onChatSelect(chat)}
-                className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
-                  selectedChatId === chat.id ? 'bg-indigo-50 border-r-2 border-indigo-500' : ''
+                className={`px-2 py-1.5 hover:bg-muted cursor-pointer transition-colors chat-list-item ${
+                  selectedChatId === chat.id ? 'bg-primary/10 border-r-2 border-primary' : ''
                 }`}
               >
-                <div className="flex items-center space-x-3">
-                  {/* Аватар */}
-                  <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
+                <div className="flex items-center space-x-1.5">
+                  {/* Ультракомпактный аватар */}
+                  <div className="w-8 h-8 rounded-full overflow-hidden bg-muted flex-shrink-0 chat-avatar">
                     {(chat.avatar_url || chat.other_participant_avatar) ? (
                       <img
                         src={chat.avatar_url || chat.other_participant_avatar}
@@ -247,7 +247,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                        <span className="text-white font-medium text-sm">
+                        <span className="text-white font-medium text-xs">
                           {chat.name?.charAt(0)?.toUpperCase() || '?'}
                         </span>
                       </div>
@@ -257,29 +257,29 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
                   {/* Информация о чате */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-gray-900 truncate">
+                      <h3 className="font-medium text-foreground text-sm truncate">
                         {chat.name}
                       </h3>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1">
                         {chat.last_message_at && (
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-muted-foreground">
                             {formatLastMessageTime(chat.last_message_at)}
                           </span>
                         )}
                         {chat.unread_count > 0 && (
-                          <div className="bg-indigo-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                          <div className="bg-primary text-primary-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center">
                             {chat.unread_count > 99 ? '99+' : chat.unread_count}
                           </div>
                         )}
                       </div>
                     </div>
-                    
+
                     {chat.last_message && (
-                      <p className="text-sm text-gray-600 truncate mt-1">
+                      <p className="text-xs text-muted-foreground truncate mt-0">
                         {chat.last_message_sender_name && chat.type === 'group' && (
-                          <span className="text-gray-500">{chat.last_message_sender_name}: </span>
+                          <span className="text-muted-foreground/70">{chat.last_message_sender_name}: </span>
                         )}
-                        {truncateText(chat.last_message)}
+                        {truncateText(chat.last_message, 35)}
                       </p>
                     )}
                   </div>

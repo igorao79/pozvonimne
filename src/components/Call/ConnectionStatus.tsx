@@ -52,13 +52,13 @@ const ConnectionStatus = () => {
 
   const getConnectionColor = () => {
     if (stats.connectionState === 'connected' && stats.iceConnectionState === 'connected') {
-      return 'text-green-600'
+      return 'text-green-600 dark:text-green-400'
     } else if (stats.connectionState === 'connecting' || stats.iceConnectionState === 'connecting') {
       return 'text-yellow-600'
     } else if (stats.connectionState === 'failed' || stats.iceConnectionState === 'failed') {
-      return 'text-red-600'
+      return 'text-destructive'
     } else {
-      return 'text-gray-600'
+      return 'text-muted-foreground'
     }
   }
 
@@ -90,7 +90,7 @@ const ConnectionStatus = () => {
 
   return (
     <div className="fixed top-4 right-4 z-50">
-      <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 p-3 min-w-[200px]">
+      <div className="bg-card/90 backdrop-blur-sm rounded-lg shadow-lg border border-border p-3 min-w-[200px]">
         {/* Основной индикатор */}
         <div 
           className="flex items-center space-x-2 cursor-pointer"
@@ -102,50 +102,50 @@ const ConnectionStatus = () => {
               {getStatusText()}
             </div>
             {stats.connected && (
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted-foreground">
                 💓 Keep-alive активен
               </div>
             )}
           </div>
-          <button className="text-gray-400 hover:text-gray-600 transition-colors">
+          <button className="text-muted-foreground hover:text-foreground transition-colors">
             {isExpanded ? '▼' : '▶'}
           </button>
         </div>
 
         {/* Расширенная информация */}
         {isExpanded && (
-          <div className="mt-3 pt-3 border-t border-gray-100 space-y-2 text-xs">
+          <div className="mt-3 pt-3 border-t border-border space-y-2 text-xs">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <div className="font-medium text-gray-600">Соединение:</div>
+                <div className="font-medium text-muted-foreground">Соединение:</div>
                 <div className={getConnectionColor()}>{stats.connectionState}</div>
               </div>
               <div>
-                <div className="font-medium text-gray-600">ICE:</div>
+                <div className="font-medium text-muted-foreground">ICE:</div>
                 <div className={getConnectionColor()}>{stats.iceConnectionState}</div>
               </div>
             </div>
             
             <div>
-              <div className="font-medium text-gray-600">ICE сбор:</div>
-              <div className="text-gray-800">{stats.iceGatheringState}</div>
+              <div className="font-medium text-muted-foreground">ICE сбор:</div>
+              <div className="text-foreground">{stats.iceGatheringState}</div>
             </div>
             
             <div>
-              <div className="font-medium text-gray-600">Data Channel:</div>
-              <div className={stats.connected ? 'text-green-600' : 'text-red-600'}>
+              <div className="font-medium text-muted-foreground">Data Channel:</div>
+              <div className={stats.connected ? 'text-green-600 dark:text-green-400' : 'text-destructive'}>
                 {stats.connected ? 'Активен' : 'Неактивен'}
               </div>
             </div>
 
             {stats.reconnectAttempts > 0 && (
               <div>
-                <div className="font-medium text-gray-600">Попытки переподключения:</div>
+                <div className="font-medium text-muted-foreground">Попытки переподключения:</div>
                 <div className="text-orange-600">{stats.reconnectAttempts}/3</div>
               </div>
             )}
 
-            <div className="text-xs text-gray-500 mt-2">
+            <div className="text-xs text-muted-foreground mt-2">
               Обновлено: {new Date().toLocaleTimeString()}
             </div>
           </div>

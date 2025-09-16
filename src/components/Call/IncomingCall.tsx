@@ -173,21 +173,21 @@ const IncomingCall = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex items-center justify-center px-4">
-      <div className="bg-white rounded-xl shadow-2xl p-8 max-w-sm w-full text-center">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="bg-card rounded-xl shadow-2xl p-8 max-w-sm w-full text-center border border-border">
         <div className="mb-6">
-          <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full mx-auto mb-4 flex items-center justify-center">
-            <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-24 h-24 bg-primary rounded-full mx-auto mb-4 flex items-center justify-center">
+            <svg className="w-12 h-12 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-foreground mb-2">
             Входящий звонок
           </h2>
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-muted-foreground">
             {callerName || `Пользователь ${callerId?.slice(0, 8)}...`}
           </p>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             ID: {callerId}
           </p>
         </div>
@@ -195,7 +195,7 @@ const IncomingCall = () => {
         <div className="flex space-x-4">
           <button
             onClick={handleReject}
-            className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-4 px-6 rounded-full transition-colors duration-200 flex items-center justify-center"
+            className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold py-4 px-6 rounded-full transition-colors duration-200 flex items-center justify-center"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -204,7 +204,7 @@ const IncomingCall = () => {
           
           <button
             onClick={handleAccept}
-            className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-4 px-6 rounded-full transition-colors duration-200 flex items-center justify-center"
+            className="flex-1 bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white font-semibold py-4 px-6 rounded-full transition-colors duration-200 flex items-center justify-center"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -214,9 +214,9 @@ const IncomingCall = () => {
 
         <div className="mt-6">
           <div className="animate-pulse flex justify-center">
-            <div className="w-4 h-4 bg-blue-500 rounded-full mx-1"></div>
-            <div className="w-4 h-4 bg-blue-500 rounded-full mx-1 animation-delay-75"></div>
-            <div className="w-4 h-4 bg-blue-500 rounded-full mx-1 animation-delay-150"></div>
+            <div className="w-4 h-4 bg-primary rounded-full mx-1"></div>
+            <div className="w-4 h-4 bg-primary rounded-full mx-1 animation-delay-75"></div>
+            <div className="w-4 h-4 bg-primary rounded-full mx-1 animation-delay-150"></div>
           </div>
         </div>
 

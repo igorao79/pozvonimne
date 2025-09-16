@@ -89,17 +89,17 @@ const RealtimeTest = () => {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 bg-white border border-gray-300 rounded-lg shadow-lg p-4 max-w-md max-h-96 overflow-auto">
+    <div className="fixed bottom-4 right-4 bg-card border border-border rounded-lg shadow-lg p-4 max-w-md max-h-96 overflow-auto">
       <div className="flex items-center justify-between mb-2">
         <h3 className="font-semibold text-sm">
           🧪 Realtime Test
-          <span className={`ml-2 px-2 py-1 rounded text-xs ${isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          <span className={`ml-2 px-2 py-1 rounded text-xs ${isConnected ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-destructive/10 text-destructive'}`}>
             {isConnected ? 'Подключен' : 'Отключен'}
           </span>
         </h3>
         <button
           onClick={clearLogs}
-          className="text-xs text-gray-500 hover:text-gray-700"
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           Очистить
         </button>
@@ -107,21 +107,21 @@ const RealtimeTest = () => {
 
       <button
         onClick={testInsert}
-        className="mb-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+        className="mb-2 px-3 py-1 bg-primary text-primary-foreground text-xs rounded hover:bg-primary/90 transition-colors"
       >
         Тестовое сообщение
       </button>
 
       <div className="space-y-1 text-xs font-mono">
         {logs.slice(-10).map((log, index) => (
-          <div key={index} className="text-gray-600">
+          <div key={index} className="text-muted-foreground">
             {log}
           </div>
         ))}
       </div>
 
       {logs.length > 10 && (
-        <div className="text-xs text-gray-400 mt-2">
+        <div className="text-xs text-muted-foreground/70 mt-2">
           ... и ещё {logs.length - 10} сообщений
         </div>
       )}

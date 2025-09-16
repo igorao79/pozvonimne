@@ -127,15 +127,15 @@ const CreateChatModal = ({ isOpen, onClose, onChatCreated }: CreateChatModalProp
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-lg max-w-md w-full max-h-[80vh] flex flex-col border border-border">
         {/* Заголовок */}
         <div className="p-4 border-b">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Новый чат</h2>
+            <h2 className="text-lg font-semibold text-foreground">Новый чат</h2>
             <button
               onClick={onClose}
-              className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -152,9 +152,9 @@ const CreateChatModal = ({ isOpen, onClose, onChatCreated }: CreateChatModalProp
               placeholder="Поиск пользователей..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-border bg-background text-foreground rounded-lg focus:ring-2 focus:ring-ring focus:border-ring placeholder:text-muted-foreground"
             />
-            <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-muted-foreground absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
@@ -163,8 +163,8 @@ const CreateChatModal = ({ isOpen, onClose, onChatCreated }: CreateChatModalProp
         {/* Ошибка */}
         {error && (
           <div className="p-4">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="bg-destructive/10 border border-destructive rounded-lg p-3">
+              <p className="text-sm text-destructive">{error}</p>
             </div>
           </div>
         )}
@@ -174,11 +174,11 @@ const CreateChatModal = ({ isOpen, onClose, onChatCreated }: CreateChatModalProp
           {usersLoading ? (
             <div className="p-4 text-center">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto mb-2"></div>
-              <p className="text-sm text-gray-600">Загрузка пользователей...</p>
+              <p className="text-sm text-muted-foreground">Загрузка пользователей...</p>
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="p-4 text-center">
-              <p className="text-gray-500">
+              <p className="text-muted-foreground">
                 {searchQuery ? 'Пользователи не найдены' : 'Нет доступных пользователей'}
               </p>
             </div>
@@ -188,16 +188,16 @@ const CreateChatModal = ({ isOpen, onClose, onChatCreated }: CreateChatModalProp
                 <div
                   key={user.id}
                   onClick={() => toggleUserSelection(user.id)}
-                  className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
-                    selectedUsers.includes(user.id) ? 'bg-indigo-50' : ''
+                  className={`p-4 hover:bg-muted cursor-pointer transition-colors ${
+                    selectedUsers.includes(user.id) ? 'bg-primary/10' : ''
                   }`}
                 >
                   <div className="flex items-center space-x-3">
                     {/* Чекбокс */}
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
                       selectedUsers.includes(user.id) 
-                        ? 'bg-indigo-600 border-indigo-600' 
-                        : 'border-gray-300'
+                        ? 'bg-primary border-primary' 
+                        : 'border-border'
                     }`}>
                       {selectedUsers.includes(user.id) && (
                         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -207,7 +207,7 @@ const CreateChatModal = ({ isOpen, onClose, onChatCreated }: CreateChatModalProp
                     </div>
 
                     {/* Аватар */}
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
                       {user.avatar_url ? (
                         <img
                           src={user.avatar_url}
@@ -225,13 +225,13 @@ const CreateChatModal = ({ isOpen, onClose, onChatCreated }: CreateChatModalProp
 
                     {/* Информация */}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">
+                      <p className="font-medium text-foreground truncate">
                         {user.display_name || user.username}
                       </p>
                       <p className={`text-xs truncate ${
                         getUserStatus(user) === 'онлайн' 
-                          ? 'text-green-500' 
-                          : 'text-gray-500'
+                          ? 'text-green-600 dark:text-green-400' 
+                          : 'text-muted-foreground'
                       }`}>
                         {getUserStatus(user)}
                       </p>
@@ -248,14 +248,14 @@ const CreateChatModal = ({ isOpen, onClose, onChatCreated }: CreateChatModalProp
           <div className="flex space-x-3">
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              className="flex-1 px-4 py-2 text-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors"
             >
               Отмена
             </button>
             <button
               onClick={handleCreateChat}
               disabled={selectedUsers.length === 0 || creating}
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {creating ? (
                 <>

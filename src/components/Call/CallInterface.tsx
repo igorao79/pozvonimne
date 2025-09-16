@@ -151,16 +151,16 @@ const CallInterface = () => {
 
   // Показываем лоадер, когда звонок отправлен, но еще не принят
   if (isInCall && isCalling && !isCallActive) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-hidden">
+        <div className="bg-card rounded-lg p-6 max-w-sm w-full mx-4 border border-border">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Звонок отправлен</h3>
-            <p className="text-gray-600 mb-4">Ожидание принятия звонка...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <h3 className="text-lg font-semibold text-foreground mb-2">Звонок отправлен</h3>
+            <p className="text-muted-foreground mb-4">Ожидание принятия звонка...</p>
             <button
               onClick={endCall}
-              className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
+              className="w-full bg-destructive text-destructive-foreground py-2 px-4 rounded-lg hover:bg-destructive/90 transition-colors"
             >
               Отменить звонок
             </button>

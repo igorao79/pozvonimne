@@ -269,15 +269,15 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto border border-border"></div>
         <div className="p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Профиль</h2>
+            <h2 className="text-2xl font-bold text-foreground">Профиль</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-muted-foreground hover:text-foreground transition-colors"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -287,12 +287,12 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
 
           {/* Messages */}
           {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            <div className="mb-4 bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded">
               {error}
             </div>
           )}
           {success && (
-            <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+            <div className="mb-4 bg-green-500/10 border border-green-500 text-green-700 dark:text-green-400 px-4 py-3 rounded">
               {success}
             </div>
           )}
@@ -300,7 +300,7 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
           {/* Avatar Section */}
           <div className="text-center mb-6">
             <div className="relative inline-block">
-              <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100 mx-auto mb-4">
+              <div className="w-24 h-24 rounded-full overflow-hidden bg-muted mx-auto mb-4">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
@@ -308,8 +308,8 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600">
-                    <span className="text-2xl font-bold text-white">
+                  <div className="w-full h-full flex items-center justify-center bg-primary">
+                    <span className="text-2xl font-bold text-primary-foreground">
                       {username?.charAt(0)?.toUpperCase() || '?'}
                     </span>
                   </div>
@@ -329,7 +329,7 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 text-sm transition-colors"
               >
                 {avatarUrl ? 'Изменить' : 'Загрузить'}
               </button>
@@ -337,7 +337,7 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
                 <button
                   onClick={handleRemoveAvatar}
                   disabled={loading}
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 text-sm"
+                  className="px-4 py-2 bg-destructive text-destructive-foreground rounded hover:bg-destructive/90 disabled:opacity-50 text-sm transition-colors"
                 >
                   Удалить
                 </button>
@@ -347,7 +347,7 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
 
           {/* Display Name Section */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Имя и никнейм для звонков
             </label>
             <div className="flex space-x-2">
@@ -359,22 +359,22 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
                   setError(null) // Сбрасываем ошибку при изменении
                 }}
                 placeholder="Ваше имя (никнейм для звонков)"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-3 py-2 border border-border bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
                 disabled={loading}
               />
               <button
                 onClick={handleDisplayNameUpdate}
                 disabled={loading || !newDisplayName || newDisplayName === displayName || displayNameAvailable === false || (newDisplayName.length >= 3 && displayNameAvailable === null)}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 transition-colors"
               >
                 Сохранить
               </button>
             </div>
             {newDisplayName && newDisplayName.length >= 3 && (
               <div className={`text-sm mt-2 flex items-center ${
-                checkingDisplayName ? 'text-gray-500' :
-                displayNameAvailable === true ? 'text-green-600' :
-                displayNameAvailable === false ? 'text-red-600' : 'text-gray-500'
+                checkingDisplayName ? 'text-muted-foreground' :
+                displayNameAvailable === true ? 'text-green-600 dark:text-green-400' :
+                displayNameAvailable === false ? 'text-destructive' : 'text-muted-foreground'
               }`}>
                 {checkingDisplayName ? (
                   <>
@@ -398,20 +398,20 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
                 ) : null}
               </div>
             )}
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Это имя будет видно другим пользователям и использоваться как никнейм для звонков
             </p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               3-20 символов, только буквы, цифры и подчеркивание
             </p>
           </div>
 
           {/* Email Section */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Email
             </label>
-            <p className="text-gray-600 bg-gray-50 px-3 py-2 rounded border">
+            <p className="text-muted-foreground bg-muted px-3 py-2 rounded border border-border">
               {user?.email}
             </p>
           </div>
@@ -421,17 +421,16 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
             <button
               onClick={handlePasswordReset}
               disabled={loading}
-              className="w-full px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+              className="w-full px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50 dark:bg-yellow-500 dark:hover:bg-yellow-600 transition-colors"
             >
               {loading ? 'Отправка...' : 'Сбросить пароль'}
             </button>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Новый пароль будет отправлен на вашу почту
             </p>
           </div>
         </div>
       </div>
-    </div>
   )
 }
 

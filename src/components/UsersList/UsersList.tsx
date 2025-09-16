@@ -5,6 +5,11 @@ import useUsers from '@/hooks/useUsers'
 import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
 import { default as UserProfile } from '../Profile/UserProfile'
+import LoadingState from './LoadingState'
+import ErrorState from './ErrorState'
+import EmptyState from './EmptyState'
+import CurrentUserCard from './CurrentUserCard'
+import UserCard from './UserCard'
 
 interface BroadcastPayload {
   payload: any
@@ -17,7 +22,7 @@ const UsersList = () => {
   const [selectedUserProfile, setSelectedUserProfile] = useState<string | null>(null)
 
   // Функция для форматирования статуса последнего входа
-  const formatLastSeen = (lastSignInAt: string | null, status?: string) => {
+  const formatLastSeen = (lastSignInAt: string | null | undefined, status?: string) => {
     console.log('🔍 formatLastSeen:', { lastSignInAt, status })
 
     if (!lastSignInAt) return 'Неизвестно'
@@ -262,48 +267,11 @@ const UsersList = () => {
   }
 
   if (loading) {
-    return (
-      <div className="bg-white shadow-xl rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4 text-center">
-          Пользователи онлайн
-        </h2>
-        <div className="flex justify-center items-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-          <span className="ml-2 text-gray-600">Загрузка пользователей...</span>
-        </div>
-      </div>
-    )
+    return <LoadingState title="Пользователи онлайн" />
   }
 
   if (error) {
-    return (
-      <div className="bg-white shadow-xl rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4 text-center">
-          Пользователи приложения
-        </h2>
-        <div className="text-center py-4">
-          <p className="text-red-600 mb-2">Ошибка загрузки: {error}</p>
-          {error.includes('SQL скрипт') && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 text-left">
-              <p className="text-sm text-yellow-800 mb-2">
-                <strong>Требуется настройка базы данных:</strong>
-              </p>
-              <ol className="text-xs text-yellow-700 space-y-1">
-                <li>1. Откройте SQL Editor в Supabase Dashboard</li>
-                <li>2. Выполните скрипт из файла <code>supabase_setup.sql</code></li>
-                <li>3. Обновите страницу</li>
-              </ol>
-            </div>
-          )}
-          <button
-            onClick={refreshUsers}
-            className="text-indigo-600 hover:text-indigo-500 text-sm"
-          >
-            Попробовать снова
-          </button>
-        </div>
-      </div>
-    )
+    return <ErrorState title="Пользователи приложения" error={error} onRetry={refreshUsers} />
   }
 
   // Показываем всех пользователей, включая текущего для диагностики
@@ -314,12 +282,12 @@ const UsersList = () => {
   return (
     <div>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-xl font-semibold text-foreground">
             Пользователи приложения ({allUsers.length})
           </h2>
           <button
             onClick={refreshUsers}
-            className="text-indigo-600 hover:text-indigo-500 text-sm"
+            className="text-primary hover:text-primary/80 text-sm transition-colors"
           >
             <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -329,129 +297,22 @@ const UsersList = () => {
         </div>
 
       {allUsers.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          <svg className="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-          <p>Загрузка пользователей...</p>
-          <p className="text-sm text-gray-400 mt-1">
-            Если список пустой - зарегистрируйте новых пользователей
-          </p>
-          <p className="text-xs text-red-400 mt-2">
-            ⚠️ Решение: выполните ТОЛЬКО supabase_updates.sql в SQL Editor Supabase
-          </p>
-          <p className="text-xs text-orange-400 mt-1">
-            ❌ НЕ выполняйте supabase_setup.sql - он удалит все данные!
-          </p>
-          <p className="text-xs text-blue-600 mt-1">
-            📋 supabase_updates.sql содержит: колонки status/last_seen, функцию set_user_offline, исправленную get_users_with_profiles
-          </p>
-        </div>
+        <EmptyState />
       ) : (
         <div className="space-y-2 max-h-60 overflow-y-auto">
           {/* Текущий пользователь */}
-          {currentUser && (
-            <div
-              className="flex items-center justify-between p-3 bg-blue-50 border-2 border-blue-200 rounded-lg"
-            >
-              <div className="flex items-center space-x-3 flex-1">
-                <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
-                  {currentUser.avatar_url ? (
-                    <img
-                      src={currentUser.avatar_url}
-                      alt={currentUser.display_name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                      <span className="text-white font-medium text-sm">
-                        {currentUser.display_name?.charAt(0)?.toUpperCase() || currentUser.username?.charAt(0)?.toUpperCase() || '?'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-blue-900 truncate">
-                    {currentUser.display_name || currentUser.username} <span className="text-sm font-normal">(Вы)</span>
-                  </p>
-                  <p className="text-xs text-blue-700">
-                    ● онлайн
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-sm text-blue-600 font-medium">
-                Это вы
-              </div>
-            </div>
-          )}
+          {currentUser && <CurrentUserCard user={currentUser} />}
 
           {otherUsers.map((user) => (
-            <div
+            <UserCard
               key={user.id}
-              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <div className="flex items-center space-x-3 flex-1">
-                <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
-                  {user.avatar_url ? (
-                    <img
-                      src={user.avatar_url}
-                      alt={user.display_name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                      <span className="text-white font-medium text-sm">
-                        {user.display_name?.charAt(0)?.toUpperCase() || user.username?.charAt(0)?.toUpperCase() || '?'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <button
-                    onClick={() => setSelectedUserProfile(user.id)}
-                    className="text-left w-full group"
-                  >
-                    <p className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors truncate">
-                      {user.display_name || user.username}
-                    </p>
-                    {user.last_seen && (
-                      <p className={`text-xs ${
-                        formatLastSeen(user.last_seen, user.status) === 'онлайн'
-                          ? 'text-green-500 font-medium'
-                          : 'text-gray-500'
-                      }`}>
-                        ● {formatLastSeen(user.last_seen, user.status) === 'онлайн'
-                          ? 'онлайн'
-                          : `Был в сети: ${formatLastSeen(user.last_seen, user.status)}`}
-                      </p>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                onClick={() => handleCallUser(user.id, user.username, user.display_name)}
-                disabled={isInCall || callingUserId === user.id}
-                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ml-2"
-              >
-                {callingUserId === user.id ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Вызов...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21L6.16 11.37a11.045 11.045 0 005.516 5.516l1.983-4.064a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                    Позвонить
-                  </>
-                )}
-              </button>
-            </div>
+              user={user}
+              isInCall={isInCall}
+              callingUserId={callingUserId}
+              formatLastSeen={formatLastSeen}
+              onCallUser={handleCallUser}
+              onShowProfile={setSelectedUserProfile}
+            />
           ))}
         </div>
       )}

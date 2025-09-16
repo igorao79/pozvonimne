@@ -91,14 +91,14 @@ const AudioDiagnostics = ({ onClose }: AudioDiagnosticsProps) => {
   }, [localStream, remoteStream, peer])
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-border">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Диагностика аудио</h2>
+            <h2 className="text-2xl font-bold text-foreground">Диагностика аудио</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-muted-foreground hover:text-foreground transition-colors"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -116,19 +116,19 @@ const AudioDiagnostics = ({ onClose }: AudioDiagnosticsProps) => {
                   <div><strong>Активен:</strong> {localAudioInfo.active ? 'Да' : 'Нет'}</div>
                   <div><strong>Треки:</strong> {localAudioInfo.tracks.length}</div>
                   {localAudioInfo.tracks.map((track: any, index: number) => (
-                    <div key={index} className="ml-4 p-2 bg-gray-50 rounded">
+                    <div key={index} className="ml-4 p-2 bg-muted rounded">
                       <div><strong>Включен:</strong> {track.enabled ? 'Да' : 'Нет'}</div>
                       <div><strong>Заглушен:</strong> {track.muted ? 'Да' : 'Нет'}</div>
                       <div><strong>Состояние:</strong> {track.readyState}</div>
                       <div><strong>Настройки:</strong></div>
-                      <pre className="text-xs bg-gray-100 p-1 rounded overflow-x-auto">
+                      <pre className="text-xs bg-muted/50 p-1 rounded overflow-x-auto">
                         {JSON.stringify(track.settings, null, 2)}
                       </pre>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500">Нет данных</p>
+                <p className="text-muted-foreground">Нет данных</p>
               )}
             </div>
 
@@ -141,19 +141,19 @@ const AudioDiagnostics = ({ onClose }: AudioDiagnosticsProps) => {
                   <div><strong>Активен:</strong> {remoteAudioInfo.active ? 'Да' : 'Нет'}</div>
                   <div><strong>Треки:</strong> {remoteAudioInfo.tracks.length}</div>
                   {remoteAudioInfo.tracks.map((track: any, index: number) => (
-                    <div key={index} className="ml-4 p-2 bg-gray-50 rounded">
+                    <div key={index} className="ml-4 p-2 bg-muted rounded">
                       <div><strong>Включен:</strong> {track.enabled ? 'Да' : 'Нет'}</div>
                       <div><strong>Заглушен:</strong> {track.muted ? 'Да' : 'Нет'}</div>
                       <div><strong>Состояние:</strong> {track.readyState}</div>
                       <div><strong>Настройки:</strong></div>
-                      <pre className="text-xs bg-gray-100 p-1 rounded overflow-x-auto">
+                      <pre className="text-xs bg-muted/50 p-1 rounded overflow-x-auto">
                         {JSON.stringify(track.settings, null, 2)}
                       </pre>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500">Нет данных</p>
+                <p className="text-muted-foreground">Нет данных</p>
               )}
             </div>
 
@@ -199,12 +199,12 @@ const AudioDiagnostics = ({ onClose }: AudioDiagnosticsProps) => {
                   </div>
                 </div>
               ) : (
-                <p className="text-gray-500">Нет данных о соединении</p>
+                <p className="text-muted-foreground">Нет данных о соединении</p>
               )}
             </div>
           </div>
 
-          <div className="mt-6 text-sm text-gray-600">
+          <div className="mt-6 text-sm text-muted-foreground">
             <p><strong>Обновляется каждую секунду</strong></p>
             <p>Если удаленный поток показывает треки, но нет звука - проверьте настройки браузера и autoplay.</p>
           </div>

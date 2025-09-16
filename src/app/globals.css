@@ -1,17 +1,59 @@
 @import "tailwindcss";
 
+/* Theme variables for light and dark modes */
 @theme {
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
-  --color-primary-950: #172554;
+  /* Colors */
+  --color-background: #ffffff;
+  --color-foreground: #0f172a;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+  --color-primary: #0f172a;
+  --color-primary-foreground: #f8fafc;
+  --color-secondary: #f1f5f9;
+  --color-secondary-foreground: #0f172a;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+  --color-accent: #f1f5f9;
+  --color-accent-foreground: #0f172a;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-input: #e2e8f0;
+  --color-ring: #0f172a;
+  
+  /* Radius */
+  --radius: 0.5rem;
+}
+
+/* Dark theme variables */
+.dark {
+  --color-background: #0f172a;
+  --color-foreground: #f8fafc;
+  --color-card: #1e293b;
+  --color-card-foreground: #f8fafc;
+  --color-primary: #f8fafc;
+  --color-primary-foreground: #0f172a;
+  --color-secondary: #1e293b;
+  --color-secondary-foreground: #f8fafc;
+  --color-muted: #1e293b;
+  --color-muted-foreground: #94a3b8;
+  --color-accent: #1e293b;
+  --color-accent-foreground: #f8fafc;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #f8fafc;
+  --color-border: #334155;
+  --color-input: #334155;
+  --color-ring: #f8fafc;
+}
+
+/* Base styles */
+* {
+  @apply border-border;
+}
+
+body {
+  @apply bg-background text-foreground;
+  font-feature-settings: "rlig" 1, "calt" 1;
 }
 
 /* Custom animations */
@@ -110,13 +152,57 @@ input:focus-visible {
   .dial-pad {
     padding: 1rem;
   }
-  
+
   .call-controls {
     padding: 0.75rem;
   }
-  
+
   .video-container {
-    height: calc(100vh - 120px);
+    height: calc(100vh - 80px);
+  }
+
+  /* Ультракомпактный чат на мобильных */
+  .chat-header {
+    min-height: 28px !important;
+    padding: 0.25rem 0.5rem !important;
+  }
+
+  .chat-input-form {
+    padding: 0.25rem 0.5rem !important;
+  }
+
+  .chat-input {
+    min-height: 24px !important;
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  .chat-send-button {
+    min-height: 24px !important;
+    min-width: 24px !important;
+    padding: 0.25rem !important;
+  }
+
+  /* Дополнительная компактность для очень маленьких экранов */
+  @media (max-height: 600px) {
+    .chat-header {
+      min-height: 24px !important;
+      padding: 0.125rem 0.25rem !important;
+    }
+
+    .chat-list-item {
+      padding: 0.25rem 0.5rem !important;
+    }
+
+    .chat-avatar {
+      width: 1.5rem !important;
+      height: 1.5rem !important;
+    }
+
+    /* Ещё более компактная область сообщений на маленьких экранах */
+    .chat-messages-area {
+      max-height: 30vh !important;
+    }
   }
 }
 
@@ -135,3 +221,47 @@ input:focus-visible {
     margin: 0 auto;
   }
 }
+
+/* View transitions for theme switching */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Utility classes for theme colors */
+.bg-background { background-color: var(--color-background); }
+.text-foreground { color: var(--color-foreground); }
+.bg-card { background-color: var(--color-card); }
+.text-card-foreground { color: var(--color-card-foreground); }
+.bg-primary { background-color: var(--color-primary); }
+.text-primary { color: var(--color-primary); }
+.text-primary-foreground { color: var(--color-primary-foreground); }
+.bg-secondary { background-color: var(--color-secondary); }
+.text-secondary-foreground { color: var(--color-secondary-foreground); }
+.bg-muted { background-color: var(--color-muted); }
+.text-muted-foreground { color: var(--color-muted-foreground); }
+.bg-accent { background-color: var(--color-accent); }
+.text-accent-foreground { color: var(--color-accent-foreground); }
+.bg-destructive { background-color: var(--color-destructive); }
+.text-destructive { color: var(--color-destructive); }
+.text-destructive-foreground { color: var(--color-destructive-foreground); }
+.border-border { border-color: var(--color-border); }
+.border-input { border-color: var(--color-input); }
+.ring-ring { --tw-ring-color: var(--color-ring); }
+
+/* Additional utility classes */
+.hover\:bg-primary\/90:hover { background-color: hsl(from var(--color-primary) h s calc(l * 0.9)); }
+.hover\:bg-secondary:hover { background-color: var(--color-secondary); }
+.hover\:text-primary:hover { color: var(--color-primary); }
+.hover\:text-primary\/80:hover { color: hsl(from var(--color-primary) h s calc(l * 0.8) / 0.8); }
+
+/* Special classes for smooth transitions */
+.bg-destructive\/10 { background-color: hsl(from var(--color-destructive) h s l / 0.1); }
+
+/* Input focus states */
+.focus\:ring-ring:focus { --tw-ring-color: var(--color-ring); }
+.focus\:border-ring:focus { border-color: var(--color-ring); }
+
+/* Placeholder text */
+.placeholder\:text-muted-foreground::placeholder { color: var(--color-muted-foreground); }
