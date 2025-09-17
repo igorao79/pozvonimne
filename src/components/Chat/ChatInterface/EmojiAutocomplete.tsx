@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { SearchIndex } from 'emoji-mart'
+import data from '@emoji-mart/data'
 
 interface EmojiSuggestion {
   id: string
   name: string
   native: string
-  shortcodes: string
-  keywords: string[]
+  shortcodes?: string
+  keywords?: string[]
 }
 
 interface EmojiAutocompleteProps {
@@ -14,29 +16,21 @@ interface EmojiAutocompleteProps {
   onClose: () => void
 }
 
-// Простая база emoji для autocomplete
-const emojiDatabase: EmojiSuggestion[] = [
-  { id: 'smile', name: 'Smile', native: '😊', shortcodes: ':smile:', keywords: ['happy', 'joy', 'smile'] },
-  { id: 'heart', name: 'Heart', native: '❤️', shortcodes: ':heart:', keywords: ['love', 'heart', 'like'] },
-  { id: 'thumbs_up', name: 'Thumbs Up', native: '👍', shortcodes: ':thumbs_up:', keywords: ['good', 'ok', 'yes'] },
-  { id: 'laughing', name: 'Laughing', native: '😂', shortcodes: ':laughing:', keywords: ['laugh', 'funny', 'lol'] },
-  { id: 'wink', name: 'Wink', native: '😉', shortcodes: ':wink:', keywords: ['wink', 'flirt', 'cute'] },
-  { id: 'fire', name: 'Fire', native: '🔥', shortcodes: ':fire:', keywords: ['hot', 'fire', 'lit'] },
-  { id: 'star', name: 'Star', native: '⭐', shortcodes: ':star:', keywords: ['star', 'favorite', 'awesome'] },
-  { id: 'cry', name: 'Cry', native: '😢', shortcodes: ':cry:', keywords: ['sad', 'tear', 'cry'] },
-  { id: 'thinking', name: 'Thinking', native: '🤔', shortcodes: ':thinking:', keywords: ['think', 'confused', 'wonder'] },
-  { id: 'cool', name: 'Cool', native: '😎', shortcodes: ':cool:', keywords: ['cool', 'sunglasses', 'awesome'] },
-  { id: 'hi', name: 'Hi', native: '👋', shortcodes: ':hi:', keywords: ['hello', 'hi', 'wave'] },
-  { id: 'bye', name: 'Bye', native: '👋', shortcodes: ':bye:', keywords: ['bye', 'goodbye', 'wave'] },
-  { id: 'yes', name: 'Yes', native: '✅', shortcodes: ':yes:', keywords: ['yes', 'check', 'agree'] },
-  { id: 'no', name: 'No', native: '❌', shortcodes: ':no:', keywords: ['no', 'cross', 'deny'] },
-  { id: 'love', name: 'Love', native: '😍', shortcodes: ':love:', keywords: ['love', 'hearts', 'inlove'] },
-  { id: 'angry', name: 'Angry', native: '😠', shortcodes: ':angry:', keywords: ['angry', 'mad', 'upset'] },
-  { id: 'surprised', name: 'Surprised', native: '😮', shortcodes: ':surprised:', keywords: ['wow', 'surprise', 'shocked'] },
-  { id: 'sleep', name: 'Sleep', native: '😴', shortcodes: ':sleep:', keywords: ['sleep', 'tired', 'sleepy'] },
-  { id: 'coffee', name: 'Coffee', native: '☕', shortcodes: ':coffee:', keywords: ['coffee', 'drink', 'morning'] },
-  { id: 'pizza', name: 'Pizza', native: '🍕', shortcodes: ':pizza:', keywords: ['pizza', 'food', 'yum'] }
-]
+// Флаг инициализации данных
+let dataInitialized = false
+
+const initializeData = async () => {
+  if (!dataInitialized) {
+    try {
+      // Инициализируем данные emoji-mart
+      await SearchIndex.reset()
+      dataInitialized = true
+      console.log('🎨 Emoji data initialized successfully')
+    } catch (error) {
+      console.error('❌ Failed to initialize Emoji data:', error)
+    }
+  }
+}
 
 export const EmojiAutocomplete: React.FC<EmojiAutocompleteProps> = ({
   inputValue,
@@ -48,25 +42,41 @@ export const EmojiAutocomplete: React.FC<EmojiAutocompleteProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Инициализация данных при монтировании компонента
+  useEffect(() => {
+    initializeData()
+  }, [])
+
   // Анализ введенного текста для поиска emoji паттернов
   useEffect(() => {
-    const analyzeText = () => {
+    const analyzeText = async () => {
       // Ищем паттерн :text: в конце строки
       const colonMatch = inputValue.match(/:([^:\s]+)$/)
 
-      if (colonMatch) {
+      if (colonMatch && dataInitialized) {
         const searchTerm = colonMatch[1].toLowerCase()
         setIsVisible(true)
 
-        // Ищем emoji в нашей базе данных
-        const filteredEmojis = emojiDatabase.filter(emoji =>
-          emoji.id.toLowerCase().includes(searchTerm) ||
-          emoji.name.toLowerCase().includes(searchTerm) ||
-          emoji.keywords.some(keyword => keyword.toLowerCase().includes(searchTerm))
-        ).slice(0, 5) // Ограничиваем до 5 подсказок
+        try {
+          // Используем SearchIndex из emoji-mart для поиска
+          const searchResults = await SearchIndex.search(searchTerm, { maxResults: 8, caller: 'autocomplete' })
 
-        setSuggestions(filteredEmojis)
-        setSelectedIndex(0)
+          // Преобразуем результаты в формат нашего компонента
+          const filteredEmojis: EmojiSuggestion[] = searchResults
+            .map((emoji: any) => ({
+              id: emoji.id,
+              name: emoji.name,
+              native: emoji.skins?.[0]?.native || emoji.native,
+              shortcodes: emoji.shortcodes ? `:${emoji.shortcodes}:` : `:${emoji.id}:`,
+              keywords: emoji.keywords
+            }))
+
+          setSuggestions(filteredEmojis)
+          setSelectedIndex(0)
+        } catch (error) {
+          console.error('❌ Error searching emojis:', error)
+          setSuggestions([])
+        }
       } else {
         setIsVisible(false)
         setSuggestions([])
