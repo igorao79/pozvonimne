@@ -7,6 +7,7 @@ import AuthForm from '@/components/Auth/AuthForm'
 import CallInterface from '@/components/Call/CallInterface'
 import { UserProfile } from '@/components/Profile'
 import { ThemeToggler } from '@/components/ui/theme-toggler'
+import { User } from 'lucide-react'
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
@@ -101,9 +102,10 @@ export default function Home() {
               <ThemeToggler />
               <button
                 onClick={() => setShowProfile(true)}
-                className="text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                className="p-2 rounded-md hover:bg-secondary transition-colors duration-200 border border-border"
+                aria-label="Открыть профиль"
               >
-                {user?.email}
+                <User className="h-5 w-5 text-foreground" />
               </button>
               <button
                 onClick={handleSignOut}

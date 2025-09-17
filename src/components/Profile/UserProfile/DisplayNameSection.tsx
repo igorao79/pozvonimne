@@ -11,25 +11,26 @@ const DisplayNameSection = ({
 }: DisplayNameSectionProps) => {
   // Определяем классы для обводки инпута
   const getInputClasses = () => {
-    const baseClasses = "flex-1 px-3 py-2 bg-background text-foreground rounded-md focus:outline-none placeholder:text-muted-foreground transition-colors relative"
+    const hasIcon = newDisplayName && newDisplayName.length >= 3
+    const baseClasses = `w-full px-3 py-2 bg-background text-foreground focus:outline-none placeholder:text-muted-foreground transition-colors border rounded-md ${hasIcon ? 'pr-10' : 'pr-3'} focus:ring-2`
 
     if (!newDisplayName || newDisplayName.length < 3) {
-      return `${baseClasses} border border-border focus:ring-2 focus:ring-ring`
+      return `${baseClasses} border-border focus:ring-ring`
     }
 
     if (checkingDisplayName) {
-      return `${baseClasses} border border-muted-foreground/50 focus:ring-2 focus:ring-ring animate-pulse`
+      return `${baseClasses} border-muted-foreground/50 focus:ring-ring animate-pulse`
     }
 
     if (displayNameAvailable === true) {
-      return `${baseClasses} border-2 border-green-500 focus:ring-2 focus:ring-green-500`
+      return `${baseClasses} border-green-500 focus:ring-green-500`
     }
 
     if (displayNameAvailable === false) {
-      return `${baseClasses} border-2 border-destructive focus:ring-2 focus:ring-destructive`
+      return `${baseClasses} border-destructive focus:ring-destructive`
     }
 
-    return `${baseClasses} border border-border focus:ring-2 focus:ring-ring`
+    return `${baseClasses} border-border focus:ring-ring`
   }
 
   // Определяем иконку для состояния
@@ -72,7 +73,7 @@ const DisplayNameSection = ({
       <label className="block text-sm font-medium text-foreground mb-2">
         Имя и никнейм для звонков
       </label>
-      <div className="flex space-x-2">
+      <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
         <div className="flex-1 relative">
           <input
             type="text"
@@ -89,7 +90,7 @@ const DisplayNameSection = ({
         <button
           onClick={onDisplayNameUpdate}
           disabled={loading || !newDisplayName || newDisplayName === displayName || displayNameAvailable === false || (newDisplayName.length >= 3 && displayNameAvailable === null)}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 transition-colors w-full sm:w-auto"
         >
           Сохранить
         </button>

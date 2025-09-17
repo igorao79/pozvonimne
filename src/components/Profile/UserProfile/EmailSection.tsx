@@ -6,7 +6,7 @@ const EmailSection = ({ email }: EmailSectionProps) => {
       <label className="block text-sm font-medium text-foreground mb-2">
         Email
       </label>
-      <p className="text-muted-foreground bg-muted px-3 py-2 rounded border border-border">
+      <p className="text-muted-foreground bg-muted px-3 py-2 rounded border border-border break-all text-sm">
         {email}
       </p>
     </div>
