@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react'
 import { EmojiPicker } from './EmojiPicker'
 import { EmojiAutocomplete } from './EmojiAutocomplete'
+import { useTyping } from '@/hooks/useTyping'
 
 interface MessageInputProps {
   value: string
@@ -8,17 +9,38 @@ interface MessageInputProps {
   onSubmit: (e: React.FormEvent) => void
   sending: boolean
   disabled?: boolean
+  chatId: string
 }
 
-export const MessageInput: React.FC<MessageInputProps> = ({
+export interface MessageInputRef {
+  focus: () => void
+}
+
+export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
   value,
   onChange,
   onSubmit,
   sending,
-  disabled = false
-}) => {
+  disabled = false,
+  chatId
+}, ref) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  
+  // Используем простой typing hook
+  const { handleInputChange: handleTypingChange, handleSubmit: handleTypingSubmit } = useTyping({
+    chatId,
+    enabled: !disabled
+  })
+
+  // Экспортируем метод focus наружу
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      if (inputRef.current) {
+        inputRef.current.focus()
+      }
+    }
+  }))
 
   // Преобразование emoji shortcodes в emoji
   const convertEmojiShortcodes = (text: string) => {
@@ -60,6 +82,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
+    console.log('📨 [MessageInput] Отправка сообщения, останавливаем typing')
+
+    // Останавливаем typing при отправке сообщения
+    handleTypingSubmit()
+    
+    console.log(`📨 [MessageInput] Отправляем сообщение: "${value}"`)
+
     // Преобразуем emoji shortcodes в emoji перед отправкой
     const convertedValue = convertEmojiShortcodes(value)
 
@@ -77,6 +106,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     } as React.FormEvent
 
     onSubmit(syntheticEvent)
+  }
+
+  // Обработчик изменения текста с typing logic
+  const handleInputChangeInternal = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value
+    console.log(`📝 [MessageInput] handleInputChangeInternal: "${newValue}"`)
+    onChange(newValue)
+
+    // Обрабатываем typing через новый хук
+    console.log(`📝 [MessageInput] Вызываем handleTypingChange`)
+    handleTypingChange(newValue)
   }
 
   const handleEmojiSelect = (emoji: string) => {
@@ -108,7 +148,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   const toggleEmojiPicker = () => {
-    console.log('🎨 Emoji picker toggle, current state:', showEmojiPicker)
+    // Emoji picker toggle
     setShowEmojiPicker(!showEmojiPicker)
   }
 
@@ -120,10 +160,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             ref={inputRef}
             type="text"
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={handleInputChangeInternal}
             placeholder="Напишите сообщение..."
             disabled={sending || disabled}
-            className="w-full px-4 py-2 pr-12 border border-border bg-background text-foreground rounded-lg focus:ring-2 focus:ring-ring focus:border-ring placeholder:text-muted-foreground disabled:opacity-50"
+            className="w-full px-4 py-2 pr-12 border border-border bg-background text-foreground rounded-lg focus:ring-0 focus:border-border placeholder:text-muted-foreground disabled:opacity-50"
           />
 
           {/* Кнопка emoji */}
@@ -169,5 +209,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       />
     </div>
   )
-}
+})
 
+MessageInput.displayName = 'MessageInput'

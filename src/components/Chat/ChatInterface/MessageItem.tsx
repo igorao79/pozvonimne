@@ -6,12 +6,14 @@ interface MessageItemProps {
   message: Message
   chat: Chat
   userId?: string
+  onClick?: () => void
 }
 
 export const MessageItem: React.FC<MessageItemProps> = ({
   message,
   chat,
-  userId
+  userId,
+  onClick
 }) => {
   const isOwn = message.sender_id === userId
   const isSystemMessage = message.type === 'system'
@@ -22,6 +24,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       <div
         key={`${message.id}-${message.updated_at}`}
         className="flex justify-center my-4"
+        onClick={onClick}
       >
         <div className="max-w-md px-4 py-2 rounded-lg bg-muted/50 text-muted-foreground border border-muted text-center">
           <p className="text-sm font-medium">{message.content}</p>
@@ -38,6 +41,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     <div
       key={`${message.id}-${message.updated_at}`}
       className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+      onClick={onClick}
     >
       <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
         isOwn

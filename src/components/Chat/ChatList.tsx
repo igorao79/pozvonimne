@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
-import { createClient } from '@/utils/supabase/client'
+import useSupabaseStore from '@/store/useSupabaseStore'
+import useChatSyncStore from '@/store/useChatSyncStore'
 import useCallStore from '@/store/useCallStore'
+import { ChatListItem } from './ChatListItem'
 
 interface Chat {
   id: string
@@ -30,14 +32,17 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { userId } = useCallStore()
-  const supabase = createClient()
+  const { supabase } = useSupabaseStore()
+  const { refreshChatList, registerRefreshCallback, lastMessageUpdate } = useChatSyncStore()
 
-  // Загрузка чатов
-  const loadChats = async () => {
+  // Загрузка чатов с опциональным лоадером
+  const loadChats = async (showLoader = false) => {
     if (!userId) return
 
     try {
-      setLoading(true)
+      if (showLoader) {
+        setLoading(true)
+      }
       setError(null)
 
       const { data, error: chatsError } = await supabase.rpc('get_user_chats')
@@ -53,18 +58,33 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       console.error('Ошибка:', err)
       setError('Ошибка подключения')
     } finally {
-      setLoading(false)
+      if (showLoader) {
+        setLoading(false)
+      }
     }
   }
 
-  // Загружаем чаты при монтировании и изменении userId
+  // Загружаем чаты при монтировании и изменении userId (с лоадером)
   useEffect(() => {
-    loadChats()
+    loadChats(true)
   }, [userId])
+
+  // Подписываемся на глобальные обновления через Zustand (без лоадера)
+  useEffect(() => {
+    const unsubscribe = registerRefreshCallback(() => loadChats(false))
+    return unsubscribe
+  }, [registerRefreshCallback])
+
+  // Реагируем на изменения lastMessageUpdate (без лоадера)
+  useEffect(() => {
+    if (lastMessageUpdate > 0) {
+      loadChats(false)
+    }
+  }, [lastMessageUpdate])
 
   // Экспортируем методы для внешнего использования
   useImperativeHandle(ref, () => ({
-    refreshChats: loadChats,
+    refreshChats: () => loadChats(true),
     findAndSelectChat: async (chatId: string) => {
       console.log('🔍 ChatList.findAndSelectChat called with:', chatId)
       console.log('🔍 Current chats count:', chats.length)
@@ -113,7 +133,8 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
     }
   }), [chats, onChatSelect, supabase, setChats])
 
-  // Realtime подписка на изменения чатов с оптимизацией
+  // Удалили старую realtime подписку - теперь используем глобальную синхронизацию через Zustand
+  /*
   useEffect(() => {
     if (!userId) return
 
@@ -213,7 +234,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
         console.log('📊 POLLING CLEARED (ChatList)')
       }
     }
-  }, [userId]) // Убрали supabase из зависимостей
+  */
 
   // Форматирование времени последнего сообщения
   const formatLastMessageTime = (timestamp?: string) => {
@@ -288,7 +309,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
             <div className="bg-destructive/10 border border-destructive rounded-lg p-3">
               <p className="text-sm text-destructive">{error}</p>
               <button
-                onClick={loadChats}
+                onClick={() => loadChats(true)}
                 className="text-xs text-destructive hover:text-destructive/80 mt-1 transition-colors"
               >
                 Попробовать снова
@@ -315,62 +336,14 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
         ) : (
           <div className="divide-y divide-gray-100">
             {chats.map((chat) => (
-              <div
+              <ChatListItem
                 key={chat.id}
+                chat={chat}
                 onClick={() => onChatSelect(chat)}
-                className={`px-2 py-1.5 hover:bg-muted cursor-pointer transition-colors chat-list-item ${
-                  selectedChatId === chat.id ? 'bg-primary/10 border-r-2 border-primary' : ''
-                }`}
-              >
-                <div className="flex items-center space-x-1.5">
-                  {/* Ультракомпактный аватар */}
-                  <div className="w-8 h-8 rounded-full overflow-hidden bg-muted flex-shrink-0 chat-avatar">
-                    {(chat.avatar_url || chat.other_participant_avatar) ? (
-                      <img
-                        src={chat.avatar_url || chat.other_participant_avatar}
-                        alt={chat.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                        <span className="text-white font-medium text-xs">
-                          {chat.name?.charAt(0)?.toUpperCase() || '?'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Информация о чате */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-foreground text-sm truncate">
-                        {chat.name}
-                      </h3>
-                      <div className="flex items-center space-x-1">
-                        {chat.last_message_at && (
-                          <span className="text-xs text-muted-foreground">
-                            {formatLastMessageTime(chat.last_message_at)}
-                          </span>
-                        )}
-                        {chat.unread_count > 0 && (
-                          <div className="bg-primary text-primary-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                            {chat.unread_count > 99 ? '99+' : chat.unread_count}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {chat.last_message && (
-                      <p className="text-xs text-muted-foreground truncate mt-0">
-                        {chat.last_message_sender_name && chat.type === 'group' && (
-                          <span className="text-muted-foreground/70">{chat.last_message_sender_name}: </span>
-                        )}
-                        {truncateText(chat.last_message, 35)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
+                isSelected={selectedChatId === chat.id}
+                formatLastMessageTime={formatLastMessageTime}
+                truncateText={truncateText}
+              />
             ))}
           </div>
         )}

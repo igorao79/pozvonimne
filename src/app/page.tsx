@@ -1,18 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/utils/supabase/client'
+import useSupabaseStore from '@/store/useSupabaseStore'
+import useChatSyncStore from '@/store/useChatSyncStore'
 import useCallStore from '@/store/useCallStore'
 import AuthForm from '@/components/Auth/AuthForm'
 import CallInterface from '@/components/Call/CallInterface'
 import { UserProfile } from '@/components/Profile'
 import { ThemeToggler } from '@/components/ui/theme-toggler'
+import { useGlobalTypingManager } from '@/hooks/useGlobalTypingManager'
 import { User } from 'lucide-react'
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [showProfile, setShowProfile] = useState(false)
-  const supabase = createClient()
+  const { supabase } = useSupabaseStore()
+  const { startGlobalSync, stopGlobalSync } = useChatSyncStore()
   
   const {
     isAuthenticated,
@@ -23,6 +26,9 @@ export default function Home() {
     resetAll,
     error
   } = useCallStore()
+
+  // Инициализируем глобальный typing менеджер
+  useGlobalTypingManager()
 
   useEffect(() => {
     // Check initial session
@@ -62,6 +68,21 @@ export default function Home() {
 
     return () => subscription.unsubscribe()
   }, [supabase, setUser, setUserId, setAuthenticated, resetAll])
+
+  // Запускаем глобальную синхронизацию чатов при аутентификации
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      console.log('🌐 Запуск глобальной синхронизации чатов')
+      startGlobalSync()
+    } else {
+      console.log('🌐 Остановка глобальной синхронизации чатов')
+      stopGlobalSync()
+    }
+
+    return () => {
+      stopGlobalSync()
+    }
+  }, [isAuthenticated, user?.id, startGlobalSync, stopGlobalSync])
 
   const handleSignOut = async () => {
     try {

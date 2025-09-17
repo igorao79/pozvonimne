@@ -10,6 +10,7 @@ interface MessagesAreaProps {
   userId?: string
   onRetry?: () => void
   messagesEndRef: React.RefObject<HTMLDivElement | null>
+  onMessageClick?: () => void
 }
 
 export const MessagesArea: React.FC<MessagesAreaProps> = ({
@@ -19,7 +20,8 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
   chat,
   userId,
   onRetry,
-  messagesEndRef
+  messagesEndRef,
+  onMessageClick
 }) => {
   if (loading) {
     return (
@@ -56,9 +58,9 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 overflow-y-auto p-4 bg-background">
+      <div className="flex-1 overflow-y-auto p-4 chat-pattern-bg">
         <div className="flex items-center justify-center h-full">
-          <div className="text-center">
+          <div className="text-center bg-card/80 backdrop-blur-sm rounded-lg p-6 border border-border/50">
             <svg className="w-12 h-12 mx-auto text-muted-foreground mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
@@ -71,7 +73,10 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 bg-background">
+    <div
+      className="flex-1 overflow-y-auto p-4 chat-pattern-bg"
+      onClick={onMessageClick}
+    >
       <div className="space-y-4">
         {messages.map((message) => (
           <MessageItem
@@ -79,8 +84,10 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
             message={message}
             chat={chat}
             userId={userId}
+            onClick={onMessageClick}
           />
         ))}
+
         <div ref={messagesEndRef} />
       </div>
     </div>

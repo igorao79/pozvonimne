@@ -1,5 +1,6 @@
 import React from 'react'
 import { Chat } from './types'
+import { TypingIndicator } from '../TypingIndicator'
 
 interface ChatHeaderProps {
   chat: Chat
@@ -7,6 +8,8 @@ interface ChatHeaderProps {
   onCall?: () => void
   userStatus?: string
   isInCall?: boolean
+  typingUsers?: string[]
+  currentUserId?: string
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -14,8 +17,31 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onBack,
   onCall,
   userStatus,
-  isInCall = false
+  isInCall = false,
+  typingUsers = [],
+  currentUserId
 }) => {
+  // Проверяем, печатает ли кто-то из собеседников (исключая текущего пользователя)
+  const isOtherParticipantTyping = React.useMemo(() => {
+    if (chat.type !== 'private') {
+      return false
+    }
+
+    // Поскольку текущий пользователь уже исключен в селекторе, 
+    // любые пользователи в списке - это собеседники
+    const hasTyping = typingUsers.length > 0
+    
+    // Логируем только когда кто-то печатает
+    if (hasTyping) {
+      console.log(`🎯 [ChatHeader] ✅ СОБЕСЕДНИК ПЕЧАТАЕТ!`, {
+        chatName: chat.name,
+        typingUsers: typingUsers
+      })
+    }
+    
+    return hasTyping
+  }, [chat.type, typingUsers, chat.name, currentUserId])
+
   return (
     <div className="p-4 border-b bg-card">
       <div className="flex items-center justify-between">
@@ -50,10 +76,32 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           {/* Имя */}
           <div>
             <h2 className="font-semibold text-foreground">{chat.name}</h2>
-            {chat.type === 'private' && userStatus && (
-              <p className="text-xs text-muted-foreground">
-                {userStatus}
-              </p>
+            {chat.type === 'private' && (
+              <div className="flex items-center space-x-2">
+                {isOtherParticipantTyping ? (
+                  // Индикатор печатания вместо статуса - только когда печатает собеседник
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs text-primary italic">
+                      печатает
+                    </span>
+                    <TypingIndicator
+                      size="sm"
+                      showText={false}
+                      className="scale-75"
+                    />
+                  </div>
+                ) : userStatus ? (
+                  // Обычный статус (онлайн/оффлайн)
+                  <p className="text-xs text-muted-foreground">
+                    {userStatus}
+                  </p>
+                ) : (
+                  // Нет статуса
+                  <p className="text-xs text-muted-foreground italic">
+                    не в сети
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </div>

@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { createClient } from '@/utils/supabase/client'
+import useSupabaseStore from '@/store/useSupabaseStore'
+import useChatSyncStore from '@/store/useChatSyncStore'
 import useCallStore from '@/store/useCallStore'
 import useUsers from '@/hooks/useUsers'
 
 import { ChatHeader } from './ChatHeader'
 import { MessagesArea } from './MessagesArea'
-import { MessageInput } from './MessageInput'
+import { MessageInput, MessageInputRef } from './MessageInput'
 import { Message, RealtimeMessagePayload, Chat, ChatInterfaceProps } from './types'
+import { useTypingUsers } from '@/hooks/useTypingSelectors'
 
 const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
   const [messages, setMessages] = useState<Message[]>([])
@@ -18,9 +20,31 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
   const [error, setError] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messageInputRef = useRef<MessageInputRef>(null)
   const { userId, startCall, isInCall } = useCallStore()
   const { users } = useUsers()
-  const supabase = createClient()
+  const { supabase } = useSupabaseStore()
+  const { refreshChatList } = useChatSyncStore()
+
+  // Typing indicators теперь управляются глобальным менеджером в page.tsx
+
+  // Получаем typing users из оптимизированного хука (исключаем себя)
+  const typingUsers = useTypingUsers(chat.id, userId || undefined)
+
+  // Функция для фокуса на input поле
+  const focusInput = useCallback(() => {
+    if (messageInputRef.current) {
+      messageInputRef.current.focus()
+    }
+  }, [])
+
+  // Автофокус на input при монтировании компонента
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      focusInput()
+    }, 100) // Небольшая задержка для корректного монтирования DOM
+    return () => clearTimeout(timer)
+  }, [focusInput])
 
   // Загрузка сообщений
   const loadMessages = useCallback(async () => {
@@ -134,32 +158,24 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
   const getUserStatus = useCallback((userId?: string) => {
     if (!userId) return 'Неизвестно'
 
-    console.log('🔍 Проверяем статус для пользователя:', userId)
-    console.log('👥 Все пользователи:', users.map(u => ({ id: u.id.substring(0, 8), status: u.status, last_seen: u.last_seen })))
-    console.log('📊 Количество пользователей:', users.length, 'Загрузка:', loading)
 
     // Если список пользователей пустой и идет загрузка, показываем "Загрузка..."
     if (users.length === 0 && loading) {
-      console.log('⚠️ Список пользователей пустой, идет загрузка, возвращаем "Загрузка..."')
       return 'Загрузка...'
     }
 
     // Если список пользователей пустой, но загрузка завершена, показываем "Неизвестно"
     if (users.length === 0 && !loading) {
-      console.log('⚠️ Список пользователей пустой, загрузка завершена, возвращаем "Неизвестно"')
       return 'Неизвестно'
     }
 
     const user = users.find(u => u.id === userId)
-    console.log('🎯 Найден пользователь:', user)
-
     if (!user) {
       console.log('⚠️ Пользователь не найден в списке из', users.length, 'пользователей')
       return 'Неизвестно'
     }
 
     // Возвращаем статус напрямую из базы данных (теперь обновляется в realtime)
-    console.log('📋 Возвращаем статус из базы данных:', user.status)
     return user.status === 'online' ? 'онлайн' : 'оффлайн'
   }, [users, loading])
 
@@ -318,6 +334,9 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
                 }
               }, 200)
             }
+
+            // Уведомляем о новом сообщении через Zustand для обновления списка чатов
+            refreshChatList()
           }
         )
         .subscribe((status, err) => {
@@ -426,6 +445,9 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
           : msg
       ))
 
+      // Автофокус на input после отправки сообщения
+      setTimeout(() => focusInput(), 50)
+
     } catch (err) {
       console.error('Ошибка:', err)
       setError('Ошибка подключения')
@@ -484,16 +506,18 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
     }
   }, [chat.type, chat.other_participant_id, chat.id, chat.name, userId, startCall, supabase])
 
-  console.log('🎨 ChatInterface рендерится, сообщений:', messages.length, 'чат:', chat.id)
+  // Компонент рендерится
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" onClick={focusInput}>
       <ChatHeader
         chat={chat}
         onBack={onBack}
         onCall={handleCall}
         userStatus={chat.type === 'private' && chat.other_participant_id ? getUserStatus(chat.other_participant_id) : undefined}
         isInCall={isInCall}
+        typingUsers={typingUsers}
+        currentUserId={userId || undefined}
       />
 
       <MessagesArea
@@ -504,13 +528,16 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
         userId={userId || undefined}
         onRetry={loadMessages}
         messagesEndRef={messagesEndRef}
+        onMessageClick={focusInput}
       />
 
       <MessageInput
+        ref={messageInputRef}
         value={newMessage}
         onChange={setNewMessage}
         onSubmit={handleSendMessage}
         sending={sending}
+        chatId={chat.id}
       />
     </div>
   )

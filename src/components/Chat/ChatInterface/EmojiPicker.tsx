@@ -36,7 +36,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
   isOpen,
   onClose
 }) => {
-  console.log('🎨 EmojiPicker render, isOpen:', isOpen)
+  // EmojiPicker render
 
   const { theme } = useThemeStore()
   const pickerRef = useRef<HTMLDivElement>(null)
