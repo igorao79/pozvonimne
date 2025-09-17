@@ -16,6 +16,10 @@ interface CallState {
   callerId: string | null
   callerName: string | null
   
+  // Call tracking
+  callStartTime: number | null // Время начала звонка в миллисекундах
+  callDurationSeconds: number  // Продолжительность звонка в секундах
+  
   // Media state
   isMicMuted: boolean
   localStream: MediaStream | null
@@ -89,6 +93,9 @@ const useCallStore = create<CallStore>((set, get) => ({
   callerId: null,
   callerName: null,
   
+  callStartTime: null,
+  callDurationSeconds: 0,
+  
   isMicMuted: false,
   localStream: null,
   remoteStream: null,
@@ -109,7 +116,20 @@ const useCallStore = create<CallStore>((set, get) => ({
   
   // Call actions
   setIsInCall: (isInCall) => set({ isInCall }),
-  setIsCallActive: (isCallActive) => set({ isCallActive }),
+  setIsCallActive: (isCallActive) => {
+    const currentState = get()
+    const newState: Partial<CallState> = { isCallActive }
+    
+    // Если звонок активируется, устанавливаем время начала
+    if (isCallActive && !currentState.isCallActive && !currentState.callStartTime) {
+      const callStartTime = Date.now()
+      newState.callStartTime = callStartTime
+      newState.callDurationSeconds = 0
+      console.log('📞 Call activated at:', new Date(callStartTime).toLocaleTimeString())
+    }
+    
+    set(newState)
+  },
   setIsCalling: (isCalling) => set({ isCalling }),
   setIsReceivingCall: (isReceivingCall, callerId, callerName) => 
     set({ isReceivingCall, callerId: callerId || null, callerName: callerName || null }),
@@ -292,6 +312,9 @@ const useCallStore = create<CallStore>((set, get) => ({
       }
     })
     
+    const callStartTime = Date.now()
+    console.log('📞 Call started at:', new Date(callStartTime).toLocaleTimeString())
+    
     set({ 
       isReceivingCall: false, 
       isCallActive: true, 
@@ -299,7 +322,9 @@ const useCallStore = create<CallStore>((set, get) => ({
       isCalling: false, // Явно устанавливаем в false для принимающей стороны
       targetUserId: callerId || '', // Устанавливаем targetUserId как ID звонящего
       callerId: null,
-      callerName: null
+      callerName: null,
+      callStartTime, // Устанавливаем время начала звонка
+      callDurationSeconds: 0 // Сбрасываем счетчик
     })
     
     console.log('📞 Accepting call - after state change:', {
@@ -308,7 +333,8 @@ const useCallStore = create<CallStore>((set, get) => ({
         isCallActive: get().isCallActive,
         isCalling: get().isCalling,
         isReceivingCall: get().isReceivingCall,
-        targetUserId: get().targetUserId
+        targetUserId: get().targetUserId,
+        callStartTime
       }
     })
   },
@@ -322,9 +348,16 @@ const useCallStore = create<CallStore>((set, get) => ({
   },
   
   endCall: () => {
-    const { peer, localStream, screenStream } = get()
+    const { peer, localStream, screenStream, callStartTime, isCallActive } = get()
 
     console.log('🔚 EndCall: Starting cleanup process')
+
+    // Вычисляем продолжительность звонка
+    let callDurationSeconds = 0
+    if (callStartTime && isCallActive) {
+      callDurationSeconds = Math.floor((Date.now() - callStartTime) / 1000)
+      console.log('🔚 EndCall: Call duration was:', callDurationSeconds, 'seconds')
+    }
 
     // Close peer connection safely
     if (peer && !peer.destroyed) {
@@ -360,9 +393,6 @@ const useCallStore = create<CallStore>((set, get) => ({
       })
     }
 
-    // Очищаем буфер сигналов в useWebRTC hook
-    // Это нужно сделать через callback или напрямую в hook
-
     console.log('🔚 EndCall: Resetting all call state')
     set({
       isInCall: false,
@@ -379,10 +409,12 @@ const useCallStore = create<CallStore>((set, get) => ({
       screenStream: null,
       remoteScreenStream: null,
       targetUserId: '', // ВАЖНО: очищаем targetUserId
-      error: null
+      error: null,
+      callStartTime: null,
+      callDurationSeconds // Сохраняем продолжительность для использования в компонентах
     })
 
-    console.log('🔚 EndCall: Cleanup completed')
+    console.log('🔚 EndCall: Cleanup completed, call duration:', callDurationSeconds, 'seconds')
   },
   
   // Reset functions
@@ -416,7 +448,9 @@ const useCallStore = create<CallStore>((set, get) => ({
       screenStream: null,
       remoteScreenStream: null,
       targetUserId: '',
-      error: null
+      error: null,
+      callStartTime: null,
+      callDurationSeconds: 0
     })
   },
   

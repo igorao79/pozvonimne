@@ -66,68 +66,154 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
   useImperativeHandle(ref, () => ({
     refreshChats: loadChats,
     findAndSelectChat: async (chatId: string) => {
-      await loadChats()
-      const chat = chats.find(c => c.id === chatId)
-      if (chat) {
-        onChatSelect(chat)
-        return chat
-      }
-      return null
-    }
-  }), [chats, onChatSelect])
+      console.log('🔍 ChatList.findAndSelectChat called with:', chatId)
+      console.log('🔍 Current chats count:', chats.length)
 
-  // Realtime подписка на изменения чатов
+      try {
+        console.log('🔍 Fast chat search - checking current state first...')
+        
+        // Сначала проверяем текущее состояние чатов
+        let actualChats = chats
+        
+        // Если чаты не загружены, делаем прямой запрос без loadChats()
+        if (actualChats.length === 0) {
+          console.log('🔍 No chats in state, making direct database query...')
+          
+          const { data, error: directQueryError } = await supabase.rpc('get_user_chats')
+          
+          if (!directQueryError && data) {
+            actualChats = data
+            console.log('🔍 Direct query successful, found chats:', actualChats.length)
+            
+            // Обновляем состояние компонента после успешного запроса
+            setChats(data)
+          } else {
+            console.error('🔍 Direct query failed:', directQueryError)
+            return null
+          }
+        } else {
+          console.log('🔍 Using cached chats:', actualChats.length)
+        }
+
+        const chat = actualChats.find(c => c.id === chatId)
+        console.log('🔍 Found chat:', chat ? `${chat.name} (${chat.id})` : 'null')
+
+        if (chat) {
+          console.log('🔍 Calling onChatSelect for chat:', chat.name)
+          onChatSelect(chat)
+          return chat
+        }
+
+        console.log('🔍 Chat not found:', chatId)
+        return null
+      } catch (error) {
+        console.error('🔍 Error in findAndSelectChat:', error)
+        return null
+      }
+    }
+  }), [chats, onChatSelect, supabase, setChats])
+
+  // Realtime подписка на изменения чатов с оптимизацией
   useEffect(() => {
     if (!userId) return
 
-    console.log('📡 Подписываемся на обновления чатов для пользователя:', userId)
+    let timeoutId: NodeJS.Timeout
+    let isPollingMode = false
+    let pollInterval: NodeJS.Timeout
 
-    // Подписка на изменения в чатах
-    const chatsChannel = supabase
-      .channel('chats_updates')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'chats' 
-        }, 
-        (payload) => {
-          console.log('📡 Изменение в чатах:', payload)
-          // Быстрое обновление без задержки
-          setTimeout(() => loadChats(), 100)
-        }
-      )
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'messages' 
-        }, 
-        (payload) => {
-          console.log('📡 Новое сообщение:', payload)
-          // Быстрое обновление без задержки
-          setTimeout(() => loadChats(), 100)
-        }
-      )
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'chat_participants' 
-        }, 
-        (payload) => {
-          console.log('📡 Изменение участников чата:', payload)
-          // Быстрое обновление без задержки
-          setTimeout(() => loadChats(), 100)
-        }
-      )
-      .subscribe()
+    const setupRealtimeSubscription = () => {
+      if (isPollingMode) return
+
+      console.log('📡 Подписываемся на обновления чатов для пользователя:', userId)
+
+      // Уникальное имя канала для избежания конфликтов
+      const channelName = `chats_updates_${userId.substring(0, 8)}`
+      
+      // Проверяем существующие каналы и очищаем дубли
+      const existingChannels = supabase.getChannels().filter(ch => ch.topic.includes('chats_updates'))
+      existingChannels.forEach(ch => supabase.removeChannel(ch))
+
+      const chatsChannel = supabase
+        .channel(channelName)
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'chats' 
+          }, 
+          (payload) => {
+            console.log('📡 Изменение в чатах:', payload)
+            // Дебаунсинг обновлений
+            clearTimeout(timeoutId)
+            timeoutId = setTimeout(() => loadChats(), 300)
+          }
+        )
+        .on('postgres_changes', 
+          { 
+            event: 'INSERT', // Только новые сообщения
+            schema: 'public', 
+            table: 'messages' 
+          }, 
+          (payload) => {
+            console.log('📡 Новое сообщение:', payload)
+            clearTimeout(timeoutId)
+            timeoutId = setTimeout(() => loadChats(), 300)
+          }
+        )
+        .subscribe((status, err) => {
+          console.log('📡 Статус канала чатов:', status, err ? `Ошибка: ${err}` : '')
+
+          if (status === 'SUBSCRIBED') {
+            console.log('📡 Успешно подписались на изменения чатов')
+            isPollingMode = false
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('📡 Ошибка канала чатов:', err)
+            
+            // Переключаемся на polling режим при ошибке
+            console.log('🚨 CRITICAL REALTIME ERROR (ChatList) - Переключаемся на polling')
+            
+            supabase.removeChannel(chatsChannel)
+            isPollingMode = true
+            
+            // Запускаем polling
+            pollInterval = setInterval(async () => {
+              try {
+                await loadChats()
+                console.log('📊 POLLING MODE (ChatList) - Чаты обновлены')
+              } catch (error) {
+                console.error('📊 POLLING ERROR (ChatList):', error)
+              }
+            }, 5000)
+            
+            console.log('📊 SWITCHED TO POLLING MODE (ChatList)')
+          } else if (status === 'TIMED_OUT') {
+            console.warn('📡 Таймаут канала чатов, переподключение...')
+            // Повторная попытка подключения через 2 секунды
+            setTimeout(setupRealtimeSubscription, 2000)
+          } else if (status === 'CLOSED') {
+            console.log('📡 Канал чатов закрыт')
+          }
+        })
+
+      return chatsChannel
+    }
+
+    const channel = setupRealtimeSubscription()
 
     return () => {
       console.log('📡 Отписываемся от обновлений чатов')
-      supabase.removeChannel(chatsChannel)
+      clearTimeout(timeoutId)
+      
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
+      
+      if (pollInterval) {
+        clearInterval(pollInterval)
+        console.log('📊 POLLING CLEARED (ChatList)')
+      }
     }
-  }, [userId, supabase])
+  }, [userId]) // Убрали supabase из зависимостей
 
   // Форматирование времени последнего сообщения
   const formatLastMessageTime = (timestamp?: string) => {

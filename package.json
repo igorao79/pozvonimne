@@ -12,6 +12,8 @@
     "deploy": "touch out/.nojekyll && gh-pages -d out"
   },
   "dependencies": {
+    "@emoji-mart/data": "^1.2.1",
+    "@emoji-mart/react": "^1.1.1",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.57.4",
     "@types/simple-peer": "^9.11.8",
@@ -20,8 +22,10 @@
     "lucide-react": "^0.544.0",
     "megajs": "^1.3.9",
     "next": "15.5.3",
+    "node-emoji": "^2.2.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-loading-skeleton": "^3.5.0",
     "simple-peer": "^9.11.1",
     "tailwind-merge": "^3.3.1",
     "zustand": "^5.0.8"

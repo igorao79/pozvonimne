@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import useCallStore from '@/store/useCallStore'
 import useAudioAnalyzer from '@/hooks/useAudioAnalyzer'
+import useCallTimer from '@/hooks/useCallTimer'
 import { createClient } from '@/utils/supabase/client'
 
 interface AudioCallInterfaceProps {
@@ -42,6 +43,12 @@ const AudioCallInterface = ({
   const { isSpeaking: isRemoteSpeaking } = useAudioAnalyzer({
     stream: remoteStream,
     isActive: isCallActive && !remoteMicMuted
+  })
+
+  // Use call timer for duration tracking
+  const { timeString: callDuration } = useCallTimer({
+    isActive: isCallActive,
+    reset: !isCallActive
   })
 
   const supabase = createClient()
@@ -170,7 +177,7 @@ const AudioCallInterface = ({
             {remoteUserName || `Пользователь ${targetUserId?.slice(0, 8)}...`}
           </h2>
           <p className="text-lg text-blue-200 mb-4">
-            {targetUserId && `ID: ${targetUserId}`}
+            {isCallActive ? `Продолжительность: ${callDuration}` : 'Соединение...'}
           </p>
 
           {/* Call Status */}

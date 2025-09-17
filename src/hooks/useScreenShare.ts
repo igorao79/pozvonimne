@@ -44,60 +44,39 @@ export const useScreenShare = () => {
   // Функция для добавления video трека к существующему peer connection
   const addVideoTrackToPeer = useCallback(async (videoTrack: MediaStreamTrack, stream: MediaStream): Promise<boolean> => {
     if (!peer || peer.destroyed || !peer.connected) {
-      console.warn('📺 Peer not ready for adding video track')
       return false
     }
 
     try {
       const pc = (peer as any)._pc
       if (!pc) {
-        console.warn('📺 RTCPeerConnection not available')
         return false
       }
 
-      console.log('📺 Adding screen video track to peer connection...')
-
       // Добавляем track к RTCPeerConnection
       const sender = pc.addTrack(videoTrack, stream)
-      console.log('📺 Screen video track added via addTrack:', {
-        sender: !!sender,
-        trackId: videoTrack.id,
-        streamId: stream.id
-      })
 
       // Ожидаем небольшую задержку для стабилизации
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Создаем новый offer для renegotiation
-      console.log('📺 Creating offer for screen sharing renegotiation...')
-      
       const offer = await pc.createOffer({
         iceRestart: false,
         offerToReceiveAudio: true,
         offerToReceiveVideo: true
       })
 
-      console.log('📺 Created offer for screen sharing:', {
-        type: offer.type,
-        hasVideo: offer.sdp?.includes('m=video'),
-        hasAudio: offer.sdp?.includes('m=audio'),
-        sdpVideoLines: (offer.sdp?.match(/m=video/g) || []).length
-      })
-
       // Устанавливаем локальное описание
       await pc.setLocalDescription(offer)
-      console.log('📺 Set local description for screen sharing')
 
       // Отправляем сигнал через SimplePeer
       if (typeof (peer as any).emit === 'function') {
-        console.log('📺 Sending screen sharing offer signal via SimplePeer')
         ;(peer as any).emit('signal', offer)
       }
 
       return true
 
     } catch (err: any) {
-      console.warn('📺 Failed to add video track and renegotiate:', err)
       return false
     }
   }, [peer])
