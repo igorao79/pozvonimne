@@ -1,10 +1,20 @@
 import React, { useRef, useEffect } from 'react'
 import dynamic from 'next/dynamic'
-import data from '@emoji-mart/data'
+import useThemeStore from '@/store/useThemeStore'
 
 // Динамический импорт для избежания проблем с SSR
-const EmojiPickerComponent = dynamic(
-  () => import('@emoji-mart/react'),
+const EmojiPickerWithTheme = dynamic(
+  async () => {
+    const mod = await import('emoji-picker-react')
+    const EmojiPicker = mod.default
+    const Theme = mod.Theme
+    return ({ theme, ...props }: any) => (
+      <EmojiPicker
+        theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+        {...props}
+      />
+    )
+  },
   {
     ssr: false,
     loading: () => (
@@ -28,6 +38,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
 }) => {
   console.log('🎨 EmojiPicker render, isOpen:', isOpen)
 
+  const { theme } = useThemeStore()
   const pickerRef = useRef<HTMLDivElement>(null)
 
   // Закрытие при клике вне компонента
@@ -47,8 +58,8 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
     }
   }, [isOpen, onClose])
 
-  const handleEmojiSelect = (emoji: any) => {
-    onEmojiSelect(emoji.native)
+  const handleEmojiSelect = (emojiData: any) => {
+    onEmojiSelect(emojiData.emoji)
     onClose()
   }
 
@@ -64,40 +75,17 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
         transformOrigin: 'bottom right'
       }}
     >
-      <EmojiPickerComponent
-        data={data}
-        onEmojiSelect={handleEmojiSelect}
-        theme="dark"
-        previewPosition="none"
-        skinTonePosition="none"
-        perLine={8}
-        emojiSize={24}
-        emojiButtonSize={32}
-        navPosition="bottom"
-        maxFrequentRows={1}
-        categories={['frequent', 'people', 'nature', 'foods', 'activity', 'places', 'objects', 'symbols', 'flags']}
-        i18n={{
-          search: 'Поиск emoji...',
-          search_no_results_1: 'Ничего не найдено',
-          search_no_results_2: 'Попробуйте другой запрос',
-          pick: 'Выберите emoji...',
-          add_custom: 'Добавить свой',
-          categories: {
-            search: 'Результаты поиска',
-            recent: 'Недавние',
-            frequent: 'Часто используемые',
-            people: 'Люди и эмоции',
-            nature: 'Животные и природа',
-            foods: 'Еда и напитки',
-            activity: 'Активности',
-            places: 'Путешествия и места',
-            objects: 'Объекты',
-            symbols: 'Символы',
-            flags: 'Флаги',
-            custom: 'Пользовательские'
-          }
-        }}
-      />
+      <div className="emoji-picker-container">
+        <EmojiPickerWithTheme
+          onEmojiClick={handleEmojiSelect}
+          theme={theme}
+          previewConfig={{ showPreview: false }}
+          skinTonesDisabled={true}
+          width={300}
+          height={400}
+          searchPlaceHolder="Поиск emoji..."
+        />
+      </div>
     </div>
   )
 }

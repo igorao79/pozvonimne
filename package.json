@@ -12,8 +12,7 @@
     "deploy": "touch out/.nojekyll && gh-pages -d out"
   },
   "dependencies": {
-    "@emoji-mart/data": "^1.2.1",
-    "@emoji-mart/react": "^1.1.1",
+    "emoji-picker-react": "^4.13.3",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.57.4",
     "@types/simple-peer": "^9.11.8",

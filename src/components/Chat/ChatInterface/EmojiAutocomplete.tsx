@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { SearchIndex } from 'emoji-mart'
-import data from '@emoji-mart/data'
+import * as emoji from 'node-emoji'
 
 interface EmojiSuggestion {
   id: string
@@ -19,16 +18,10 @@ interface EmojiAutocompleteProps {
 // Флаг инициализации данных
 let dataInitialized = false
 
-const initializeData = async () => {
+const initializeData = () => {
   if (!dataInitialized) {
-    try {
-      // Инициализируем данные emoji-mart
-      await SearchIndex.reset()
-      dataInitialized = true
-      console.log('🎨 Emoji data initialized successfully')
-    } catch (error) {
-      console.error('❌ Failed to initialize Emoji data:', error)
-    }
+    dataInitialized = true
+    console.log('🎨 Emoji data initialized successfully')
   }
 }
 
@@ -58,17 +51,18 @@ export const EmojiAutocomplete: React.FC<EmojiAutocompleteProps> = ({
         setIsVisible(true)
 
         try {
-          // Используем SearchIndex из emoji-mart для поиска
-          const searchResults = await SearchIndex.search(searchTerm, { maxResults: 8, caller: 'autocomplete' })
+          // Используем node-emoji для поиска
+          const searchResults = emoji.search(searchTerm)
 
           // Преобразуем результаты в формат нашего компонента
           const filteredEmojis: EmojiSuggestion[] = searchResults
-            .map((emoji: any) => ({
-              id: emoji.id,
-              name: emoji.name,
-              native: emoji.skins?.[0]?.native || emoji.native,
-              shortcodes: emoji.shortcodes ? `:${emoji.shortcodes}:` : `:${emoji.id}:`,
-              keywords: emoji.keywords
+            .slice(0, 8)
+            .map((emojiData: any) => ({
+              id: emojiData.key,
+              name: emojiData.name,
+              native: emojiData.emoji,
+              shortcodes: `:${emojiData.key}:`,
+              keywords: []
             }))
 
           setSuggestions(filteredEmojis)
@@ -160,7 +154,7 @@ export const EmojiAutocomplete: React.FC<EmojiAutocompleteProps> = ({
       <div className="space-y-1">
         {suggestions.map((emoji, index) => (
           <button
-            key={emoji.id}
+            key={`${emoji.id}-${index}`}
             onClick={() => handleEmojiSelect(emoji)}
             className={`w-full text-left px-3 py-2 rounded-md transition-colors flex items-center space-x-3 ${
               index === selectedIndex
