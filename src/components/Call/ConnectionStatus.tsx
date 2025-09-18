@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import useCallStore from '@/store/useCallStore'
+import { Wifi, WifiOff, AlertCircle, CheckCircle, Clock } from 'lucide-react'
 
 interface ConnectionStats {
   connectionState: string
@@ -64,13 +65,13 @@ const ConnectionStatus = () => {
 
   const getConnectionIcon = () => {
     if (stats.connectionState === 'connected' && stats.iceConnectionState === 'connected') {
-      return '🟢'
+      return <CheckCircle className="h-4 w-4 text-green-500" />
     } else if (stats.connectionState === 'connecting' || stats.iceConnectionState === 'connecting') {
-      return '🟡'
+      return <Clock className="h-4 w-4 text-yellow-500" />
     } else if (stats.connectionState === 'failed' || stats.iceConnectionState === 'failed') {
-      return '🔴'
+      return <AlertCircle className="h-4 w-4 text-red-500" />
     } else {
-      return '⚪'
+      return <WifiOff className="h-4 w-4 text-gray-400" />
     }
   }
 
@@ -89,64 +90,63 @@ const ConnectionStatus = () => {
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50">
-      <div className="bg-card/90 backdrop-blur-sm rounded-lg shadow-lg border border-border p-3 min-w-[200px]">
+    <div className="fixed top-16 right-4 z-50">
+      <div className="bg-card/95 backdrop-blur-md rounded-lg shadow-lg border border-border p-2 min-w-[180px]">
         {/* Основной индикатор */}
-        <div 
+        <div
           className="flex items-center space-x-2 cursor-pointer"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          <span className="text-lg">{getConnectionIcon()}</span>
-          <div className="flex-1">
-            <div className={`font-medium text-sm ${getConnectionColor()}`}>
+          {getConnectionIcon()}
+          <div className="flex-1 min-w-0">
+            <div className={`font-medium text-xs ${getConnectionColor()}`}>
               {getStatusText()}
             </div>
             {stats.connected && (
-              <div className="text-xs text-muted-foreground">
-                💓 Keep-alive активен
+              <div className="text-xs text-muted-foreground flex items-center space-x-1">
+                <Wifi className="h-3 w-3" />
+                <span>Keep-alive</span>
               </div>
             )}
           </div>
-          <button className="text-muted-foreground hover:text-foreground transition-colors">
+          <button className="text-muted-foreground hover:text-foreground transition-colors p-0.5">
             {isExpanded ? '▼' : '▶'}
           </button>
         </div>
 
         {/* Расширенная информация */}
         {isExpanded && (
-          <div className="mt-3 pt-3 border-t border-border space-y-2 text-xs">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <div className="font-medium text-muted-foreground">Соединение:</div>
-                <div className={getConnectionColor()}>{stats.connectionState}</div>
+          <div className="mt-2 pt-2 border-t border-border space-y-1.5 text-xs">
+            <div className="grid grid-cols-1 gap-1">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Соединение:</span>
+                <span className={getConnectionColor()}>{stats.connectionState}</span>
               </div>
-              <div>
-                <div className="font-medium text-muted-foreground">ICE:</div>
-                <div className={getConnectionColor()}>{stats.iceConnectionState}</div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">ICE:</span>
+                <span className={getConnectionColor()}>{stats.iceConnectionState}</span>
               </div>
-            </div>
-            
-            <div>
-              <div className="font-medium text-muted-foreground">ICE сбор:</div>
-              <div className="text-foreground">{stats.iceGatheringState}</div>
-            </div>
-            
-            <div>
-              <div className="font-medium text-muted-foreground">Data Channel:</div>
-              <div className={stats.connected ? 'text-green-600 dark:text-green-400' : 'text-destructive'}>
-                {stats.connected ? 'Активен' : 'Неактивен'}
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">ICE сбор:</span>
+                <span className="text-foreground">{stats.iceGatheringState}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Data Channel:</span>
+                <span className={stats.connected ? 'text-green-600 dark:text-green-400' : 'text-destructive'}>
+                  {stats.connected ? 'Активен' : 'Неактивен'}
+                </span>
               </div>
             </div>
 
             {stats.reconnectAttempts > 0 && (
-              <div>
-                <div className="font-medium text-muted-foreground">Попытки переподключения:</div>
-                <div className="text-orange-600">{stats.reconnectAttempts}/3</div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Переподключения:</span>
+                <span className="text-orange-600">{stats.reconnectAttempts}/3</span>
               </div>
             )}
 
-            <div className="text-xs text-muted-foreground mt-2">
-              Обновлено: {new Date().toLocaleTimeString()}
+            <div className="text-xs text-muted-foreground pt-1 border-t border-border">
+              {new Date().toLocaleTimeString()}
             </div>
           </div>
         )}

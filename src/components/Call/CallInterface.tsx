@@ -378,7 +378,7 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
             <p className="text-muted-foreground mb-4">Ожидание принятия звонка...</p>
             <button
               onClick={endCall}
-              className="w-full bg-destructive text-destructive-foreground py-2 px-4 rounded-lg hover:bg-destructive/90 transition-colors"
+              className="w-full bg-destructive text-destructive-foreground py-2 px-4 rounded-lg hover:bg-destructive/90 transition-all duration-200 cursor-pointer hover:ring-2 hover:ring-destructive/50"
             >
               Отменить звонок
             </button>

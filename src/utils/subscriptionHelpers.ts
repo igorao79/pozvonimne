@@ -12,21 +12,43 @@ export interface SubscriptionStatus {
  */
 export function logSubscriptionError(context: string, error: any): string {
   if (error === undefined || error === null) {
-    return 'No error details provided'
+    return `No error details provided (context: ${context})`
   }
   
   if (typeof error === 'string') {
     return error
   }
   
+  // Более детальное логирование ошибок
   if (error?.message) {
-    return error.message
+    const additional = []
+    if (error.code) additional.push(`code: ${error.code}`)
+    if (error.status) additional.push(`status: ${error.status}`)
+    if (error.type) additional.push(`type: ${error.type}`)
+    if (error.reason) additional.push(`reason: ${error.reason}`)
+    
+    const details = additional.length > 0 ? ` (${additional.join(', ')})` : ''
+    return `${error.message}${details}`
+  }
+  
+  // Если это объект ошибки без message
+  if (typeof error === 'object') {
+    const errorInfo = []
+    if (error.code !== undefined) errorInfo.push(`code: ${error.code}`)
+    if (error.status !== undefined) errorInfo.push(`status: ${error.status}`)
+    if (error.type !== undefined) errorInfo.push(`type: ${error.type}`)
+    if (error.reason !== undefined) errorInfo.push(`reason: ${error.reason}`)
+    if (error.name !== undefined) errorInfo.push(`name: ${error.name}`)
+    
+    if (errorInfo.length > 0) {
+      return `Error details: ${errorInfo.join(', ')}`
+    }
   }
   
   try {
     return JSON.stringify(error)
   } catch {
-    return 'Unknown error (could not serialize)'
+    return `Unknown error (could not serialize, type: ${typeof error})`
   }
 }
 
@@ -40,10 +62,19 @@ export function createSubscriptionHandler(
     onError?: (error: string) => void
     onTimeout?: (error: string) => void
     onClosed?: () => void
+    suppressExpectedErrors?: boolean // Новый флаг для подавления ожидаемых ошибок
   } = {}
 ) {
+  const { suppressExpectedErrors = false } = options
+  
   return (status: string, err?: any) => {
-    console.log(`📡 [${context}] Subscription status:`, status, err ? logSubscriptionError(context, err) : 'No error')
+    // Более тихое логирование для нормальных операций
+    const shouldLogError = !suppressExpectedErrors || status !== 'CHANNEL_ERROR'
+    const shouldLogVerbose = !context.includes('calls:') && !context.includes('webrtc:')
+
+    if (shouldLogVerbose) {
+      console.log(`📡 [${context}] Subscription status:`, status, err ? logSubscriptionError(context, err) : 'No error')
+    }
 
     switch (status) {
       case 'SUBSCRIBED':
@@ -53,8 +84,25 @@ export function createSubscriptionHandler(
         
       case 'CHANNEL_ERROR':
         const errorMessage = logSubscriptionError(context, err)
-        console.error(`📡 [${context}] Channel error:`, errorMessage)
-        options.onError?.(errorMessage)
+        
+        // Проверяем, является ли это ожидаемой ошибкой при закрытии
+        const isExpectedCloseError = (
+          errorMessage.includes('User-Initiated Abort') ||
+          errorMessage.includes('Close called') ||
+          errorMessage.includes('connection closed') ||
+          errorMessage.includes('No error details provided')
+        )
+        
+        if (shouldLogError && !isExpectedCloseError) {
+          console.error(`📡 [${context}] Channel error:`, errorMessage)
+        } else if (isExpectedCloseError && shouldLogVerbose) {
+          console.log(`📡 [${context}] Expected close:`, errorMessage)
+        }
+        
+        // Все равно вызываем callback, но только для неожиданных ошибок
+        if (!isExpectedCloseError) {
+          options.onError?.(errorMessage)
+        }
         break
         
       case 'TIMED_OUT':
@@ -64,12 +112,16 @@ export function createSubscriptionHandler(
         break
         
       case 'CLOSED':
-        console.log(`📡 [${context}] Subscription closed`)
+        if (shouldLogVerbose) {
+          console.log(`📡 [${context}] Subscription closed`)
+        }
         options.onClosed?.()
         break
         
       default:
-        console.log(`📡 [${context}] Unknown status:`, status)
+        if (shouldLogVerbose) {
+          console.log(`📡 [${context}] Unknown status:`, status)
+        }
     }
   }
 }

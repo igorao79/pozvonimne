@@ -4,6 +4,7 @@ import { useRef, useEffect, useState, useCallback} from 'react'
 import useCallStore from '@/store/useCallStore'
 import useAudioAnalyzer from '@/hooks/useAudioAnalyzer'
 import useConnectionHandler from '@/hooks/useConnectionHandler'
+import useThemeStore from '@/store/useThemeStore'
 import { createClient } from '@/utils/supabase/client'
 import CallControls from './CallControls'
 import AudioDiagnostics from './AudioDiagnostics'
@@ -48,6 +49,9 @@ const CallScreen = () => {
     isReceivingCall,
     isInCall
   } = useCallStore()
+
+  // Get current theme
+  const { theme } = useThemeStore()
 
   // Use audio analyzer for speaking detection
   const { isSpeaking: isLocalSpeaking } = useAudioAnalyzer({
@@ -310,103 +314,131 @@ const CallScreen = () => {
     localStorage.setItem('screenWindowSize', JSON.stringify(screenWindowSize))
   }, [screenWindowSize])
 
+  // Theme-based background classes
+  const getBackgroundClasses = () => {
+    if (theme === 'dark') {
+      return 'min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col relative'
+    } else {
+      return 'min-h-screen bg-gradient-to-br from-blue-400 via-indigo-500 to-purple-600 flex flex-col relative'
+    }
+  }
+
+  // Theme-based overlay classes for better contrast
+  const getOverlayClasses = () => {
+    if (theme === 'dark') {
+      return 'absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10'
+    } else {
+      return 'absolute inset-0 bg-gradient-to-t from-white/10 via-transparent to-blue-900/20'
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex flex-col">
-      {/* Hidden audio elements */}
-      <audio
-        ref={localAudioRef}
-        autoPlay
-        muted
-        style={{ display: 'none' }}
-      />
-      <audio
-        ref={remoteAudioRef}
-        autoPlay
-        playsInline
-        controls={false}
-        muted={false}
-        style={{ display: 'none' }}
-        onLoadedData={() => console.log('Remote audio loaded data')}
-        onCanPlay={() => {
-          console.log('Remote audio can play')
-          if (remoteAudioRef.current) {
-            console.log('Auto-starting remote audio...')
-            remoteAudioRef.current.play()
-              .then(() => console.log('Remote audio auto-play successful'))
-              .catch((error) => {
-                console.log('Remote audio auto-play failed:', error.name)
-                const startAudioOnClick = () => {
-                  if (remoteAudioRef.current) {
-                    remoteAudioRef.current.play().catch(console.error)
-                    document.removeEventListener('click', startAudioOnClick)
-                    document.removeEventListener('touchstart', startAudioOnClick)
+    <div className={getBackgroundClasses()}>
+      {/* Theme overlay for better visual hierarchy */}
+      <div className={getOverlayClasses()}></div>
+
+      {/* Content container with relative positioning */}
+      <div className="relative z-10 min-h-screen flex flex-col">
+        {/* Hidden audio elements */}
+        <audio
+          ref={localAudioRef}
+          autoPlay
+          muted
+          style={{ display: 'none' }}
+        />
+        <audio
+          ref={remoteAudioRef}
+          autoPlay
+          playsInline
+          controls={false}
+          muted={false}
+          style={{ display: 'none' }}
+          onLoadedData={() => console.log('Remote audio loaded data')}
+          onCanPlay={() => {
+            console.log('Remote audio can play')
+            if (remoteAudioRef.current) {
+              console.log('Auto-starting remote audio...')
+              remoteAudioRef.current.play()
+                .then(() => console.log('Remote audio auto-play successful'))
+                .catch((error) => {
+                  console.log('Remote audio auto-play failed:', error.name)
+                  const startAudioOnClick = () => {
+                    if (remoteAudioRef.current) {
+                      remoteAudioRef.current.play().catch(console.error)
+                      document.removeEventListener('click', startAudioOnClick)
+                      document.removeEventListener('touchstart', startAudioOnClick)
+                    }
                   }
-                }
-                document.addEventListener('click', startAudioOnClick)
-                document.addEventListener('touchstart', startAudioOnClick)
-              })
-          }
-        }}
-        onPlay={() => console.log('Remote audio started playing')}
-        onPause={() => console.log('Remote audio paused')}
-        onError={(e) => console.error('Remote audio error:', e)}
-        onVolumeChange={() => console.log('Remote audio volume changed:', remoteAudioRef.current?.volume)}
-        onLoadedMetadata={() => {
-          console.log('Remote audio metadata loaded')
-          if (remoteAudioRef.current) {
-            console.log('Audio duration:', remoteAudioRef.current.duration)
-          }
-        }}
-        onStalled={() => console.log('Remote audio stalled')}
-        onSuspend={() => console.log('Remote audio suspended')}
-        onWaiting={() => console.log('Remote audio waiting')}
-        onEnded={() => console.log('Remote audio ended')}
-      />
+                  document.addEventListener('click', startAudioOnClick)
+                  document.addEventListener('touchstart', startAudioOnClick)
+                })
+            }
+          }}
+          onPlay={() => console.log('Remote audio started playing')}
+          onPause={() => console.log('Remote audio paused')}
+          onError={(e) => console.error('Remote audio error:', e)}
+          onVolumeChange={() => console.log('Remote audio volume changed:', remoteAudioRef.current?.volume)}
+          onLoadedMetadata={() => {
+            console.log('Remote audio metadata loaded')
+            if (remoteAudioRef.current) {
+              console.log('Audio duration:', remoteAudioRef.current.duration)
+            }
+          }}
+          onStalled={() => console.log('Remote audio stalled')}
+          onSuspend={() => console.log('Remote audio suspended')}
+          onWaiting={() => console.log('Remote audio waiting')}
+          onEnded={() => console.log('Remote audio ended')}
+        />
 
-      {/* Screen Sharing Window */}
-      <ScreenSharingWindow
-        isScreenFullscreen={isScreenFullscreen}
-        screenWindowPosition={screenWindowPosition}
-        screenWindowSize={screenWindowSize}
-        onMouseDown={handleMouseDown}
-        onToggleFullscreen={toggleFullscreen}
-        onStopVideo={() => {
-          if (screenVideoRef.current) {
-            console.log('📺 Stopping video playback')
-            screenVideoRef.current.pause()
-            screenVideoRef.current.srcObject = null
-          }
-        }}
-        onResetPosition={resetPosition}
-      />
+        {/* Screen Sharing Window */}
+        <ScreenSharingWindow
+          isScreenFullscreen={isScreenFullscreen}
+          screenWindowPosition={screenWindowPosition}
+          screenWindowSize={screenWindowSize}
+          onMouseDown={handleMouseDown}
+          onToggleFullscreen={toggleFullscreen}
+          onStopVideo={() => {
+            if (screenVideoRef.current) {
+              console.log('📺 Stopping video playback')
+              screenVideoRef.current.pause()
+              screenVideoRef.current.srcObject = null
+            }
+          }}
+          onResetPosition={resetPosition}
+        />
 
-      {/* Audio Call Interface */}
-      <AudioCallInterface
-        remoteMicMuted={remoteMicMuted}
-        setRemoteMicMuted={setRemoteMicMuted}
-        remoteUserName={remoteUserName}
-        remoteUserAvatar={remoteUserAvatar}
-        showDiagnostics={showDiagnostics}
-        setShowDiagnostics={setShowDiagnostics}
-        remoteAudioRef={remoteAudioRef}
-      />
-
-      {/* Controls */}
-      <div className="p-6 bg-black bg-opacity-25">
-        <div className="flex flex-col items-center space-y-4">
-          <CallControls />
-
-          
+        {/* Audio Call Interface */}
+        <div className="flex-1 flex items-center justify-center pb-32">
+          <AudioCallInterface
+            remoteMicMuted={remoteMicMuted}
+            setRemoteMicMuted={setRemoteMicMuted}
+            remoteUserName={remoteUserName}
+            remoteUserAvatar={remoteUserAvatar}
+            showDiagnostics={showDiagnostics}
+            setShowDiagnostics={setShowDiagnostics}
+            remoteAudioRef={remoteAudioRef}
+          />
         </div>
+
+        {/* Controls - Fixed at bottom */}
+        <div className={`fixed bottom-0 left-0 right-0 p-6 z-50 ${
+          theme === 'dark'
+            ? 'bg-black/50 backdrop-blur-md border-t border-white/20'
+            : 'bg-white/40 backdrop-blur-md border-t border-white/30'
+        }`}>
+          <div className="flex flex-col items-center space-y-4">
+            <CallControls />
+          </div>
+        </div>
+
+        {/* Audio Diagnostics Modal */}
+        {showDiagnostics && (
+          <AudioDiagnostics onClose={() => setShowDiagnostics(false)} />
+        )}
+
+        {/* Connection Status */}
+        <ConnectionStatus />
       </div>
-
-      {/* Audio Diagnostics Modal */}
-      {showDiagnostics && (
-        <AudioDiagnostics onClose={() => setShowDiagnostics(false)} />
-      )}
-
-      {/* Connection Status */}
-      <ConnectionStatus />
     </div>
   )
 }

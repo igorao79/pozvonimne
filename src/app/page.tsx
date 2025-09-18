@@ -132,7 +132,7 @@ export default function Home() {
                 className="mr-2"
               />
               <h1
-                className="text-lg font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
+                className="text-lg font-semibold text-foreground hover:text-primary hover:ring-2 hover:ring-primary/30 dark:hover:ring-primary/50 hover:ring-offset-1 transition-all duration-200 cursor-pointer rounded px-2 py-1"
                 onClick={handleLogoClick}
               >
                 Позвони.мне
@@ -142,14 +142,14 @@ export default function Home() {
               <ThemeToggler />
               <button
                 onClick={() => setShowProfile(true)}
-                className="p-2 rounded-md hover:bg-secondary transition-colors duration-200 border border-border"
+                className="p-2 rounded-md hover:bg-secondary/80 hover:ring-2 hover:ring-secondary/60 dark:hover:bg-white dark:hover:ring-white transition-all duration-200 border border-border cursor-pointer"
                 aria-label="Открыть профиль"
               >
                 <User className="h-5 w-5 text-foreground" />
               </button>
               <button
                 onClick={handleSignOut}
-                className="text-sm text-primary hover:text-primary/80 transition-colors"
+                className="text-sm text-primary hover:text-primary/80 hover:bg-primary/10 hover:ring-1 hover:ring-primary/30 dark:hover:bg-white dark:hover:ring-white transition-all duration-200 px-3 py-1 rounded cursor-pointer"
               >
                 Выйти
               </button>

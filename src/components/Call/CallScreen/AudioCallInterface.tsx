@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import useCallStore from '@/store/useCallStore'
 import useAudioAnalyzer from '@/hooks/useAudioAnalyzer'
 import useCallTimer from '@/hooks/useCallTimer'
+import useThemeStore from '@/store/useThemeStore'
 import { createClient } from '@/utils/supabase/client'
 
 interface AudioCallInterfaceProps {
@@ -52,6 +53,30 @@ const AudioCallInterface = ({
   })
 
   const supabase = createClient()
+
+  // Get current theme
+  const { theme } = useThemeStore()
+
+  // Theme-based text color classes
+  const getTextColorClasses = () => {
+    if (theme === 'dark') {
+      return {
+        primary: 'text-white',
+        secondary: 'text-slate-300',
+        accent: 'text-purple-300',
+        muted: 'text-slate-400'
+      }
+    } else {
+      return {
+        primary: 'text-white',
+        secondary: 'text-blue-100',
+        accent: 'text-indigo-200',
+        muted: 'text-blue-300'
+      }
+    }
+  }
+
+  const textColors = getTextColorClasses()
 
   // Handle mic status changes
   useEffect(() => {
@@ -130,14 +155,16 @@ const AudioCallInterface = ({
         <div className={`relative mb-8 transition-all duration-500 ${
           isScreenSharing ? 'transform scale-75 translate-y-8 opacity-60' : ''
         }`}>
-          <div className={`w-40 h-40 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full mx-auto flex items-center justify-center shadow-2xl transition-all duration-200 overflow-hidden ${
-            isRemoteSpeaking ? 'ring-4 ring-green-400 ring-opacity-75 animate-pulse' : ''
+          <div className={`w-40 h-40 rounded-full mx-auto flex items-center justify-center shadow-2xl transition-all duration-200 relative ${
+            theme === 'dark'
+              ? `bg-gradient-to-br from-slate-600 to-purple-700 ${isRemoteSpeaking ? 'ring-4 ring-purple-400 ring-opacity-75 animate-pulse' : ''}`
+              : `bg-gradient-to-br from-blue-500 to-indigo-600 ${isRemoteSpeaking ? 'ring-4 ring-green-400 ring-opacity-75 animate-pulse' : ''}`
           }`}>
             {remoteUserAvatar ? (
               <img
                 src={remoteUserAvatar}
                 alt="Avatar"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover rounded-full"
                 onError={(e) => {
                   console.error('Failed to load remote user avatar:', remoteUserAvatar)
                   e.currentTarget.style.display = 'none'
@@ -149,17 +176,17 @@ const AudioCallInterface = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7-7h14a7 7 0 00-7-7z" />
               </svg>
             )}
-          </div>
 
-          {/* Remote mic status indicator */}
-          {remoteMicMuted && (
-            <div className="absolute bottom-2 right-2 bg-red-500 rounded-full p-2 shadow-lg">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-3a1 1 0 011-1h1.586l4.707-4.707C10.923 4.663 12 5.109 12 6v12c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-              </svg>
-            </div>
-          )}
+            {/* Remote mic status indicator - теперь внутри аватарки */}
+            {remoteMicMuted && (
+              <div className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-1.5 shadow-lg border-2 border-white">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-3a1 1 0 011-1h1.586l4.707-4.707C10.923 4.663 12 5.109 12 6v12c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                </svg>
+              </div>
+            )}
+          </div>
 
           {/* Speaking waves animation */}
           {isRemoteSpeaking && !remoteMicMuted && (
@@ -172,11 +199,11 @@ const AudioCallInterface = ({
         </div>
 
         {/* User Info */}
-        <div className="text-white mb-8">
+        <div className={`${textColors.primary} mb-8`}>
           <h2 className="text-2xl font-bold mb-2">
             {remoteUserName || `Пользователь ${targetUserId?.slice(0, 8)}...`}
           </h2>
-          <p className="text-lg text-blue-200 mb-4">
+          <p className={`text-lg mb-4 ${textColors.secondary}`}>
             {isCallActive ? `Продолжительность: ${callDuration}` : 'Соединение...'}
           </p>
 
@@ -184,7 +211,7 @@ const AudioCallInterface = ({
           <div className="flex flex-col items-center space-y-2">
             <div className="flex items-center justify-center space-x-2">
               <div className={`w-3 h-3 rounded-full ${isCallActive ? 'bg-green-400' : 'bg-yellow-400'} animate-pulse`}></div>
-              <span className="text-blue-100">
+              <span className={textColors.secondary}>
                 {isCallActive ? 'Активный звонок' : 'Соединение...'}
               </span>
             </div>
@@ -195,7 +222,7 @@ const AudioCallInterface = ({
                 <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
-                <span className="text-green-200 text-sm">
+                <span className={`${theme === 'dark' ? 'text-green-300' : 'text-green-200'} text-sm`}>
                   Демонстрация экрана
                 </span>
               </div>
@@ -207,8 +234,10 @@ const AudioCallInterface = ({
         {/* Audio Status Indicators */}
         <div className="flex justify-center space-x-8 mb-12">
           <div className="text-center">
-            <div className={`relative w-16 h-16 bg-blue-600 bg-opacity-50 rounded-full flex items-center justify-center mb-2 transition-all duration-200 ${
-              isLocalSpeaking && !isMicMuted ? 'ring-2 ring-green-400 ring-opacity-75' : ''
+            <div className={`relative w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all duration-200 ${
+              theme === 'dark'
+                ? `bg-slate-700/60 ${isLocalSpeaking && !isMicMuted ? 'ring-2 ring-purple-400 ring-opacity-75' : ''}`
+                : `bg-blue-600/50 ${isLocalSpeaking && !isMicMuted ? 'ring-2 ring-green-400 ring-opacity-75' : ''}`
             }`}>
               {isMicMuted ? (
                 <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -223,17 +252,21 @@ const AudioCallInterface = ({
 
               {/* Local speaking animation */}
               {isLocalSpeaking && !isMicMuted && (
-                <div className="absolute inset-0 bg-green-400 rounded-full opacity-20 animate-pulse"></div>
+                <div className={`absolute inset-0 rounded-full opacity-20 animate-pulse ${
+                  theme === 'dark' ? 'bg-purple-400' : 'bg-green-400'
+                }`}></div>
               )}
             </div>
-            <p className="text-blue-200 text-sm">
+            <p className={`${textColors.secondary} text-sm`}>
               {isMicMuted ? 'Микрофон выкл.' : 'Ваш микрофон'}
             </p>
           </div>
 
           <div className="text-center">
-            <div className={`relative w-16 h-16 bg-blue-600 bg-opacity-50 rounded-full flex items-center justify-center mb-2 transition-all duration-200 ${
-              isRemoteSpeaking && !remoteMicMuted ? 'ring-2 ring-green-400 ring-opacity-75' : ''
+            <div className={`relative w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all duration-200 ${
+              theme === 'dark'
+                ? `bg-slate-700/60 ${isRemoteSpeaking && !remoteMicMuted ? 'ring-2 ring-purple-400 ring-opacity-75' : ''}`
+                : `bg-blue-600/50 ${isRemoteSpeaking && !remoteMicMuted ? 'ring-2 ring-green-400 ring-opacity-75' : ''}`
             }`}>
               {!remoteStream ? (
                 <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -250,10 +283,12 @@ const AudioCallInterface = ({
 
               {/* Remote speaking animation */}
               {isRemoteSpeaking && !remoteMicMuted && (
-                <div className="absolute inset-0 bg-green-400 rounded-full opacity-20 animate-pulse"></div>
+                <div className={`absolute inset-0 rounded-full opacity-20 animate-pulse ${
+                  theme === 'dark' ? 'bg-purple-400' : 'bg-green-400'
+                }`}></div>
               )}
             </div>
-            <p className="text-blue-200 text-sm">
+            <p className={`${textColors.secondary} text-sm`}>
               {!remoteStream ? 'Аудио не подключено' : remoteMicMuted ? 'Микрофон выкл.' : 'Подключен'}
             </p>
           </div>

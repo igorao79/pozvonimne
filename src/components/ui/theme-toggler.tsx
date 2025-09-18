@@ -63,11 +63,11 @@ export const ThemeToggler = ({ className }: Props) => {
   };
 
   return (
-    <button 
-      ref={buttonRef} 
-      onClick={handleToggle} 
+    <button
+      ref={buttonRef}
+      onClick={handleToggle}
       className={cn(
-        "p-2 rounded-md hover:bg-secondary transition-colors duration-200 border border-border",
+        "p-2 rounded-md hover:bg-secondary/80 hover:ring-2 hover:ring-secondary/60 dark:hover:bg-white dark:hover:ring-white transition-all duration-200 border border-border cursor-pointer",
         className
       )}
       aria-label={theme === 'dark' ? 'Переключить на светлую тему' : 'Переключить на тёмную тему'}

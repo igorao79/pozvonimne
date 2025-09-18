@@ -195,7 +195,7 @@ const IncomingCall = () => {
         <div className="flex space-x-4">
           <button
             onClick={handleReject}
-            className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold py-4 px-6 rounded-full transition-colors duration-200 flex items-center justify-center"
+            className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold py-4 px-6 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-destructive/50"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -204,7 +204,7 @@ const IncomingCall = () => {
           
           <button
             onClick={handleAccept}
-            className="flex-1 bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white font-semibold py-4 px-6 rounded-full transition-colors duration-200 flex items-center justify-center"
+            className="flex-1 bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white font-semibold py-4 px-6 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-green-400/50"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

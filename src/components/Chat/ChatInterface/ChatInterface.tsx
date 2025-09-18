@@ -56,7 +56,7 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
     loading
   })
 
-  const { messageInputRef, focusInput, focusAfterSend } = useChatFocus()
+  const { messageInputRef, focusInput, focusAfterSend, disableAutoFocus, enableAutoFocus } = useChatFocus()
 
   const { handleCall } = useChatActions({ chat, onError: setError })
 
@@ -160,6 +160,17 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
     })
   }, [])
 
+  // Управление автофокусом при открытии/закрытии модального окна редактирования
+  useEffect(() => {
+    if (editModal.isOpen) {
+      // Отключаем автофокус на основном инпуте при открытии модального окна
+      disableAutoFocus()
+    } else {
+      // Включаем автофокус обратно при закрытии модального окна
+      enableAutoFocus()
+    }
+  }, [editModal.isOpen, disableAutoFocus, enableAutoFocus])
+
   // Обработчик удаления сообщения
   const handleDeleteMessage = useCallback(async (messageId: string) => {
     try {
@@ -174,7 +185,7 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
   // Компонент рендерится
 
   return (
-    <div className="h-full flex flex-col" onClick={focusInput}>
+    <div className="h-full flex flex-col hover:ring-2 hover:ring-border/60 dark:hover:ring-white/30 transition-all duration-300" onClick={focusInput}>
       <ChatHeader
         chat={chat}
         onBack={onBack}

@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react'
 import useCallStore from '@/store/useCallStore'
+import useThemeStore from '@/store/useThemeStore'
 import CallControls from '../CallControls'
 
 interface ScreenSharingWindowProps {
@@ -24,6 +25,7 @@ const ScreenSharingWindow = ({
   onResetPosition
 }: ScreenSharingWindowProps) => {
   const screenVideoRef = useRef<HTMLVideoElement>(null)
+  const { theme } = useThemeStore()
   const {
     screenStream,
     remoteScreenStream,
@@ -31,6 +33,23 @@ const ScreenSharingWindow = ({
     isReceivingCall,
     isInCall
   } = useCallStore()
+
+  // Theme-based button styles
+  const getButtonStyles = () => {
+    if (theme === 'dark') {
+      return {
+        background: 'bg-slate-800/70 hover:bg-slate-700/80',
+        text: 'text-slate-200 hover:text-white'
+      }
+    } else {
+      return {
+        background: 'bg-black/50 hover:bg-black/75',
+        text: 'text-white'
+      }
+    }
+  }
+
+  const buttonStyles = getButtonStyles()
 
   // Убираем всю сложную логику - простая схема: есть стрим = показываем видео
 
@@ -99,7 +118,7 @@ const ScreenSharingWindow = ({
                 e.stopPropagation()
                 onStopVideo()
               }}
-              className="w-6 h-6 bg-black/50 hover:bg-black/75 text-white rounded flex items-center justify-center text-xs transition-colors"
+              className={`w-6 h-6 ${buttonStyles.background} ${buttonStyles.text} rounded flex items-center justify-center text-xs transition-colors`}
               title="Остановить просмотр"
             >
               ⏸️
@@ -110,7 +129,7 @@ const ScreenSharingWindow = ({
               e.stopPropagation()
               onToggleFullscreen()
             }}
-            className="w-6 h-6 bg-black/50 hover:bg-black/75 text-white rounded flex items-center justify-center text-xs transition-colors"
+            className={`w-6 h-6 ${buttonStyles.background} ${buttonStyles.text} rounded flex items-center justify-center text-xs transition-colors`}
             title="На весь экран"
           >
             ⛶
@@ -120,7 +139,7 @@ const ScreenSharingWindow = ({
               e.stopPropagation()
               onResetPosition()
             }}
-            className="w-6 h-6 bg-black/50 hover:bg-black/75 text-white rounded flex items-center justify-center text-xs transition-colors"
+            className={`w-6 h-6 ${buttonStyles.background} ${buttonStyles.text} rounded flex items-center justify-center text-xs transition-colors`}
             title="Сбросить позицию"
           >
             ↻
@@ -139,7 +158,11 @@ const ScreenSharingWindow = ({
               e.stopPropagation()
               onToggleFullscreen()
             }}
-            className="px-6 py-3 bg-blue-500 bg-opacity-90 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm font-medium transition-colors shadow-lg"
+            className={`px-6 py-3 rounded-lg flex items-center justify-center text-sm font-medium transition-colors shadow-lg ${
+              theme === 'dark'
+                ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                : 'bg-blue-500 bg-opacity-90 hover:bg-blue-600 text-white'
+            }`}
             title="Выйти из полноэкранного режима"
           >
             🪟 Окно
@@ -152,7 +175,11 @@ const ScreenSharingWindow = ({
                 e.stopPropagation()
                 onStopVideo()
               }}
-              className="px-6 py-3 bg-gray-500 bg-opacity-90 hover:bg-gray-600 text-white rounded-lg flex items-center justify-center text-sm font-medium transition-colors shadow-lg"
+              className={`px-6 py-3 rounded-lg flex items-center justify-center text-sm font-medium transition-colors shadow-lg ${
+                theme === 'dark'
+                  ? 'bg-slate-600 hover:bg-slate-700 text-slate-200'
+                  : 'bg-gray-500 bg-opacity-90 hover:bg-gray-600 text-white'
+              }`}
               title="Остановить демонстрацию экрана"
             >
               ⏸️ Стоп
@@ -164,7 +191,11 @@ const ScreenSharingWindow = ({
       {/* Drag handle для маленького окошка */}
       {!isScreenFullscreen && (
         <div
-          className="absolute top-0 left-0 right-0 h-8 bg-black bg-opacity-40 cursor-move rounded-t-lg z-40 hover:bg-opacity-60 transition-opacity"
+          className={`absolute top-0 left-0 right-0 h-8 cursor-move rounded-t-lg z-40 transition-opacity ${
+            theme === 'dark'
+              ? 'bg-slate-800/60 hover:bg-slate-700/80'
+              : 'bg-black/40 hover:bg-black/60'
+          }`}
           onMouseDown={(e) => onMouseDown(e, 'drag')}
           title="Переместить окно (зажмите и тяните)"
         />
@@ -179,7 +210,9 @@ const ScreenSharingWindow = ({
             playsInline
             controls={false}
             muted={false}
-            className="w-full h-full object-contain bg-black border-2 border-green-500 rounded-lg"
+            className={`w-full h-full object-contain bg-black border-2 rounded-lg ${
+              theme === 'dark' ? 'border-purple-400' : 'border-green-500'
+            }`}
             style={{
               borderRadius: isScreenFullscreen ? 0 : '8px',
               // Принудительные стили для диагностики серого экрана

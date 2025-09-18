@@ -101,6 +101,9 @@ class ResilientChannelManager {
             recreationCount: 0
           }
 
+          // Определяем, является ли это каналом WebRTC или звонков
+          const isWebRTCOrCallChannel = channelName.includes('webrtc:') || channelName.includes('calls:')
+          
           // Подписываемся с улучшенной обработкой ошибок
           configuredChannel.subscribe(
             createSubscriptionHandler(`ResilientChannel:${channelName}`, {
@@ -144,7 +147,8 @@ class ResilientChannelManager {
                 if (!channelState.isReconnecting) {
                   this.attemptReconnection(channelState)
                 }
-              }
+              },
+              suppressExpectedErrors: isWebRTCOrCallChannel // Подавляем ожидаемые ошибки для WebRTC и звонков
             })
           )
 
@@ -211,6 +215,9 @@ class ResilientChannelManager {
       channelState.lastActivity = Date.now()
       channelState.isHealthy = false
       
+      // Определяем, является ли это каналом WebRTC или звонков (для переподключения)
+      const isWebRTCOrCallChannel = channelName.includes('webrtc:') || channelName.includes('calls:')
+      
       // Подписываемся заново
       configuredChannel.subscribe(
         createSubscriptionHandler(`ResilientChannel:${channelName}`, {
@@ -242,7 +249,8 @@ class ResilientChannelManager {
           onClosed: () => {
             console.log(`🚪 [ResilientChannel] Reconnected channel closed: ${channelName}`)
             channelState.isHealthy = false
-          }
+          },
+          suppressExpectedErrors: isWebRTCOrCallChannel // Подавляем ожидаемые ошибки для WebRTC и звонков
         })
       )
     } catch (error) {

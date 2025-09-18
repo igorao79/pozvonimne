@@ -50,10 +50,10 @@ const CallControls = () => {
       {/* Mute/Unmute Button */}
       <button
         onClick={toggleMic}
-        className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors duration-200 ${
-          isMicMuted 
-            ? 'bg-red-500 hover:bg-red-600' 
-            : 'bg-gray-600 hover:bg-gray-700'
+        className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors duration-200 cursor-pointer ${
+          isMicMuted
+            ? 'bg-red-500 hover:bg-red-600 hover:ring-2 hover:ring-red-400/50'
+            : 'bg-gray-600 hover:bg-gray-700 hover:ring-2 hover:ring-gray-400/50 dark:bg-gray-700 dark:hover:bg-gray-500 dark:hover:ring-gray-300'
         }`}
       >
         {isMicMuted ? (
@@ -71,7 +71,7 @@ const CallControls = () => {
       {/* End Call Button */}
       <button
         onClick={handleEndCall}
-        className="w-16 h-16 bg-red-500 hover:bg-red-600 active:bg-red-700 rounded-full flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+        className="w-16 h-16 bg-red-500 hover:bg-red-600 active:bg-red-700 rounded-full flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 cursor-pointer hover:ring-2 hover:ring-red-400/50"
       >
         <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -87,8 +87,8 @@ const CallControls = () => {
           !!remoteScreenStream && !isScreenSharing
             ? 'bg-gray-400 cursor-not-allowed opacity-50'
             : isScreenSharing
-            ? 'bg-green-500 hover:bg-green-600'
-            : 'bg-gray-600 hover:bg-gray-700'
+            ? 'bg-green-500 hover:bg-green-600 hover:ring-2 hover:ring-green-400/50 cursor-pointer'
+            : 'bg-gray-600 hover:bg-gray-700 hover:ring-2 hover:ring-gray-400/50 dark:bg-gray-700 dark:hover:bg-gray-500 dark:hover:ring-gray-300 cursor-pointer'
         }`}
         title={
           !!remoteScreenStream && !isScreenSharing

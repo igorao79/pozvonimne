@@ -1,6 +1,7 @@
 import SimplePeer from 'simple-peer'
 import type { PeerRefs } from './types'
 import useCallStore from '@/store/useCallStore'
+import { resilientChannelManager } from '@/utils/resilientChannelManager'
 
 // Функция для попытки переподключения
 export const attemptReconnection = (
@@ -73,19 +74,27 @@ export const handlePeerError = (
   isInCall: boolean,
   initializePeer: (isInitiator: boolean) => Promise<void>
 ) => {
-  console.error('Peer error:', err)
+  // Проверяем, является ли это ожидаемой ошибкой при закрытии
+  const isExpectedCloseError = err instanceof Error && (
+    err.message.includes('InvalidStateError') ||
+    err.message.includes('wrong state') ||
+    err.message.includes('already have a remote') ||
+    err.message.includes('User-Initiated Abort') ||
+    err.message.includes('OperationError: User-Initiated Abort') ||
+    err.message.includes('Close called') ||
+    err.message.includes('connection closed') ||
+    err.message.includes('DataChannel closing') ||
+    err.message.includes('RTCPeerConnection closed')
+  )
 
-  // Игнорируем определенные типы ошибок, которые не требуют завершения звонка
-  if (err instanceof Error) {
-    if (err.message.includes('InvalidStateError') ||
-        err.message.includes('wrong state') ||
-        err.message.includes('already have a remote') ||
-        err.message.includes('User-Initiated Abort, reason=Close called') ||
-        err.message.includes('OperationError: User-Initiated Abort')) {
-      console.log('Ignoring normal peer closure error:', err.message)
-      return
-    }
+  if (isExpectedCloseError) {
+    // Тихое логирование для ожидаемых ошибок при закрытии
+    console.log(`📞 [User ${userId?.slice(0, 8)}] Expected peer close:`, err.message)
+    return
   }
+
+  // Логируем только неожиданные ошибки
+  console.error(`📞 [User ${userId?.slice(0, 8)}] Unexpected peer error:`, err)
 
   const { setError, endCall } = useCallStore.getState()
   setError('Ошибка соединения: ' + err.message)
@@ -117,6 +126,16 @@ export const cleanupAllPeerResources = (peerRefs: PeerRefs, userId: string | nul
   peerRefs.lastKeepAliveRef.current = 0
   peerRefs.reconnectAttemptsRef.current = 0
   
+  // Очищаем WebRTC каналы через resilientChannelManager
+  if (userId) {
+    try {
+      resilientChannelManager.removeChannel(`webrtc:${userId}`)
+      console.log(`🧹 [User ${userId?.slice(0, 8)}] Cleaned up WebRTC channel`)
+    } catch (err) {
+      console.warn(`🧹 [User ${userId?.slice(0, 8)}] Error cleaning WebRTC channel:`, err)
+    }
+  }
+  
   // Уничтожаем peer connection с дополнительными проверками
   if (peerRefs.peerRef.current) {
     try {
@@ -126,7 +145,16 @@ export const cleanupAllPeerResources = (peerRefs: PeerRefs, userId: string | nul
         peerRefs.peerRef.current.destroy()
       }
     } catch (err) {
-      console.warn(`🧹 [User ${userId?.slice(0, 8)}] Error during peer cleanup:`, err)
+      // Тихо обрабатываем ожидаемые ошибки при закрытии
+      if (err instanceof Error && (
+        err.message.includes('User-Initiated Abort') ||
+        err.message.includes('Close called') ||
+        err.message.includes('already destroyed')
+      )) {
+        console.log(`🧹 [User ${userId?.slice(0, 8)}] Expected error during peer cleanup:`, err.message)
+      } else {
+        console.warn(`🧹 [User ${userId?.slice(0, 8)}] Unexpected error during peer cleanup:`, err)
+      }
     } finally {
       peerRefs.peerRef.current = null
     }
