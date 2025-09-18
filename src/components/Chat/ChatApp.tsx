@@ -23,9 +23,11 @@ interface Chat {
 
 interface ChatAppProps {
   autoOpenChatId?: string // ID чата для автоматического открытия
+  onResetChat?: () => void // Callback для сброса состояния чата
+  resetTrigger?: number // Триггер для принудительного сброса состояния
 }
 
-const ChatApp = ({ autoOpenChatId }: ChatAppProps = {}) => {
+const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger }: ChatAppProps = {}) => {
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isLoading, setIsLoading] = useState(!!autoOpenChatId) // Простая логика загрузки
@@ -33,6 +35,29 @@ const ChatApp = ({ autoOpenChatId }: ChatAppProps = {}) => {
   
   // Ref для debouncing сохранения в localStorage
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Функция для сброса состояния чата
+  const resetChatState = () => {
+    console.log('🔄 RESET CHAT STATE - Сброс состояния чата')
+    setSelectedChat(null)
+    setShowCreateModal(false)
+    setIsLoading(false)
+
+    // Очищаем localStorage
+    try {
+      localStorage.removeItem('selectedChatId')
+      localStorage.removeItem('selectedChatName')
+      localStorage.removeItem('selectedChatTimestamp')
+      console.log('💾 RESET CHAT STATE - localStorage очищен')
+    } catch (error) {
+      console.error('💾 RESET CHAT STATE - Ошибка очистки localStorage:', error)
+    }
+
+    // Вызываем callback если он есть
+    if (onResetChat) {
+      onResetChat()
+    }
+  }
   
   // Debounced функция для сохранения в localStorage
   const debouncedSaveToLocalStorage = (chat: Chat) => {
@@ -139,6 +164,14 @@ const ChatApp = ({ autoOpenChatId }: ChatAppProps = {}) => {
       }
     }
   }, [autoOpenChatId])
+
+  // Effect для обработки внешнего сброса чата по триггеру
+  useEffect(() => {
+    if (resetTrigger && resetTrigger > 0) {
+      console.log('🔄 EXTERNAL RESET - Триггер сброса чата активирован:', resetTrigger)
+      resetChatState()
+    }
+  }, [resetTrigger])
 
   // Очистка таймера при размонтировании компонента
   useEffect(() => {

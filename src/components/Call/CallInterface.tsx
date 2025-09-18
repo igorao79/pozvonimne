@@ -9,7 +9,11 @@ import { ChatApp } from '../Chat'
 import { sendCallEndedMessage, sendMissedCallMessage, findOrCreateChatWithUser } from '@/utils/callSystemMessages'
 import { createSubscriptionHandler, createReconnectionManager, safeRemoveChannel } from '@/utils/subscriptionHelpers'
 
-const CallInterface = () => {
+interface CallInterfaceProps {
+  resetChatTrigger?: number
+}
+
+const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
   const {
     userId,
     isInCall,
@@ -59,24 +63,8 @@ const CallInterface = () => {
   }
 
   // Восстановление сохраненного чата из localStorage при загрузке
-  useEffect(() => {
-    if (!userId) return
-
-    console.log('💾 ВОССТАНОВЛЕНИЕ ЧАТА - Проверка localStorage при загрузке компонента')
-    
-    try {
-      const savedChatFromStorage = localStorage.getItem('selectedChatId')
-      
-      if (savedChatFromStorage) {
-        console.log('💾 ВОССТАНОВЛЕНИЕ ЧАТА - Найден сохраненный чат:', savedChatFromStorage)
-        setSavedChatId(savedChatFromStorage)
-      } else {
-        console.log('💾 ВОССТАНОВЛЕНИЕ ЧАТА - Сохраненный чат не найден')
-      }
-    } catch (error) {
-      console.error('💾 ВОССТАНОВЛЕНИЕ ЧАТА - Ошибка чтения localStorage:', error)
-    }
-  }, [userId])
+  // УБРАНО: Автоматическое восстановление чата при входе в аккаунт
+  // Теперь чат восстанавливается только после звонка или при явном выборе
 
   // Отслеживаем состояния звонка для системных сообщений
   useEffect(() => {
@@ -411,7 +399,7 @@ const CallInterface = () => {
     timestamp: new Date().toISOString()
   })
 
-  return <ChatApp autoOpenChatId={chatIdToOpen || undefined} />
+  return <ChatApp autoOpenChatId={chatIdToOpen || undefined} onResetChat={() => setChatToOpenAfterCall(null)} resetTrigger={resetChatTrigger} />
 }
 
 export default CallInterface

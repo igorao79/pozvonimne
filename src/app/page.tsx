@@ -16,6 +16,7 @@ import { User } from 'lucide-react'
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [showProfile, setShowProfile] = useState(false)
+  const [resetChatTrigger, setResetChatTrigger] = useState(0)
   const { supabase } = useSupabaseStore()
   const { startGlobalSync, stopGlobalSync } = useChatSyncStore()
   
@@ -95,6 +96,12 @@ export default function Home() {
     }
   }
 
+  const handleLogoClick = () => {
+    // Сбрасываем состояние к начальному виду - закрываем профиль и сбрасываем чаты
+    setShowProfile(false)
+    setResetChatTrigger(prev => prev + 1) // Триггерим сброс состояния чатов
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -124,7 +131,10 @@ export default function Home() {
                 height={32}
                 className="mr-2"
               />
-              <h1 className="text-lg font-semibold text-foreground">
+              <h1
+                className="text-lg font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
+                onClick={handleLogoClick}
+              >
                 Позвони.мне
               </h1>
             </div>
@@ -161,7 +171,7 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
-        <CallInterface />
+        <CallInterface resetChatTrigger={resetChatTrigger} />
       </main>
 
       {/* Profile Modal */}
