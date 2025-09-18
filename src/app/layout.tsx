@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'Позвони.мне - Простое приложение для голосовых звонков',
   description: 'Простое и безопасное приложение для аудио звонков с WebRTC',
   icons: {
-    icon: '/logo.ico',
+    icon: '/pozvonimne/logo.ico',
   },
 }
 

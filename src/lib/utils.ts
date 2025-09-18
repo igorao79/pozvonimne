@@ -6,6 +6,6 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getAssetPath(path: string): string {
-  const assetPrefix = process.env.NODE_ENV === 'production' ? '/pozvonimne' : ''
-  return `${assetPrefix}${path}`
+  const basePath = process.env.NODE_ENV === 'production' ? '/pozvonimne' : ''
+  return `${basePath}${path}`
 }
