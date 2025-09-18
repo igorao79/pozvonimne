@@ -6,6 +6,7 @@ import { sendSignal } from './signalHandlers'
 import { startKeepAlive, stopKeepAlive, handleKeepAliveMessage } from './keepAlive'
 import { startConnectionMonitoring, stopConnectionMonitoring } from './connectionMonitor'
 import { resetReconnectionCounter, handlePeerError, handlePeerClose } from './reconnection'
+import { performanceMonitor } from './performanceMonitor'
 
 // Функция для инициализации peer соединения
 export const initializePeer = async (
@@ -83,6 +84,7 @@ export const initializePeer = async (
 
     // Обработчик ошибок
     peer.on('error', (err) => {
+      performanceMonitor.recordConnectionFailure(userId || 'unknown', err.message)
       handlePeerError(err, peerRefs, userId, targetUserId, useCallStore.getState().isInCall, (isInit) => initializePeer(isInit, peerRefs, userId, targetUserId, isCallActive, processBufferedSignals))
     })
 
@@ -96,6 +98,9 @@ export const initializePeer = async (
       console.log('Peer connected!')
       setIsCallActive(true)
 
+      // Регистрируем успешное соединение
+      performanceMonitor.recordConnectionSuccess(userId || 'unknown')
+
       // Сбрасываем счетчик переподключений при успешном соединении
       resetReconnectionCounter(peerRefs)
 
@@ -104,6 +109,7 @@ export const initializePeer = async (
       startConnectionMonitoring(peerRefs, userId, () => {
         // Функция переподключения
         const { isInCall: currentIsInCall, targetUserId: currentTargetUserId } = useCallStore.getState()
+        performanceMonitor.recordReconnectionAttempt(userId || 'unknown')
         attemptReconnection(peerRefs, userId, currentIsInCall, currentTargetUserId, (isInit) => initializePeer(isInit, peerRefs, userId, currentTargetUserId, isCallActive, processBufferedSignals))
       })
     })

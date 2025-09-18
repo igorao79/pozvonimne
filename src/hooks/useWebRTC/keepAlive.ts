@@ -17,7 +17,7 @@ export const startKeepAlive = (
   console.log(`💓 [User ${userId?.slice(0, 8)}] Starting keep-alive mechanism`)
 
   keepAliveIntervalRef.current = setInterval(() => {
-    if (peerRef.current && !peerRef.current.destroyed && targetUserId && isCallActive) {
+    if (peerRef.current && !peerRef.current.destroyed && targetUserId) {
       try {
         const currentTime = Date.now()
 
@@ -40,7 +40,7 @@ export const startKeepAlive = (
         console.warn(`💓 [User ${userId?.slice(0, 8)}] Keep-alive error:`, err)
       }
     }
-  }, 30000) // Отправляем keep-alive каждые 30 секунд
+  }, 20000) // Уменьшаем интервал для раннего обнаружения проблем
 }
 
 // Функция для остановки keep-alive

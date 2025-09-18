@@ -42,9 +42,9 @@ export const getIceServers = (): IceServerConfig[] => [
 export const getPeerConfig = (): PeerConfig => ({
   iceServers: getIceServers(),
   iceTransportPolicy: 'all',
-          bundlePolicy: 'max-bundle',
-          rtcpMuxPolicy: 'require' as const,
-  iceCandidatePoolSize: 15, // Увеличиваем пул для лучшего соединения
+  bundlePolicy: 'max-bundle',
+  rtcpMuxPolicy: 'require' as const,
+  iceCandidatePoolSize: 10, // Оптимизируем для стабильности
   certificates: undefined // Автогенерация сертификата
 })
 

@@ -56,7 +56,7 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
     loading
   })
 
-  const { messageInputRef, focusInput } = useChatFocus()
+  const { messageInputRef, focusInput, focusAfterSend } = useChatFocus()
 
   const { handleCall } = useChatActions({ chat, onError: setError })
 
@@ -125,8 +125,11 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
     if (result && !result.success) {
       // Если отправка не удалась, возвращаем текст
       setNewMessage(result.text || messageText)
+    } else {
+      // Всегда восстанавливаем фокус после отправки сообщения
+      focusAfterSend()
     }
-  }, [newMessage, sending, userId, sendMessage])
+  }, [newMessage, sending, userId, sendMessage, focusAfterSend])
 
   // Обработчик начала редактирования сообщения
   const handleEditMessage = useCallback((messageId: string, currentContent: string) => {

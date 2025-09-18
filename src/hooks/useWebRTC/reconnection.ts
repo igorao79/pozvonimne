@@ -22,6 +22,10 @@ export const attemptReconnection = (
   if (currentAttempt > maxRetries) {
     console.error(`🔄 [User ${userId?.slice(0, 8)}] Max reconnection attempts reached, ending call`)
     const { setError, endCall } = useCallStore.getState()
+    
+    // Полная очистка всех ресурсов перед завершением звонка
+    cleanupAllPeerResources(peerRefs, userId)
+    
     setError('Соединение потеряно и не может быть восстановлено')
     endCall()
     return
@@ -30,28 +34,23 @@ export const attemptReconnection = (
   console.log(`🔄 [User ${userId?.slice(0, 8)}] Attempting reconnection ${currentAttempt}/${maxRetries}`)
   reconnectAttemptsRef.current = currentAttempt
 
-  // Быстрая задержка перед переподключением для ускорения повторных звонков
+  // Увеличиваем задержки для уменьшения нагрузки на сеть
+  const delay = Math.min(1000 * Math.pow(1.5, currentAttempt - 1), 5000) // Экспоненциальная задержка
+  
   reconnectTimeoutRef.current = setTimeout(() => {
     reconnectTimeoutRef.current = null
 
     if (isInCall && targetUserId) {
       console.log(`🔄 [User ${userId?.slice(0, 8)}] Reinitializing peer connection`)
 
-      // Уничтожаем старое соединение
-      if (peerRefs.peerRef.current && !peerRefs.peerRef.current.destroyed) {
-        try {
-          peerRefs.peerRef.current.destroy()
-        } catch (err) {
-          console.warn('Error destroying old peer during reconnection:', err)
-        }
-        peerRefs.peerRef.current = null
-      }
+      // Полная очистка старого соединения
+      cleanupAllPeerResources(peerRefs, userId)
 
       // Создаем новое соединение
       const wasInitiator = useCallStore.getState().isCalling
       initializePeer(wasInitiator)
     }
-  }, 100 * currentAttempt) // Минимум для моментальной работы (0.1, 0.2, 0.3 сек)
+  }, delay)
 }
 
 // Функция для сброса счетчика переподключений
@@ -91,6 +90,49 @@ export const handlePeerError = (
   const { setError, endCall } = useCallStore.getState()
   setError('Ошибка соединения: ' + err.message)
   endCall()
+}
+
+// Функция для полной очистки всех peer-ресурсов
+export const cleanupAllPeerResources = (peerRefs: PeerRefs, userId: string | null) => {
+  console.log(`🧹 [User ${userId?.slice(0, 8)}] Starting comprehensive cleanup`)
+  
+  // Очищаем все таймауты и интервалы
+  if (peerRefs.reconnectTimeoutRef.current) {
+    clearTimeout(peerRefs.reconnectTimeoutRef.current)
+    peerRefs.reconnectTimeoutRef.current = null
+  }
+  
+  if (peerRefs.keepAliveIntervalRef.current) {
+    clearInterval(peerRefs.keepAliveIntervalRef.current)
+    peerRefs.keepAliveIntervalRef.current = null
+  }
+  
+  if (peerRefs.connectionCheckIntervalRef.current) {
+    clearInterval(peerRefs.connectionCheckIntervalRef.current)
+    peerRefs.connectionCheckIntervalRef.current = null
+  }
+  
+  // Очищаем буферы
+  peerRefs.signalBufferRef.current = []
+  peerRefs.lastKeepAliveRef.current = 0
+  peerRefs.reconnectAttemptsRef.current = 0
+  
+  // Уничтожаем peer connection с дополнительными проверками
+  if (peerRefs.peerRef.current) {
+    try {
+      if (!peerRefs.peerRef.current.destroyed) {
+        // Удаляем все event listeners перед уничтожением
+        peerRefs.peerRef.current.removeAllListeners()
+        peerRefs.peerRef.current.destroy()
+      }
+    } catch (err) {
+      console.warn(`🧹 [User ${userId?.slice(0, 8)}] Error during peer cleanup:`, err)
+    } finally {
+      peerRefs.peerRef.current = null
+    }
+  }
+  
+  console.log(`🧹 [User ${userId?.slice(0, 8)}] Comprehensive cleanup completed`)
 }
 
 // Функция для обработки закрытия peer соединения

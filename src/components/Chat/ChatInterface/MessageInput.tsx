@@ -202,11 +202,13 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
       />
 
       {/* Emoji Picker */}
-      <EmojiPicker
-        onEmojiSelect={handleEmojiSelect}
-        isOpen={showEmojiPicker}
-        onClose={() => setShowEmojiPicker(false)}
-      />
+      <div data-emoji-picker>
+        <EmojiPicker
+          onEmojiSelect={handleEmojiSelect}
+          isOpen={showEmojiPicker}
+          onClose={() => setShowEmojiPicker(false)}
+        />
+      </div>
     </div>
   )
 })

@@ -4,11 +4,12 @@ import { useEffect, useRef } from 'react'
 import SimplePeer from 'simple-peer'
 import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
+import { channelManager } from './channelManager'
 import type { WebRTCHooks, PeerRefs } from './types'
 import { processBufferedSignals, handleIncomingSignal } from './signalHandlers'
 import { startKeepAlive, stopKeepAlive } from './keepAlive'
 import { startConnectionMonitoring, stopConnectionMonitoring } from './connectionMonitor'
-import { attemptReconnection, resetReconnectionCounter } from './reconnection'
+import { attemptReconnection, resetReconnectionCounter, cleanupAllPeerResources } from './reconnection'
 import { initializePeer } from './peerInitialization'
 
 const useWebRTC = (): WebRTCHooks => {
@@ -134,10 +135,19 @@ const useWebRTC = (): WebRTCHooks => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
-    const webrtcChannel = supabase
-      .channel(`webrtc:${userId}`)
+    const channelName = `webrtc:${userId}`
+    const webrtcChannel = channelManager.createManagedChannel(channelName, {
+      autoCleanup: true,
+      cleanupDelayMs: 600000, // 10 минут автоочистка
+      userId
+    })
+    
+    webrtcChannel
       .on('broadcast', { event: 'webrtc_signal' }, (payload) => {
         handleIncomingSignal(payload, peerRefs, userId, targetUserId)
+        
+        // Продлеваем время жизни канала при активности
+        channelManager.extendChannelLifetime(channelName, 600000)
       })
       .subscribe()
 
@@ -148,7 +158,9 @@ const useWebRTC = (): WebRTCHooks => {
         console.log(`🗑️ [User ${userId?.slice(0, 8)}] Clearing signal buffer (${signalBufferRef.current.length} signals)`)
         signalBufferRef.current = []
       }
-      supabase.removeChannel(webrtcChannel)
+      
+      // Используем channelManager для очистки
+      channelManager.removeChannel(channelName)
       window.removeEventListener('beforeunload', handleBeforeUnload)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
@@ -223,34 +235,13 @@ const useWebRTC = (): WebRTCHooks => {
     return () => {
       console.log('🧹 useWebRTC: Starting cleanup on unmount')
 
-      // Останавливаем все интервалы и таймауты
-      stopKeepAlive(peerRefs, userId)
-      stopConnectionMonitoring(peerRefs, userId)
-      resetReconnectionCounter(peerRefs)
+      // Полная очистка всех ресурсов
+      cleanupAllPeerResources(peerRefs, userId)
       
       // Очищаем дебаунс таймаут
       if (peerInitTimeoutRef.current) {
         clearTimeout(peerInitTimeoutRef.current)
         peerInitTimeoutRef.current = null
-      }
-
-      if (peerRef.current && !peerRef.current.destroyed) {
-        try {
-          console.log('🧹 useWebRTC: Cleaning up peer connection')
-
-          // Устанавливаем флаг, что соединение уничтожается
-          const peerToDestroy = peerRef.current
-          peerRef.current = null
-
-          // Даем время на завершение текущих операций
-          setTimeout(() => {
-            if (peerToDestroy && !peerToDestroy.destroyed) {
-              peerToDestroy.destroy()
-            }
-          }, 100)
-        } catch (err) {
-          console.log('🧹 useWebRTC: Peer cleanup error:', err)
-        }
       }
     }
   }, [])
@@ -260,13 +251,11 @@ const useWebRTC = (): WebRTCHooks => {
     if (!isInCall && peerRef.current) {
       console.log(`🧹 [User ${userId?.slice(0, 8)}] Call ended, force cleanup peer`)
 
-      // Очищаем буфер сигналов
-      signalBufferRef.current = []
-
-      // Останавливаем все процессы
-      stopKeepAlive(peerRefs, userId)
-      stopConnectionMonitoring(peerRefs, userId)
-      resetReconnectionCounter(peerRefs)
+      // Полная очистка всех ресурсов
+      cleanupAllPeerResources(peerRefs, userId)
+      
+      // Очищаем все каналы пользователя
+      channelManager.cleanupUserChannels(userId || '')
       
       // Очищаем дебаунс таймаут
       if (peerInitTimeoutRef.current) {
@@ -276,15 +265,6 @@ const useWebRTC = (): WebRTCHooks => {
       
       // Сбрасываем флаг инициализации
       isInitializingRef.current = false
-
-      try {
-        if (!peerRef.current.destroyed) {
-          peerRef.current.destroy()
-        }
-      } catch (err) {
-        console.log('🧹 Force cleanup error:', err)
-      }
-      peerRef.current = null
     }
   }, [isInCall])
 
