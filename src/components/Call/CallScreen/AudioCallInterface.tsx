@@ -203,22 +203,6 @@ const AudioCallInterface = ({
           </div>
         </div>
 
-        {/* Audio Autoplay Fix Button */}
-        {remoteStream && (
-          <div className="mb-8">
-            <button
-              onClick={() => {
-                if (remoteAudioRef.current) {
-                  remoteAudioRef.current.play().catch(console.error)
-                }
-                console.log('Audio autoplay fix button clicked')
-              }}
-              className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
-            >
-              🔊 Включить звук (если не слышно)
-            </button>
-          </div>
-        )}
 
         {/* Audio Status Indicators */}
         <div className="flex justify-center space-x-8 mb-12">

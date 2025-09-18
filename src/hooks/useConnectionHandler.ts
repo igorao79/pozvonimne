@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
 
 export const useConnectionHandler = () => {
   const { isInCall, userId, targetUserId, endCall } = useCallStore()
-  const supabase = createClient()
+  
+  // Мемоизируем клиент Supabase чтобы избежать постоянного пересоздания useEffect
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     if (!isInCall || !userId) return
@@ -62,7 +64,7 @@ export const useConnectionHandler = () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
-  }, [isInCall, userId, targetUserId, endCall, supabase])
+  }, [isInCall, userId, targetUserId, endCall]) // Убираем supabase из зависимостей
 }
 
 export default useConnectionHandler

@@ -396,13 +396,7 @@ const CallScreen = () => {
         <div className="flex flex-col items-center space-y-4">
           <CallControls />
 
-          {/* Diagnostics Button */}
-          <button
-            onClick={() => setShowDiagnostics(true)}
-            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors"
-          >
-            🔧 Диагностика аудио
-          </button>
+          
         </div>
       </div>
 

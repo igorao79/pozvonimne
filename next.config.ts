@@ -24,8 +24,10 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ['lucide-react'],
     // Disable tracing to avoid OneDrive permission issues
     disableOptimizedLoading: true,
-    serverComponentsExternalPackages: [],
   },
+
+  // Server external packages
+  serverExternalPackages: [],
 
   // Build optimizations
   eslint: {

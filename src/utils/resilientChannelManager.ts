@@ -1,3 +1,5 @@
+'use client'
+
 /**
  * Устойчивый менеджер каналов Supabase с автоматическим переподключением
  * Решает проблему сбросов соединения через 40 минут
@@ -26,6 +28,8 @@ interface ChannelState {
   lastActivity: number
   errorCount: number
   isHealthy: boolean
+  isReconnecting: boolean  // Флаг активного переподключения
+  recreationCount: number  // Счетчик пересозданий канала
 }
 
 class ResilientChannelManager {
@@ -51,10 +55,10 @@ class ResilientChannelManager {
     const {
       channelName,
       setup,
-      maxReconnectAttempts = 5,
-      reconnectDelay = 2000,
-      keepAliveInterval = 30000, // 30 секунд keep-alive
-      healthCheckInterval = 60000 // проверка здоровья каждую минуту
+      maxReconnectAttempts = 3,  // Уменьшили количество попыток
+      reconnectDelay = 5000,     // Увеличили задержку между попытками
+      keepAliveInterval = 60000, // Увеличили интервал keep-alive до 1 минуты
+      healthCheckInterval = 120000 // Проверка здоровья каждые 2 минуты
     } = config
 
     console.log(`🏗️ [ResilientChannel] Creating resilient channel: ${channelName}`)
@@ -78,7 +82,8 @@ class ResilientChannelManager {
           const reconnectionManager = createReconnectionManager(
             () => {
               console.log(`🔄 [ResilientChannel] Reconnecting channel: ${channelName}`)
-              createChannel()
+              // Используем метод класса вместо рекурсивного вызова локальной функции
+              this.recreateChannel(channelName)
             },
             maxReconnectAttempts,
             reconnectDelay
@@ -91,7 +96,9 @@ class ResilientChannelManager {
             reconnectionManager,
             lastActivity: Date.now(),
             errorCount: 0,
-            isHealthy: false
+            isHealthy: false,
+            isReconnecting: false,
+            recreationCount: 0
           }
 
           // Подписываемся с улучшенной обработкой ошибок
@@ -116,8 +123,8 @@ class ResilientChannelManager {
                 channelState.isHealthy = false
                 channelState.errorCount++
                 
-                // При критическом количестве ошибок - переподключение
-                if (channelState.errorCount >= 3) {
+                // При критическом количестве ошибок - переподключение (с защитой)
+                if (channelState.errorCount >= 3 && !channelState.isReconnecting) {
                   console.log(`🔄 [ResilientChannel] Too many errors (${channelState.errorCount}), attempting reconnection for ${channelName}`)
                   this.attemptReconnection(channelState)
                 }
@@ -127,12 +134,16 @@ class ResilientChannelManager {
               onTimeout: (error) => {
                 console.warn(`⏱️ [ResilientChannel] Timeout in ${channelName}:`, error)
                 channelState.isHealthy = false
-                this.attemptReconnection(channelState)
+                if (!channelState.isReconnecting) {
+                  this.attemptReconnection(channelState)
+                }
               },
               onClosed: () => {
                 console.log(`🚪 [ResilientChannel] Channel closed: ${channelName}`)
                 channelState.isHealthy = false
-                this.attemptReconnection(channelState)
+                if (!channelState.isReconnecting) {
+                  this.attemptReconnection(channelState)
+                }
               }
             })
           )
@@ -150,13 +161,32 @@ class ResilientChannelManager {
     })
   }
 
-  // Попытка переподключения канала
-  private attemptReconnection(channelState: ChannelState) {
-    const { channelName } = channelState.config
+  // Безопасное пересоздание канала без рекурсии
+  private recreateChannel(channelName: string) {
+    const channelState = this.channels.get(channelName)
+    if (!channelState) {
+      console.warn(`⚠️ [ResilientChannel] Cannot recreate - channel not found: ${channelName}`)
+      return
+    }
+
+    // Защита от повторного переподключения
+    if (channelState.isReconnecting) {
+      console.warn(`⚠️ [ResilientChannel] Already reconnecting: ${channelName}`)
+      return
+    }
+
+    // Защита от слишком частых пересозданий
+    channelState.recreationCount++
+    if (channelState.recreationCount > 10) {
+      console.error(`💀 [ResilientChannel] Too many recreations (${channelState.recreationCount}) for: ${channelName}`)
+      this.channels.delete(channelName)
+      return
+    }
+
+    console.log(`🔄 [ResilientChannel] Recreating channel: ${channelName} (attempt ${channelState.recreationCount})`)
+    channelState.isReconnecting = true
     
-    console.log(`🔄 [ResilientChannel] Attempting reconnection for: ${channelName}`)
-    
-    // Очищаем таймеры
+    // Очищаем таймеры текущего канала
     this.clearChannelTimers(channelState)
     
     // Удаляем старый канал
@@ -169,6 +199,65 @@ class ResilientChannelManager {
       console.warn(`⚠️ [ResilientChannel] Error cleaning up old channel:`, error)
     }
 
+    // Пересоздаем канал с той же конфигурацией
+    try {
+      this.cleanupExistingChannels(channelName)
+      
+      const channel = this.supabase.channel(channelName)
+      const configuredChannel = channelState.config.setup(channel)
+      
+      // Обновляем состояние канала
+      channelState.channel = configuredChannel
+      channelState.lastActivity = Date.now()
+      channelState.isHealthy = false
+      
+      // Подписываемся заново
+      configuredChannel.subscribe(
+        createSubscriptionHandler(`ResilientChannel:${channelName}`, {
+          onSubscribed: () => {
+            console.log(`✅ [ResilientChannel] Successfully reconnected: ${channelName}`)
+            channelState.isHealthy = true
+            channelState.errorCount = 0
+            channelState.lastActivity = Date.now()
+            channelState.isReconnecting = false  // Сбрасываем флаг переподключения
+            channelState.recreationCount = 0     // Сбрасываем счетчик при успехе
+            channelState.reconnectionManager.reset()
+
+            // Запускаем keep-alive и health check
+            this.startKeepAlive(channelState, channelState.config.keepAliveInterval || 30000)
+            this.startHealthCheck(channelState, channelState.config.healthCheckInterval || 60000)
+
+            channelState.config.onSubscribed?.()
+          },
+          onError: (error) => {
+            console.error(`❌ [ResilientChannel] Reconnection error in ${channelName}:`, error)
+            channelState.isHealthy = false
+            channelState.errorCount++
+            channelState.config.onError?.(error)
+          },
+          onTimeout: (error) => {
+            console.warn(`⏱️ [ResilientChannel] Reconnection timeout in ${channelName}:`, error)
+            channelState.isHealthy = false
+          },
+          onClosed: () => {
+            console.log(`🚪 [ResilientChannel] Reconnected channel closed: ${channelName}`)
+            channelState.isHealthy = false
+          }
+        })
+      )
+    } catch (error) {
+      console.error(`💥 [ResilientChannel] Failed to recreate channel ${channelName}:`, error)
+      channelState.errorCount++
+      channelState.isReconnecting = false  // Сбрасываем флаг при ошибке
+    }
+  }
+
+  // Попытка переподключения канала
+  private attemptReconnection(channelState: ChannelState) {
+    const { channelName } = channelState.config
+    
+    console.log(`🔄 [ResilientChannel] Attempting reconnection for: ${channelName}`)
+    
     // Запускаем переподключение через менеджер
     const success = channelState.reconnectionManager.reconnect()
     if (!success) {
@@ -220,22 +309,24 @@ class ResilientChannelManager {
         channelState: channelState.channel?.state
       })
 
-      // Проверяем критические условия
-      if (timeSinceLastActivity > 300000) { // 5 минут без активности
-        console.warn(`⚠️ [ResilientChannel] No activity for 5+ minutes in ${channelName}, reconnecting`)
+      // Проверяем критические условия (с защитой от дублирования)
+      if (timeSinceLastActivity > 600000) { // Увеличили до 10 минут без активности
+        console.warn(`⚠️ [ResilientChannel] No activity for 10+ minutes in ${channelName}, reconnecting`)
         channelState.isHealthy = false
-        this.attemptReconnection(channelState)
+        if (!channelState.isReconnecting) {
+          this.attemptReconnection(channelState)
+        }
         return
       }
 
-      if (channelState.errorCount >= 5) {
+      if (channelState.errorCount >= 5 && !channelState.isReconnecting) {
         console.warn(`⚠️ [ResilientChannel] Too many errors (${channelState.errorCount}) in ${channelName}, reconnecting`)
         this.attemptReconnection(channelState)
         return
       }
 
       // Проверяем состояние канала
-      if (channelState.channel && channelState.channel.state === 'closed') {
+      if (channelState.channel && channelState.channel.state === 'closed' && !channelState.isReconnecting) {
         console.warn(`⚠️ [ResilientChannel] Channel is closed for ${channelName}, reconnecting`)
         channelState.isHealthy = false
         this.attemptReconnection(channelState)
@@ -250,24 +341,29 @@ class ResilientChannelManager {
       
       console.log(`🌍 [ResilientChannel] Global health check:`, stats)
 
-      // Если много нездоровых каналов - массовое переподключение
-      if (stats.unhealthyChannels > stats.totalChannels / 2 && stats.totalChannels > 0) {
+      // Более консервативная проверка для массового переподключения
+      if (stats.unhealthyChannels > 2 && stats.unhealthyChannels > stats.totalChannels * 0.7 && stats.totalChannels > 0) {
         console.warn(`🚨 [ResilientChannel] Too many unhealthy channels (${stats.unhealthyChannels}/${stats.totalChannels}), triggering mass reconnection`)
         this.massReconnection()
       }
-    }, 120000) // Каждые 2 минуты
+    }, 300000) // Увеличили до 5 минут
   }
 
   // Настройка глобальной обработки ошибок
   private setupGlobalErrorHandling() {
+    // Проверяем что мы на клиенте
+    if (typeof window === 'undefined') {
+      return
+    }
+
     // Обработка ошибок WebSocket соединения
     const originalWebSocket = window.WebSocket
     const self = this
-    
+
     window.WebSocket = class extends originalWebSocket {
       constructor(url: string | URL, protocols?: string | string[]) {
         super(url, protocols)
-        
+
         this.addEventListener('error', (event) => {
           console.error('🌐 [ResilientChannel] Global WebSocket error:', event)
           // Проверяем, если это Supabase WebSocket
@@ -403,9 +499,16 @@ class ResilientChannelManager {
 
 export const resilientChannelManager = ResilientChannelManager.getInstance()
 
-// Автоматическая очистка при закрытии страницы
+// Автоматическая очистка при закрытии страницы (только на клиенте)
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     resilientChannelManager.shutdown()
+  })
+
+  // Также инициализируем менеджер при загрузке страницы
+  window.addEventListener('load', () => {
+    // Это гарантирует что singleton инициализируется только на клиенте
+    const manager = ResilientChannelManager.getInstance()
+    console.log('🌐 [ResilientChannel] Client-side initialization complete')
   })
 }
