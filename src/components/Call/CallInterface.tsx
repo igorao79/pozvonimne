@@ -303,6 +303,19 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
               console.log('📞 Call ended by other user:', payload)
               endCall()
             })
+            .on('broadcast', { event: 'call_cancelled' }, (payload: any) => {
+              console.log('📞 Call cancelled by caller:', payload)
+              const { caller_id } = payload.payload
+
+              // Проверяем, что это отмена нашего звонка
+              const currentState = useCallStore.getState()
+              if (currentState.isReceivingCall && currentState.callerId === caller_id) {
+                console.log('📞 Our incoming call was cancelled by:', caller_id.slice(0, 8))
+                endCall()
+              } else {
+                console.log('📞 Call cancelled by unknown caller:', caller_id?.slice(0, 8))
+              }
+            })
         },
         onSubscribed: () => {
           // Очищаем ошибки и сбрасываем счетчик при успешном подключении
@@ -367,26 +380,7 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
     return <CallScreen />
   }
 
-  // Показываем лоадер, когда звонок отправлен, но еще не принят
-  if (isInCall && isCalling && !isCallActive) {
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-hidden">
-        <div className="bg-card rounded-lg p-6 max-w-sm w-full mx-4 border border-border">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">Звонок отправлен</h3>
-            <p className="text-muted-foreground mb-4">Ожидание принятия звонка...</p>
-            <button
-              onClick={endCall}
-              className="w-full bg-destructive text-destructive-foreground py-2 px-4 rounded-lg hover:bg-destructive/90 transition-all duration-200 cursor-pointer hover:ring-2 hover:ring-destructive/50"
-            >
-              Отменить звонок
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Убираем модальное окно - теперь индикация звонка в ChatHeader
 
   // Определяем какой чат нужно открыть: после звонка имеет приоритет над сохраненным
   const chatIdToOpen = chatToOpenAfterCall || savedChatId

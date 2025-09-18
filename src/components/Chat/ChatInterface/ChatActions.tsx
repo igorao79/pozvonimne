@@ -9,7 +9,7 @@ interface UseChatActionsProps {
 }
 
 export const useChatActions = ({ chat, onError }: UseChatActionsProps) => {
-  const { userId, startCall } = useCallStore()
+  const { userId, startCall, endCall } = useCallStore()
   const { supabase } = useSupabaseStore()
 
   // Обработка звонка
@@ -61,7 +61,42 @@ export const useChatActions = ({ chat, onError }: UseChatActionsProps) => {
     }
   }, [chat.type, chat.other_participant_id, chat.id, chat.name, userId, startCall, supabase, onError])
 
+  // Обработка отмены звонка
+  const handleCancelCall = useCallback(async () => {
+    console.log('📞 HandleCancelCall: Отмена звонка к пользователю:', chat.other_participant_id)
+
+    if (chat.type === 'private' && chat.other_participant_id) {
+      try {
+        // Отправляем сигнал отмены звонка receiver'у
+        const receiverChannelId = `calls:${chat.other_participant_id}`
+        console.log('📞 HandleCancelCall: Отправляем сигнал отмены в канал:', receiverChannelId)
+
+        const result = await supabase.channel(receiverChannelId).send({
+          type: 'broadcast',
+          event: 'call_cancelled',
+          payload: {
+            caller_id: userId,
+            timestamp: Date.now()
+          }
+        })
+
+        console.log('📞 HandleCancelCall: Сигнал call_cancelled отправлен:', result)
+
+        if (result !== 'ok') {
+          console.warn('📞 HandleCancelCall: Предупреждение при отправке сигнала отмены:', result)
+        }
+      } catch (err) {
+        console.error('📞 HandleCancelCall: Ошибка при отправке сигнала отмены:', err)
+        // Продолжаем отмену звонка даже при ошибке отправки сигнала
+      }
+    }
+
+    // Завершаем звонок локально
+    endCall()
+  }, [chat.type, chat.other_participant_id, userId, endCall, supabase])
+
   return {
-    handleCall
+    handleCall,
+    handleCancelCall
   }
 }

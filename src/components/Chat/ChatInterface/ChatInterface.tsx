@@ -58,7 +58,7 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
 
   const { messageInputRef, focusInput, focusAfterSend, disableAutoFocus, enableAutoFocus } = useChatFocus()
 
-  const { handleCall } = useChatActions({ chat, onError: setError })
+  const { handleCall, handleCancelCall } = useChatActions({ chat, onError: setError })
 
   // Хуки для работы с сообщениями
   const { editMessage, deleteMessage } = useMessageActions()
@@ -190,6 +190,7 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
         chat={chat}
         onBack={onBack}
         onCall={handleCall}
+        onCancel={handleCancelCall}
         userStatus={chat.type === 'private' && chat.other_participant_id ? getUserStatus(chat.other_participant_id) : undefined}
         isInCall={isInCall}
         typingUsers={typingUsers}
