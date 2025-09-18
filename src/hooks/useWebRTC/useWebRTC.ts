@@ -5,6 +5,7 @@ import SimplePeer from 'simple-peer'
 import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
 import { channelManager } from './channelManager'
+import { resilientChannelManager } from '@/utils/resilientChannelManager'
 import type { WebRTCHooks, PeerRefs } from './types'
 import { processBufferedSignals, handleIncomingSignal } from './signalHandlers'
 import { startKeepAlive, stopKeepAlive } from './keepAlive'
@@ -136,20 +137,27 @@ const useWebRTC = (): WebRTCHooks => {
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
     const channelName = `webrtc:${userId}`
-    const webrtcChannel = channelManager.createManagedChannel(channelName, {
-      autoCleanup: true,
-      cleanupDelayMs: 600000, // 10 минут автоочистка
-      userId
-    })
     
-    webrtcChannel
-      .on('broadcast', { event: 'webrtc_signal' }, (payload) => {
-        handleIncomingSignal(payload, peerRefs, userId, targetUserId)
-        
-        // Продлеваем время жизни канала при активности
-        channelManager.extendChannelLifetime(channelName, 600000)
-      })
-      .subscribe()
+    resilientChannelManager.createResilientChannel({
+      channelName,
+      setup: (channel) => {
+        return channel.on('broadcast', { event: 'webrtc_signal' }, (payload: any) => {
+          handleIncomingSignal(payload, peerRefs, userId, targetUserId)
+        })
+      },
+      onSubscribed: () => {
+        console.log(`📺 [WebRTC] Successfully connected to resilient channel: ${channelName}`)
+      },
+      onError: (error) => {
+        console.error(`📺 [WebRTC] Resilient channel error: ${error}`)
+      },
+      maxReconnectAttempts: 15, // Много попыток для WebRTC
+      reconnectDelay: 2000,
+      keepAliveInterval: 10000, // Агрессивный keep-alive каждые 10 секунд
+      healthCheckInterval: 20000 // Частая проверка здоровья каждые 20 секунд
+    }).catch(error => {
+      console.error(`📺 [WebRTC] Failed to create resilient channel: ${error}`)
+    })
 
     return () => {
       console.log('Cleaning up WebRTC signal listener')
@@ -159,8 +167,8 @@ const useWebRTC = (): WebRTCHooks => {
         signalBufferRef.current = []
       }
       
-      // Используем channelManager для очистки
-      channelManager.removeChannel(channelName)
+      // Используем resilientChannelManager для очистки
+      resilientChannelManager.removeChannel(channelName)
       window.removeEventListener('beforeunload', handleBeforeUnload)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
@@ -255,7 +263,7 @@ const useWebRTC = (): WebRTCHooks => {
       cleanupAllPeerResources(peerRefs, userId)
       
       // Очищаем все каналы пользователя
-      channelManager.cleanupUserChannels(userId || '')
+      resilientChannelManager.removeChannel(`webrtc:${userId || ''}`)
       
       // Очищаем дебаунс таймаут
       if (peerInitTimeoutRef.current) {

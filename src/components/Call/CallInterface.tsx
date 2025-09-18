@@ -8,6 +8,7 @@ import { CallControls, IncomingCall, CallScreen, DialPad } from '.'
 import { ChatApp } from '../Chat'
 import { sendCallEndedMessage, sendMissedCallMessage, findOrCreateChatWithUser } from '@/utils/callSystemMessages'
 import { createSubscriptionHandler, createReconnectionManager, safeRemoveChannel } from '@/utils/subscriptionHelpers'
+import { resilientChannelManager } from '@/utils/resilientChannelManager'
 
 interface CallInterfaceProps {
   resetChatTrigger?: number
@@ -241,66 +242,68 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
         console.warn('Error in call listener channel cleanup process:', err)
       }
 
-      // Subscribe to incoming calls with improved error handling
-      const callChannel = supabase
-        .channel(channelId)
-      .on('broadcast', { event: 'incoming_call' }, (payload) => {
-        console.log('📞 Received incoming call:', payload)
-        const { caller_id, caller_name, timestamp } = payload.payload
-        
-        // Check if this is a recent call (not older than 30 seconds)
-        if (timestamp && Date.now() - timestamp > 30000) {
-          console.log('📞 Ignoring old call signal')
-          return
-        }
-        
-        // Проверяем, не обрабатываем ли мы уже звонок
-        const currentState = useCallStore.getState()
-        if (currentState.isReceivingCall || currentState.isInCall) {
-          console.log('📞 Already handling a call, ignoring duplicate')
-          return
-        }
-        
-        console.log('📞 Processing incoming call from:', caller_id, 'name:', caller_name)
-        setIsReceivingCall(true, caller_id, caller_name)
-      })
-      .on('broadcast', { event: 'call_accepted' }, (payload) => {
-        console.log('📞 Call was accepted:', payload)
-        const { accepter_id } = payload.payload
-        // Caller gets notification that call was accepted
-        setIsReceivingCall(false)
-        setIsCallActive(true)
-      })
-      .on('broadcast', { event: 'call_rejected' }, (payload) => {
-        console.log('📞 Call was rejected:', payload)
-        const { rejector_id } = payload.payload
+      // Subscribe to incoming calls with resilient channel manager
+      resilientChannelManager.createResilientChannel({
+        channelName: channelId,
+        setup: (channel) => {
+          return channel
+            .on('broadcast', { event: 'incoming_call' }, (payload: any) => {
+              console.log('📞 Received incoming call:', payload)
+              const { caller_id, caller_name, timestamp } = payload.payload
+              
+              // Check if this is a recent call (not older than 30 seconds)
+              if (timestamp && Date.now() - timestamp > 30000) {
+                console.log('📞 Ignoring old call signal')
+                return
+              }
+              
+              // Проверяем, не обрабатываем ли мы уже звонок
+              const currentState = useCallStore.getState()
+              if (currentState.isReceivingCall || currentState.isInCall) {
+                console.log('📞 Already handling a call, ignoring duplicate')
+                return
+              }
+              
+              console.log('📞 Processing incoming call from:', caller_id, 'name:', caller_name)
+              setIsReceivingCall(true, caller_id, caller_name)
+            })
+            .on('broadcast', { event: 'call_accepted' }, (payload: any) => {
+              console.log('📞 Call was accepted:', payload)
+              const { accepter_id } = payload.payload
+              // Caller gets notification that call was accepted
+              setIsReceivingCall(false)
+              setIsCallActive(true)
+            })
+            .on('broadcast', { event: 'call_rejected' }, (payload: any) => {
+              console.log('📞 Call was rejected:', payload)
+              const { rejector_id } = payload.payload
 
-        // Получаем актуальное состояние из store
-        const currentState = useCallStore.getState()
+              // Получаем актуальное состояние из store
+              const currentState = useCallStore.getState()
 
-        // Проверяем, что это отклонение нашего звонка
-        if (currentState.isCalling && currentState.targetUserId === rejector_id) {
-          console.log('📞 Our call was rejected by:', rejector_id.slice(0, 8))
-          setError('Звонок отклонен')
-          endCall()
-        } else if (currentState.isReceivingCall && currentState.callerId === rejector_id) {
-          console.log('📞 Incoming call was rejected by:', rejector_id.slice(0, 8))
-          setError('Звонок отклонен')
-          endCall()
-        } else {
-          console.log('📞 Call rejected by unknown user:', rejector_id?.slice(0, 8))
-          // Даже если это неизвестный пользователь, завершаем звонок если мы в состоянии звонка
-          if (currentState.isInCall) {
-            setError('Звонок завершен')
-            endCall()
-          }
-        }
-      })
-      .on('broadcast', { event: 'call_ended' }, (payload) => {
-        console.log('📞 Call ended by other user:', payload)
-        endCall()
-      })
-      .subscribe(createSubscriptionHandler('Call Channel', {
+              // Проверяем, что это отклонение нашего звонка
+              if (currentState.isCalling && currentState.targetUserId === rejector_id) {
+                console.log('📞 Our call was rejected by:', rejector_id.slice(0, 8))
+                setError('Звонок отклонен')
+                endCall()
+              } else if (currentState.isReceivingCall && currentState.callerId === rejector_id) {
+                console.log('📞 Incoming call was rejected by:', rejector_id.slice(0, 8))
+                setError('Звонок отклонен')
+                endCall()
+              } else {
+                console.log('📞 Call rejected by unknown user:', rejector_id?.slice(0, 8))
+                // Даже если это неизвестный пользователь, завершаем звонок если мы в состоянии звонка
+                if (currentState.isInCall) {
+                  setError('Звонок завершен')
+                  endCall()
+                }
+              }
+            })
+            .on('broadcast', { event: 'call_ended' }, (payload: any) => {
+              console.log('📞 Call ended by other user:', payload)
+              endCall()
+            })
+        },
         onSubscribed: () => {
           // Очищаем ошибки и сбрасываем счетчик при успешном подключении
           setError(null)
@@ -322,27 +325,18 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
             }
           }
         },
-        onTimeout: (errorMessage) => {
-          if (!isReconnecting && reconnectionManagerRef.current) {
-            setIsReconnecting(true)
-            const attempts = reconnectionManagerRef.current.getAttempts()
-            setError(`Таймаут соединения. Переподключение... (${attempts + 1}/3)`)
-            
-            const success = reconnectionManagerRef.current.reconnect()
-            if (!success) {
-              setError('Не удалось восстановить соединение для звонков')
-              setIsReconnecting(false)
-            }
-          }
-        },
-        onClosed: () => {
-          setIsReconnecting(false)
-        }
-      }))
+        maxReconnectAttempts: 10, // Больше попыток для критически важных каналов
+        reconnectDelay: 3000, // 3 секунды между попытками
+        keepAliveInterval: 15000, // Keep-alive каждые 15 секунд для длительных соединений
+        healthCheckInterval: 30000 // Проверка здоровья каждые 30 секунд
+      }).catch(error => {
+        console.error('📞 Failed to create resilient call channel:', error)
+        setError('Не удалось установить соединение для звонков')
+      })
 
       return () => {
-        console.log('📞 Cleaning up call listener for user:', userId)
-        safeRemoveChannel(supabase, callChannel, 'Call Listener')
+        console.log('📞 Cleaning up resilient call listener for user:', userId)
+        resilientChannelManager.removeChannel(channelId)
       }
     }
 
@@ -350,6 +344,12 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
 
     return () => {
       console.log('📞 Cleaning up call listener for user:', userId)
+      
+      // Удаляем устойчивый канал
+      if (userId) {
+        resilientChannelManager.removeChannel(`calls:${userId}`)
+      }
+      
       // Очищаем менеджер переподключения
       if (reconnectionManagerRef.current) {
         reconnectionManagerRef.current.cancel()

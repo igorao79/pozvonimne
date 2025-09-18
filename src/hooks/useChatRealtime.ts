@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import useSupabaseStore from '@/store/useSupabaseStore'
+import { resilientChannelManager } from '@/utils/resilientChannelManager'
 
 interface UseChatRealtimeProps {
   chatId: string
@@ -31,15 +32,13 @@ export const useChatRealtime = ({
       supabase.removeChannel(ch)
     })
 
-    // Создаем канал ТОЛЬКО если его еще нет
+    // Создаем устойчивый канал для статуса пользователя
     const channelName = `chat_user_status_${chatId.substring(0, 8)}`
-    let userChannel = supabase.getChannels().find(ch => ch.topic === channelName)
-
-    if (!userChannel) {
-      console.log('📡 Создаем новый канал статуса пользователей:', channelName)
-      userChannel = supabase
-        .channel(channelName)
-        .on(
+    
+    resilientChannelManager.createResilientChannel({
+      channelName,
+      setup: (channel) => {
+        return channel.on(
           'postgres_changes',
           {
             event: 'UPDATE',
@@ -47,26 +46,29 @@ export const useChatRealtime = ({
             table: 'user_profiles',
             filter: `id=eq.${otherParticipantId}` // Фильтр только для собеседника
           },
-          (payload) => {
+          (payload: any) => {
             console.log('👤 Изменение статуса собеседника:', payload)
             // Обновления статуса будут обрабатываться через useUsers хук
           }
         )
-        .subscribe((status, err) => {
-          if (status === 'SUBSCRIBED') {
-            console.log('📡 Успешно подписались на статус пользователя')
-          } else if (status === 'CHANNEL_ERROR') {
-            const errorMessage = err || 'Unknown channel error'
-            console.error('📡 Ошибка канала статуса пользователя:', errorMessage)
-          }
-        })
-    } else {
-      console.log('📡 Канал статуса уже существует:', channelName)
-    }
+      },
+      onSubscribed: () => {
+        console.log('📡 Успешно подписались на устойчивый канал статуса пользователя')
+      },
+      onError: (error) => {
+        console.error('📡 Ошибка устойчивого канала статуса пользователя:', error)
+      },
+      maxReconnectAttempts: 8,
+      reconnectDelay: 2000,
+      keepAliveInterval: 25000, // Keep-alive каждые 25 секунд
+      healthCheckInterval: 45000 // Проверка здоровья каждые 45 секунд
+    }).catch(error => {
+      console.error('📡 Не удалось создать устойчивый канал статуса пользователя:', error)
+    })
 
     return () => {
-      // НЕ удаляем канал при размонтировании, чтобы избежать переподключений
-      // supabase.removeChannel(userChannel)
+      // Удаляем устойчивый канал при размонтировании
+      resilientChannelManager.removeChannel(channelName)
     }
   }, [otherParticipantId, chatId, userId, supabase])
 
@@ -97,56 +99,63 @@ export const useChatRealtime = ({
       supabase.removeChannel(ch)
     })
 
-    const globalChannel = supabase
-      .channel(globalChannelName)
-      .on('postgres_changes',
-        {
-          event: 'INSERT', // Все новые сообщения в системе
-          schema: 'public',
-          table: 'messages'
-          // Без фильтра - подписка на все сообщения
-        },
-        (payload: any) => {
-          // Тихий лог только для текущего чата
-          if (payload.new.chat_id === chatId) {
-            console.log('🌍 Новое сообщение в текущем чате:', payload.new.id)
-            onNewMessage(payload.new)
-          }
-        }
-      )
-      .on('postgres_changes',
-        {
-          event: 'UPDATE', // Все обновления сообщений в системе
-          schema: 'public',
-          table: 'messages'
-          // Без фильтра - подписка на все обновления
-        },
-        (payload: any) => {
-          // Тихий лог только для текущего чата
-          if (payload.new.chat_id === chatId) {
-            console.log('🌍 Сообщение обновлено в текущем чате:', payload.new.id)
-            onNewMessage({
-              ...payload.new,
-              _isUpdate: true,
-              _oldRecord: payload.old
-            })
-          }
-        }
-      )
-      .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('🌍 ✅ Глобальный канал успешно подключен')
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('🌍 ❌ Ошибка глобального канала:', err?.message || 'Неизвестная ошибка')
-        } else if (status === 'TIMED_OUT') {
-          console.warn('🌍 ⏰ Таймаут глобального канала, будет переподключен автоматически')
-        }
-      })
+    resilientChannelManager.createResilientChannel({
+      channelName: globalChannelName,
+      setup: (channel) => {
+        return channel
+          .on('postgres_changes',
+            {
+              event: 'INSERT', // Все новые сообщения в системе
+              schema: 'public',
+              table: 'messages'
+              // Без фильтра - подписка на все сообщения
+            },
+            (payload: any) => {
+              // Тихий лог только для текущего чата
+              if (payload.new.chat_id === chatId) {
+                console.log('🌍 Новое сообщение в текущем чате:', payload.new.id)
+                onNewMessage(payload.new)
+              }
+            }
+          )
+          .on('postgres_changes',
+            {
+              event: 'UPDATE', // Все обновления сообщений в системе
+              schema: 'public',
+              table: 'messages'
+              // Без фильтра - подписка на все обновления
+            },
+            (payload: any) => {
+              // Тихий лог только для текущего чата
+              if (payload.new.chat_id === chatId) {
+                console.log('🌍 Сообщение обновлено в текущем чате:', payload.new.id)
+                onNewMessage({
+                  ...payload.new,
+                  _isUpdate: true,
+                  _oldRecord: payload.old
+                })
+              }
+            }
+          )
+      },
+      onSubscribed: () => {
+        console.log('🌍 ✅ Устойчивый глобальный канал успешно подключен')
+      },
+      onError: (error) => {
+        console.error('🌍 ❌ Ошибка устойчивого глобального канала:', error)
+      },
+      maxReconnectAttempts: 12, // Много попыток для критически важного канала
+      reconnectDelay: 1500,
+      keepAliveInterval: 20000, // Keep-alive каждые 20 секунд
+      healthCheckInterval: 40000 // Проверка здоровья каждые 40 секунд
+    }).catch(error => {
+      console.error('🌍 ❌ Не удалось создать устойчивый глобальный канал:', error)
+    })
 
     return () => {
-      // НЕ удаляем глобальный канал при размонтировании компонента
-      // Он должен жить на протяжении всей сессии пользователя
-      console.log('🌍 Компонент размонтирован, но глобальный канал остается активным')
+      // Удаляем устойчивый глобальный канал при размонтировании
+      resilientChannelManager.removeChannel(globalChannelName)
+      console.log('🌍 Компонент размонтирован, устойчивый глобальный канал очищен')
     }
   }, [userId, supabase]) // Убрали chatId и onNewMessage из зависимостей!
 
