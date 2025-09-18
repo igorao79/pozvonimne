@@ -5,6 +5,7 @@ import useSupabaseStore from '@/store/useSupabaseStore'
 import useChatSyncStore from '@/store/useChatSyncStore'
 import useCallStore from '@/store/useCallStore'
 import { ChatListItem } from './ChatListItem'
+import { RandomFact } from '@/components/ui/random-fact'
 
 interface Chat {
   id: string
@@ -285,7 +286,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden chatlist-mobile-pattern">
       {/* Ультракомпактный заголовок */}
       <div className="px-2 py-1 border-b border-border bg-card flex-shrink-0">
         <div className="flex items-center justify-between min-h-[32px]">
@@ -334,18 +335,26 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
             </div>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
-            {chats.map((chat) => (
-              <ChatListItem
-                key={chat.id}
-                chat={chat}
-                onClick={() => onChatSelect(chat)}
-                isSelected={selectedChatId === chat.id}
-                formatLastMessageTime={formatLastMessageTime}
-                truncateText={truncateText}
-              />
-            ))}
-          </div>
+          <>
+            <div className="divide-y divide-gray-100">
+              {chats.map((chat) => (
+                <ChatListItem
+                  key={chat.id}
+                  chat={chat}
+                  onClick={() => onChatSelect(chat)}
+                  isSelected={selectedChatId === chat.id}
+                  formatLastMessageTime={formatLastMessageTime}
+                  truncateText={truncateText}
+                />
+              ))}
+            </div>
+            {/* RandomFact только на мобильных устройствах */}
+            <div className="md:hidden">
+              <div className="mobile-chatlist-random-fact">
+                <RandomFact />
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>

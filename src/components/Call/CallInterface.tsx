@@ -7,6 +7,7 @@ import useWebRTC from '@/hooks/useWebRTC'
 import { CallControls, IncomingCall, CallScreen, DialPad } from '.'
 import { ChatApp } from '../Chat'
 import { sendCallEndedMessage, sendMissedCallMessage, findOrCreateChatWithUser } from '@/utils/callSystemMessages'
+import { createSubscriptionHandler, createReconnectionManager, safeRemoveChannel } from '@/utils/subscriptionHelpers'
 
 const CallInterface = () => {
   const {
@@ -33,8 +34,7 @@ const CallInterface = () => {
 
   // Состояние для отслеживания переподключения
   const [isReconnecting, setIsReconnecting] = useState(false)
-  const [reconnectAttempts, setReconnectAttempts] = useState(0)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectionManagerRef = useRef<ReturnType<typeof createReconnectionManager> | null>(null)
 
   // Состояние для чата, который нужно открыть после звонка
   const [chatToOpenAfterCall, setChatToOpenAfterCall] = useState<string | null>(null)
@@ -223,15 +223,19 @@ const CallInterface = () => {
     if (!userId) return
 
     const setupCallListener = async () => {
-      // Предотвращаем множественные попытки переподключения
-      if (isReconnecting && reconnectAttempts >= 3) {
-        console.log('📞 Max reconnection attempts reached, stopping')
-        setError('Не удалось восстановить соединение для звонков')
-        setIsReconnecting(false)
-        return
-      }
+      console.log('📞 Setting up call listener for user:', userId)
 
-      console.log('📞 Setting up call listener for user:', userId, 'Attempt:', reconnectAttempts + 1)
+      // Инициализируем менеджер переподключения если его нет
+      if (!reconnectionManagerRef.current) {
+        reconnectionManagerRef.current = createReconnectionManager(
+          () => {
+            setIsReconnecting(false)
+            setupCallListener()
+          },
+          3, // максимум попыток
+          2000 // базовая задержка
+        )
+      }
 
       // Очищаем существующие каналы перед созданием нового
       const channelId = `calls:${userId}`
@@ -240,13 +244,7 @@ const CallInterface = () => {
         console.log('🧹 Found existing call listener channels:', existingChannels.length)
 
         for (const existingChannel of existingChannels) {
-          try {
-            console.log('🧹 Cleaning up existing call listener channel:', existingChannel.topic)
-            existingChannel.unsubscribe()
-            supabase.removeChannel(existingChannel)
-          } catch (err) {
-            console.warn('Error cleaning up call listener channel:', err)
-          }
+          safeRemoveChannel(supabase, existingChannel, `Call Listener Cleanup`)
         }
 
         // Моментальная очистка без задержек
@@ -314,59 +312,49 @@ const CallInterface = () => {
         console.log('📞 Call ended by other user:', payload)
         endCall()
       })
-      .subscribe((status, err) => {
-        console.log('📞 Call channel subscription status:', status, err)
-
-        if (status === 'CHANNEL_ERROR') {
-          console.error('📞 Call channel subscription error:', err)
-          if (!isReconnecting) {
-            setIsReconnecting(true)
-            setReconnectAttempts(prev => prev + 1)
-            console.log('📞 Starting reconnection process...')
-
-            // Показываем статус переподключения
-            setError(`Переподключение к звонкам... (${reconnectAttempts + 1}/3)`)
-
-            // Попытка переподключения через 2 секунды
-            reconnectTimeoutRef.current = setTimeout(() => {
-              setIsReconnecting(false)
-              setupCallListener()
-            }, 2000)
-          }
-        } else if (status === 'TIMED_OUT') {
-          console.error('📞 Call channel subscription timeout:', err)
-          if (!isReconnecting) {
-            setIsReconnecting(true)
-            setReconnectAttempts(prev => prev + 1)
-            console.log('📞 Channel timed out, starting reconnection...')
-
-            setError(`Таймаут соединения. Переподключение... (${reconnectAttempts + 1}/3)`)
-
-            // Попытка переподключения через 3 секунды
-            reconnectTimeoutRef.current = setTimeout(() => {
-              setIsReconnecting(false)
-              setupCallListener()
-            }, 3000)
-          }
-        } else if (status === 'SUBSCRIBED') {
-          console.log('📞 Successfully subscribed to call channel')
+      .subscribe(createSubscriptionHandler('Call Channel', {
+        onSubscribed: () => {
           // Очищаем ошибки и сбрасываем счетчик при успешном подключении
           setError(null)
           setIsReconnecting(false)
-          setReconnectAttempts(0)
-          if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current)
-            reconnectTimeoutRef.current = null
+          if (reconnectionManagerRef.current) {
+            reconnectionManagerRef.current.reset()
           }
-        } else if (status === 'CLOSED') {
-          console.log('📞 Call channel closed')
+        },
+        onError: (errorMessage) => {
+          if (!isReconnecting && reconnectionManagerRef.current) {
+            setIsReconnecting(true)
+            const attempts = reconnectionManagerRef.current.getAttempts()
+            setError(`Переподключение к звонкам... (${attempts + 1}/3)`)
+            
+            const success = reconnectionManagerRef.current.reconnect()
+            if (!success) {
+              setError('Не удалось восстановить соединение для звонков')
+              setIsReconnecting(false)
+            }
+          }
+        },
+        onTimeout: (errorMessage) => {
+          if (!isReconnecting && reconnectionManagerRef.current) {
+            setIsReconnecting(true)
+            const attempts = reconnectionManagerRef.current.getAttempts()
+            setError(`Таймаут соединения. Переподключение... (${attempts + 1}/3)`)
+            
+            const success = reconnectionManagerRef.current.reconnect()
+            if (!success) {
+              setError('Не удалось восстановить соединение для звонков')
+              setIsReconnecting(false)
+            }
+          }
+        },
+        onClosed: () => {
           setIsReconnecting(false)
         }
-      })
+      }))
 
       return () => {
         console.log('📞 Cleaning up call listener for user:', userId)
-        supabase.removeChannel(callChannel)
+        safeRemoveChannel(supabase, callChannel, 'Call Listener')
       }
     }
 
@@ -374,15 +362,14 @@ const CallInterface = () => {
 
     return () => {
       console.log('📞 Cleaning up call listener for user:', userId)
-      // Очищаем таймер переподключения
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current)
-        reconnectTimeoutRef.current = null
+      // Очищаем менеджер переподключения
+      if (reconnectionManagerRef.current) {
+        reconnectionManagerRef.current.cancel()
+        reconnectionManagerRef.current = null
       }
       setIsReconnecting(false)
-      setReconnectAttempts(0)
     }
-  }, [userId, supabase, isReconnecting, reconnectAttempts])
+  }, [userId, supabase, isReconnecting])
 
   if (isReceivingCall) {
     return <IncomingCall />

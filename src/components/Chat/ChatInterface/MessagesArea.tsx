@@ -11,6 +11,8 @@ interface MessagesAreaProps {
   onRetry?: () => void
   messagesEndRef: React.RefObject<HTMLDivElement | null>
   onMessageClick?: () => void
+  onEditMessage?: (messageId: string, currentContent: string) => void
+  onDeleteMessage?: (messageId: string) => void
 }
 
 export const MessagesArea: React.FC<MessagesAreaProps> = ({
@@ -21,7 +23,9 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
   userId,
   onRetry,
   messagesEndRef,
-  onMessageClick
+  onMessageClick,
+  onEditMessage,
+  onDeleteMessage
 }) => {
   if (loading) {
     return (
@@ -85,6 +89,8 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
             chat={chat}
             userId={userId}
             onClick={onMessageClick}
+            onEdit={onEditMessage}
+            onDelete={onDeleteMessage}
           />
         ))}
 

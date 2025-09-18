@@ -300,7 +300,8 @@ export const useUsers = () => {
       )
       .subscribe((status, err) => {
         if (status === 'CHANNEL_ERROR') {
-          console.warn('Ошибка realtime подписки пользователей, продолжаем с polling:', err)
+          const errorMessage = err || 'Unknown subscription error'
+          console.warn('Ошибка realtime подписки пользователей, продолжаем с polling:', errorMessage)
           // При ошибке realtime продолжаем работать с обычным polling
         }
       })

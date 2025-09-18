@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import useSupabaseStore from '@/store/useSupabaseStore'
 import useChatSyncStore from '@/store/useChatSyncStore'
 import useCallStore from '@/store/useCallStore'
@@ -115,6 +116,13 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-2">
             <div className="flex items-center">
+              <Image
+                src="/logo.webp"
+                alt="Позвони.мне логотип"
+                width={32}
+                height={32}
+                className="mr-2"
+              />
               <h1 className="text-lg font-semibold text-foreground">
                 Позвони.мне
               </h1>

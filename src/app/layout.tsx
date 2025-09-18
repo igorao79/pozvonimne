@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ['latin', 'cyrillic'] })
 export const metadata: Metadata = {
   title: 'Позвони.мне - Простое приложение для голосовых звонков',
   description: 'Простое и безопасное приложение для аудио звонков с WebRTC',
+  icons: {
+    icon: '/logo.ico',
+  },
 }
 
 export const viewport: Viewport = {

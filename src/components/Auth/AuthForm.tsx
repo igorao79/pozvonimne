@@ -1,10 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/utils/supabase/client'
 import useCallStore from '@/store/useCallStore'
 import LoginForm from './LoginForm'
 import RegisterForm from './RegisterForm'
+import { ThemeToggler } from '@/components/ui/theme-toggler'
 
 const AuthForm = () => {
   const [isLogin, setIsLogin] = useState(true)
@@ -73,8 +75,33 @@ const AuthForm = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* Header */}
+      <header className="bg-card shadow-sm border-b border-border flex-shrink-0 transition-colors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-2">
+            <div className="flex items-center">
+              <Image
+                src="/logo.webp"
+                alt="Позвони.мне логотип"
+                width={32}
+                height={32}
+                className="mr-2"
+              />
+              <h1 className="text-lg font-semibold text-foreground">
+                Позвони.мне
+              </h1>
+            </div>
+            <div className="flex items-center">
+              <ThemeToggler />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-extrabold text-foreground">
             {isLogin ? 'Войти в аккаунт' : 'Создать аккаунт'}
@@ -118,6 +145,7 @@ const AuthForm = () => {
               </button>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>

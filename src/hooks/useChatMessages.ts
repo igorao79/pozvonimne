@@ -137,7 +137,7 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
   }, [chatId, userId, sending, supabase])
 
   // Обработка новых сообщений из realtime
-  const handleNewMessage = useCallback((messageData: RealtimeMessagePayload) => {
+  const handleNewMessage = useCallback((messageData: RealtimeMessagePayload & { _isUpdate?: boolean, _oldRecord?: any }) => {
     if (!messageData.id || !messageData.chat_id) {
       console.warn('📡 Неполные данные сообщения:', messageData)
       return
@@ -150,6 +150,26 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
     }
 
     setMessages(prev => {
+      // Если это обновление существующего сообщения
+      if (messageData._isUpdate) {
+        console.log('📡 Обновляем существующее сообщение:', messageData.id)
+
+        return prev.map(msg => {
+          if (msg.id === messageData.id) {
+            // Обновляем сообщение новыми данными
+            return {
+              ...msg,
+              content: messageData.content,
+              updated_at: messageData.updated_at,
+              edited_at: messageData.edited_at,
+              is_deleted: messageData.is_deleted || false,
+              metadata: messageData.metadata || {}
+            }
+          }
+          return msg
+        })
+      }
+
       // Проверяем, не добавляли ли уже это сообщение
       const existingMessage = prev.find(msg => msg.id === messageData.id)
       if (existingMessage) {
@@ -184,6 +204,7 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
         type: messageData.type || 'text',
         created_at: messageData.created_at,
         updated_at: messageData.updated_at,
+        edited_at: messageData.edited_at,
         is_deleted: messageData.is_deleted || false,
         metadata: messageData.metadata || {}
       }

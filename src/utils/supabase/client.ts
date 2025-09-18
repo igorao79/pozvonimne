@@ -6,24 +6,23 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       realtime: {
-        // Основные настройки для стабильного WebSocket соединения
+        // Оптимизированные настройки для стабильного WebSocket соединения
         params: {
-          eventsPerSecond: 10,
+          eventsPerSecond: 2, // Снижаем до 2 событий в секунду для стабильности
         },
         heartbeatIntervalMs: 30000, // 30 секунд
         reconnectAfterMs: function (tries: number) {
-          return Math.min(tries * 1000, 10000) // Экспоненциальный backoff до 10 сек
+          // Более агрессивный backoff для стабильности
+          return Math.min(tries * 2000, 30000) // До 30 секунд
         },
         logger: (level: string, message: string, details?: any) => {
+          // Тихий лог, только ошибки и важные события
           if (level === 'error') {
-            console.error('Supabase Realtime Error:', message, details)
-          } else if (level === 'warn') {
-            console.warn('Supabase Realtime Warning:', message, details)
-          } else {
-            console.log(`Supabase Realtime [${level}]:`, message, details)
+            console.error('🔌 Supabase Realtime Error:', message, details?.error || details)
           }
+          // Убираем verbose логи для стабильности
         },
-        timeout: 30000
+        timeout: 20000 // Снижаем таймаут до 20 секунд
       }
     }
   )
