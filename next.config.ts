@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   // GitHub Pages deployment configuration
   output: 'export',
   trailingSlash: true,
+  basePath: process.env.NODE_ENV === 'production' ? '/pozvonimne' : '',
   assetPrefix: process.env.NODE_ENV === 'production' ? '/pozvonimne' : '',
 
   // Production optimizations
