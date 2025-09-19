@@ -17,7 +17,7 @@ import { useChatFocus } from '@/hooks/useChatFocus'
 import { useChatActions } from './ChatActions'
 import { useMessageActions } from '@/hooks/useMessageActions'
 
-const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
+const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
   const [newMessage, setNewMessage] = useState('')
   const [error, setError] = useState<string | undefined>(undefined)
 
@@ -32,11 +32,14 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
     currentContent: ''
   })
 
-  const { userId: rawUserId, isInCall } = useCallStore()
+  const { userId: rawUserId, isInCall: storeIsInCall } = useCallStore()
   const { users } = useUsers()
 
   // Преобразуем null в undefined для совместимости с хуками
   const userId = rawUserId || undefined
+
+  // Используем проп isInCall если он передан, иначе из store
+  const effectiveIsInCall = isInCall !== undefined ? isInCall : storeIsInCall
 
   // Получаем typing users из оптимизированного хука (исключаем себя)
   const typingUsers = useTypingUsers(chat.id, userId)
@@ -193,16 +196,19 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
 
   return (
     <div className="h-full flex flex-col hover:ring-2 hover:ring-border/60 dark:hover:ring-white/30 transition-all duration-300" onClick={focusInput}>
-      <ChatHeader
-        chat={chat}
-        onBack={onBack}
-        onCall={handleCall}
-        onCancel={handleCancelCall}
-        userStatus={chat.type === 'private' && chat.other_participant_id ? getUserStatus(chat.other_participant_id) : undefined}
-        isInCall={isInCall}
-        typingUsers={typingUsers}
-        currentUserId={userId || undefined}
-      />
+      {/* Скрываем хэдер во время звонка - информация уже видна в интерфейсе звонка */}
+      {!effectiveIsInCall && (
+        <ChatHeader
+          chat={chat}
+          onBack={onBack}
+          onCall={handleCall}
+          onCancel={handleCancelCall}
+          userStatus={chat.type === 'private' && chat.other_participant_id ? getUserStatus(chat.other_participant_id) : undefined}
+          isInCall={effectiveIsInCall}
+          typingUsers={typingUsers}
+          currentUserId={userId || undefined}
+        />
+      )}
 
       <MessagesArea
         messages={messages}

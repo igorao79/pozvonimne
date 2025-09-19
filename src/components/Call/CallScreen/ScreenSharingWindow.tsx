@@ -111,7 +111,7 @@ const ScreenSharingWindow = ({
     >
       {/* Control buttons */}
       {!isScreenFullscreen && (
-        <div className="absolute top-2 right-2 flex space-x-1 z-10">
+        <div className="absolute top-2 right-2 flex space-x-1 z-50">
           {(screenStream || remoteScreenStream) && (
             <button
               onClick={(e) => {
@@ -191,14 +191,63 @@ const ScreenSharingWindow = ({
       {/* Drag handle для маленького окошка */}
       {!isScreenFullscreen && (
         <div
-          className={`absolute top-0 left-0 right-0 h-8 cursor-move rounded-t-lg z-40 transition-opacity ${
+          className={`absolute top-2 left-2 right-2 h-6 cursor-move rounded-lg z-40 transition-opacity ${
             theme === 'dark'
-              ? 'bg-slate-800/60 hover:bg-slate-700/80'
-              : 'bg-black/40 hover:bg-black/60'
+              ? 'bg-slate-800/40 hover:bg-slate-700/60'
+              : 'bg-black/30 hover:bg-black/50'
           }`}
           onMouseDown={(e) => onMouseDown(e, 'drag')}
           title="Переместить окно (зажмите и тяните)"
         />
+      )}
+
+      {/* Resize handles для изменения размера */}
+      {!isScreenFullscreen && (
+        <>
+          {/* Угловые handles */}
+          <div
+            className="absolute top-0 left-0 w-3 h-3 cursor-nw-resize bg-blue-500 rounded-full opacity-0 hover:opacity-100 transition-opacity z-50"
+            onMouseDown={(e) => onMouseDown(e, 'resize')}
+            title="Изменить размер"
+          />
+          <div
+            className="absolute top-0 right-0 w-3 h-3 cursor-ne-resize bg-blue-500 rounded-full opacity-0 hover:opacity-100 transition-opacity z-50"
+            onMouseDown={(e) => onMouseDown(e, 'resize')}
+            title="Изменить размер"
+          />
+          <div
+            className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize bg-blue-500 rounded-full opacity-0 hover:opacity-100 transition-opacity z-50"
+            onMouseDown={(e) => onMouseDown(e, 'resize')}
+            title="Изменить размер"
+          />
+          <div
+            className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize bg-blue-500 rounded-full opacity-0 hover:opacity-100 transition-opacity z-50"
+            onMouseDown={(e) => onMouseDown(e, 'resize')}
+            title="Изменить размер"
+          />
+
+          {/* Боковые handles */}
+          <div
+            className="absolute top-1/2 left-0 w-2 h-8 -translate-y-1/2 cursor-w-resize bg-blue-500 rounded opacity-0 hover:opacity-100 transition-opacity z-50"
+            onMouseDown={(e) => onMouseDown(e, 'resize')}
+            title="Изменить ширину"
+          />
+          <div
+            className="absolute top-1/2 right-0 w-2 h-8 -translate-y-1/2 cursor-e-resize bg-blue-500 rounded opacity-0 hover:opacity-100 transition-opacity z-50"
+            onMouseDown={(e) => onMouseDown(e, 'resize')}
+            title="Изменить ширину"
+          />
+          <div
+            className="absolute top-0 left-1/2 w-8 h-2 -translate-x-1/2 cursor-n-resize bg-blue-500 rounded opacity-0 hover:opacity-100 transition-opacity z-50"
+            onMouseDown={(e) => onMouseDown(e, 'resize')}
+            title="Изменить высоту"
+          />
+          <div
+            className="absolute bottom-0 left-1/2 w-8 h-2 -translate-x-1/2 cursor-s-resize bg-blue-500 rounded opacity-0 hover:opacity-100 transition-opacity z-50"
+            onMouseDown={(e) => onMouseDown(e, 'resize')}
+            title="Изменить высоту"
+          />
+        </>
       )}
 
       {/* Простая логика: есть стрим - показываем видео */}

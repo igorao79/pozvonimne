@@ -49,6 +49,7 @@ export interface Chat {
 export interface ChatInterfaceProps {
   chat: Chat
   onBack: () => void
+  isInCall?: boolean
 }
 
 

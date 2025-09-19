@@ -231,68 +231,6 @@ const AudioCallInterface = ({
         </div>
 
 
-        {/* Audio Status Indicators */}
-        <div className="flex justify-center space-x-8 mb-12">
-          <div className="text-center">
-            <div className={`relative w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all duration-200 ${
-              theme === 'dark'
-                ? `bg-slate-700/60 ${isLocalSpeaking && !isMicMuted ? 'ring-2 ring-purple-400 ring-opacity-75' : ''}`
-                : `bg-blue-600/50 ${isLocalSpeaking && !isMicMuted ? 'ring-2 ring-green-400 ring-opacity-75' : ''}`
-            }`}>
-              {isMicMuted ? (
-                <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-3a1 1 0 011-1h1.586l4.707-4.707C10.923 4.663 12 5.109 12 6v12c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                </svg>
-              ) : (
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
-              )}
-
-              {/* Local speaking animation */}
-              {isLocalSpeaking && !isMicMuted && (
-                <div className={`absolute inset-0 rounded-full opacity-20 animate-pulse ${
-                  theme === 'dark' ? 'bg-purple-400' : 'bg-green-400'
-                }`}></div>
-              )}
-            </div>
-            <p className={`${textColors.secondary} text-sm`}>
-              {isMicMuted ? 'Микрофон выкл.' : 'Ваш микрофон'}
-            </p>
-          </div>
-
-          <div className="text-center">
-            <div className={`relative w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all duration-200 ${
-              theme === 'dark'
-                ? `bg-slate-700/60 ${isRemoteSpeaking && !remoteMicMuted ? 'ring-2 ring-purple-400 ring-opacity-75' : ''}`
-                : `bg-blue-600/50 ${isRemoteSpeaking && !remoteMicMuted ? 'ring-2 ring-green-400 ring-opacity-75' : ''}`
-            }`}>
-              {!remoteStream ? (
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-3a1 1 0 011-1h1.586l4.707-4.707C10.923 4.663 12 5.109 12 6v12c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                </svg>
-              ) : remoteMicMuted ? (
-                <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-3a1 1 0 011-1h1.586l4.707-4.707C10.923 4.663 12 5.109 12 6v12c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                </svg>
-              ) : (
-                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-              )}
-
-              {/* Remote speaking animation */}
-              {isRemoteSpeaking && !remoteMicMuted && (
-                <div className={`absolute inset-0 rounded-full opacity-20 animate-pulse ${
-                  theme === 'dark' ? 'bg-purple-400' : 'bg-green-400'
-                }`}></div>
-              )}
-            </div>
-            <p className={`${textColors.secondary} text-sm`}>
-              {!remoteStream ? 'Аудио не подключено' : remoteMicMuted ? 'Микрофон выкл.' : 'Подключен'}
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   )

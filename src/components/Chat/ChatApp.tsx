@@ -25,9 +25,10 @@ interface ChatAppProps {
   autoOpenChatId?: string // ID чата для автоматического открытия
   onResetChat?: () => void // Callback для сброса состояния чата
   resetTrigger?: number // Триггер для принудительного сброса состояния
+  isInCall?: boolean // Флаг, указывающий что пользователь в звонке
 }
 
-const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger }: ChatAppProps = {}) => {
+const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall }: ChatAppProps = {}) => {
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isLoading, setIsLoading] = useState(!!autoOpenChatId) // Простая логика загрузки
@@ -259,6 +260,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger }: ChatAppProps = {
           <ChatInterface
             chat={selectedChat}
             onBack={handleBackToList}
+            isInCall={isInCall}
           />
         ) : (
           <div className="bg-card h-full overflow-hidden">
@@ -272,7 +274,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger }: ChatAppProps = {
         )}
       </div>
 
-      {/* Десктопная версия - показываем оба компонента */}
+      {/* Десктопная версия - всегда показываем оба компонента */}
       <div className="hidden md:flex w-full overflow-hidden">
         {/* Левая панель - список чатов */}
         <div className="w-80 bg-card border-r border-border flex-shrink-0 overflow-hidden">
@@ -290,6 +292,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger }: ChatAppProps = {
             <ChatInterface
               chat={selectedChat}
               onBack={handleBackToList}
+              isInCall={isInCall}
             />
           ) : (
             <div className="h-full flex items-center justify-center p-4 chat-pattern-bg">

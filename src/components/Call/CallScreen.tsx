@@ -27,13 +27,32 @@ const CallScreen = () => {
   })
   const [screenWindowSize, setScreenWindowSize] = useState(() => {
     const saved = localStorage.getItem('screenWindowSize')
-    return saved ? JSON.parse(saved) : { width: 320, height: 240 }
+    return saved ? JSON.parse(saved) : { width: 400, height: 300 }
   })
   const [isScreenFullscreen, setIsScreenFullscreen] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [isResizing, setIsResizing] = useState(false)
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 })
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Отслеживаем размер окна для адаптивности
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+
+    // Проверяем при монтировании
+    checkIsMobile()
+
+    // Добавляем слушатель на изменение размера окна
+    window.addEventListener('resize', checkIsMobile)
+
+    return () => {
+      window.removeEventListener('resize', checkIsMobile)
+    }
+  }, [])
+
   // Убираем сложные состояния video - теперь все просто
 
   const {
@@ -267,8 +286,8 @@ const CallScreen = () => {
     } else if (isResizing) {
       const deltaX = e.clientX - resizeStart.x
       const deltaY = e.clientY - resizeStart.y
-      const newWidth = Math.max(200, Math.min(resizeStart.width + deltaX, window.innerWidth - screenWindowPosition.x))
-      const newHeight = Math.max(150, Math.min(resizeStart.height + deltaY, window.innerHeight - screenWindowPosition.y))
+      const newWidth = Math.max(100, Math.min(resizeStart.width + deltaX, window.innerWidth - screenWindowPosition.x))
+      const newHeight = Math.max(80, Math.min(resizeStart.height + deltaY, window.innerHeight - screenWindowPosition.y))
       setScreenWindowSize({ width: newWidth, height: newHeight })
     }
   }, [isDragging, isResizing, dragOffset, resizeStart, screenWindowSize, screenWindowPosition])
@@ -301,7 +320,7 @@ const CallScreen = () => {
 
   const resetPosition = useCallback(() => {
     setScreenWindowPosition({ x: 20, y: 20 })
-    setScreenWindowSize({ width: 320, height: 240 })
+    setScreenWindowSize({ width: 400, height: 300 })
     setIsScreenFullscreen(false)
   }, [])
 
@@ -314,12 +333,22 @@ const CallScreen = () => {
     localStorage.setItem('screenWindowSize', JSON.stringify(screenWindowSize))
   }, [screenWindowSize])
 
-  // Theme-based background classes
+  // Theme-based background classes - адаптированные для половинного экрана на десктопе
   const getBackgroundClasses = () => {
-    if (theme === 'dark') {
-      return 'min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col relative'
+    if (isMobile) {
+      // Полноэкранный режим для мобильных
+      if (theme === 'dark') {
+        return 'min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col relative'
+      } else {
+        return 'min-h-screen bg-gradient-to-br from-blue-400 via-indigo-500 to-purple-600 flex flex-col relative'
+      }
     } else {
-      return 'min-h-screen bg-gradient-to-br from-blue-400 via-indigo-500 to-purple-600 flex flex-col relative'
+      // Половинный экран для десктопа
+      if (theme === 'dark') {
+        return 'h-full bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col relative'
+      } else {
+        return 'h-full bg-gradient-to-br from-blue-400 via-indigo-500 to-purple-600 flex flex-col relative'
+      }
     }
   }
 
@@ -338,7 +367,9 @@ const CallScreen = () => {
       <div className={getOverlayClasses()}></div>
 
       {/* Content container with relative positioning */}
-      <div className="relative z-10 min-h-screen flex flex-col">
+      <div className={`relative z-10 flex flex-col ${
+        isMobile ? 'min-h-screen' : 'h-full'
+      }`}>
         {/* Hidden audio elements */}
         <audio
           ref={localAudioRef}
@@ -420,8 +451,10 @@ const CallScreen = () => {
           />
         </div>
 
-        {/* Controls - Fixed at bottom */}
-        <div className={`fixed bottom-0 left-0 right-0 p-6 z-50 ${
+        {/* Controls - positioned based on screen size */}
+        <div className={`${
+          isMobile ? 'fixed' : 'absolute'
+        } bottom-0 left-0 right-0 p-6 z-1 ${
           theme === 'dark'
             ? 'bg-black/50 backdrop-blur-md border-t border-white/20'
             : 'bg-white/40 backdrop-blur-md border-t border-white/30'

@@ -23,6 +23,24 @@ const IncomingCall = () => {
 
   const supabase = createClient()
   const [callerInfo, setCallerInfo] = useState<CallerInfo | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Отслеживаем размер окна для адаптивности
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+
+    // Проверяем при монтировании
+    checkIsMobile()
+
+    // Добавляем слушатель на изменение размера окна
+    window.addEventListener('resize', checkIsMobile)
+
+    return () => {
+      window.removeEventListener('resize', checkIsMobile)
+    }
+  }, [])
 
   // Загружаем информацию о звонящем при изменении callerId
   useEffect(() => {
@@ -157,7 +175,9 @@ const IncomingCall = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+    <div className={`${
+      isMobile ? 'min-h-screen' : 'h-full'
+    } bg-background flex items-center justify-center px-4`}>
       <div className="bg-card rounded-xl shadow-2xl p-8 max-w-sm w-full text-center border border-border">
         <div className="mb-6">
           <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden">
