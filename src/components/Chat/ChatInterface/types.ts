@@ -25,6 +25,7 @@ export interface RealtimeMessagePayload {
   type?: string
   created_at: string
   updated_at: string
+  edited_at?: string
   is_deleted?: boolean
   metadata?: any
 }

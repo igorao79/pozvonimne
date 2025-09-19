@@ -12,6 +12,8 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMoreMessages, setHasMoreMessages] = useState(true)
   const [error, setError] = useState<string | undefined>(undefined)
 
   const { supabase } = useSupabaseStore()
@@ -21,7 +23,7 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
   const loadMessages = useCallback(async () => {
     try {
       setLoading(true)
-      setError(null)
+      setError(undefined)
 
       // Пропускаем проверку участников для избежания рекурсии RLS
       // Функция get_chat_messages уже проверяет доступ внутри
@@ -29,7 +31,7 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
       // Теперь безопасно загружаем сообщения
       const { data, error: messagesError } = await supabase.rpc('get_chat_messages', {
         chat_uuid: chatId,
-        limit_count: 50
+        limit_count: 30
       })
 
       if (messagesError) {
@@ -39,8 +41,10 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
         if (messagesError.message?.includes('not a participant')) {
           console.log('Новый чат или нет доступа к сообщениям')
           setMessages([])
+          setHasMoreMessages(false)
         } else {
           setError('Ошибка загрузки сообщений')
+          setHasMoreMessages(false)
         }
         return
       }
@@ -48,10 +52,14 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
       // Сообщения приходят в обратном порядке (новые первые), переворачиваем
       const reversedMessages = (data || []).reverse()
       console.log('📨 Загружено сообщений:', reversedMessages.length)
+
+      // Проверяем, есть ли еще сообщения для загрузки
+      setHasMoreMessages(reversedMessages.length >= 30)
+
       setMessages(reversedMessages)
 
       // Помечаем сообщения как прочитанные сразу после загрузки
-      if (messages.length > 0) {
+      if (reversedMessages.length > 0) {
         try {
           console.log('📖 Помечаем сообщения как прочитанные для чата:', chatId)
           await supabase.rpc('mark_messages_as_read', { chat_uuid: chatId })
@@ -64,10 +72,50 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
     } catch (err) {
       console.error('Ошибка:', err)
       setError('Ошибка подключения')
+      setHasMoreMessages(false)
     } finally {
       setLoading(false)
     }
   }, [chatId, supabase])
+
+  // Загрузка дополнительных сообщений (пагинация)
+  const loadMoreMessages = useCallback(async () => {
+    if (!hasMoreMessages || loadingMore) return
+
+    try {
+      setLoadingMore(true)
+      console.log('📜 Загружаем дополнительные сообщения, текущий offset:', messages.length)
+
+      const { data, error: messagesError } = await supabase.rpc('get_chat_messages', {
+        chat_uuid: chatId,
+        limit_count: 30,
+        offset_count: messages.length
+      })
+
+      if (messagesError) {
+        console.error('Ошибка загрузки дополнительных сообщений:', messagesError)
+        setHasMoreMessages(false)
+        return
+      }
+
+      const newMessages = (data || []).reverse()
+      console.log('📜 Загружено дополнительных сообщений:', newMessages.length)
+
+      // Проверяем, есть ли еще сообщения
+      setHasMoreMessages(newMessages.length >= 30)
+
+      // Добавляем новые сообщения в начало массива (старые сообщения)
+      if (newMessages.length > 0) {
+        setMessages(prev => [...newMessages, ...prev])
+      }
+
+    } catch (err) {
+      console.error('Ошибка загрузки дополнительных сообщений:', err)
+      setHasMoreMessages(false)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [chatId, messages.length, hasMoreMessages, loadingMore, supabase])
 
   // Загружаем сообщения при монтировании
   useEffect(() => {
@@ -231,8 +279,11 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
     messages,
     loading,
     sending,
+    loadingMore,
+    hasMoreMessages,
     error,
     loadMessages,
+    loadMoreMessages,
     sendMessage,
     handleNewMessage,
     setError

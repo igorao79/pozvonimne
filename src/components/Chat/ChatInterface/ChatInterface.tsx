@@ -46,14 +46,18 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
     messages,
     loading,
     sending,
+    loadingMore,
+    hasMoreMessages,
     loadMessages,
+    loadMoreMessages,
     sendMessage,
     handleNewMessage
   } = useChatMessages({ chatId: chat.id, userId })
 
-  const { messagesEndRef } = useChatScroll({
+  const { messagesEndRef, scrollToBottom, hasInitialScrolled } = useChatScroll({
     messagesLength: messages.length,
-    loading
+    loading,
+    loadingMore
   })
 
   const { messageInputRef, focusInput, focusAfterSend, disableAutoFocus, enableAutoFocus } = useChatFocus()
@@ -203,14 +207,19 @@ const ChatInterface = ({ chat, onBack }: ChatInterfaceProps) => {
       <MessagesArea
         messages={messages}
         loading={loading}
+        loadingMore={loadingMore}
+        hasMoreMessages={hasMoreMessages}
         error={error || undefined}
         chat={chat}
         userId={userId || undefined}
         onRetry={loadMessages}
-          messagesEndRef={messagesEndRef}
+        onLoadMore={loadMoreMessages}
+        messagesEndRef={messagesEndRef}
         onMessageClick={focusInput}
         onEditMessage={handleEditMessage}
         onDeleteMessage={handleDeleteMessage}
+        hasInitialScrolled={hasInitialScrolled}
+        onScrollToBottom={scrollToBottom}
       />
 
       <MessageInput
