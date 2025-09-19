@@ -6,6 +6,7 @@
  */
 
 import { createClient } from '@/utils/supabase/client'
+import { resilientChannelManager } from '@/utils/resilientChannelManager'
 
 interface SendCallSignalParams {
   targetUserId: string
@@ -56,14 +57,38 @@ export const sendCallSignal = async ({
       })
       
       // Отправляем сигнал напрямую на канал получателя
-      const result = await supabase
-        .channel(receiverChannelId)
-        .send({
-          type: 'broadcast',
-          event,
-          payload
+      // Используем существующий канал из resilientChannelManager, если он есть
+      const existingChannel = resilientChannelManager.getChannel(receiverChannelId)
+      let channel: any
+
+      if (existingChannel && existingChannel.state === 'joined') {
+        console.log(`📡 CallSignaling: Using existing channel for ${event}`)
+        channel = existingChannel
+      } else {
+        console.log(`📡 CallSignaling: Creating new channel for ${event}`)
+        channel = supabase.channel(receiverChannelId)
+
+        // Быстрая подписка для надежности
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(() => {
+            console.log(`📡 CallSignaling: Channel subscription timeout for ${event}, continuing...`)
+            resolve()
+          }, 500)
+
+          channel.subscribe((status: any) => {
+            clearTimeout(timeout)
+            console.log(`📡 CallSignaling: Channel subscription status for ${event}:`, status)
+            resolve()
+          })
         })
-      
+      }
+
+      const result = await channel.send({
+        type: 'broadcast',
+        event,
+        payload
+      })
+
       console.log(`📡 CallSignaling: ${event} signal result:`, result)
       
       if (result === 'ok') {
@@ -78,7 +103,7 @@ export const sendCallSignal = async ({
       
       if (attempts < maxAttempts) {
         console.log(`🔄 CallSignaling: Retrying ${event} signal...`)
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempts)) // Увеличивающаяся задержка
+        await new Promise(resolve => setTimeout(resolve, 200)) // Быстрая повторная попытка - 200ms
       }
     }
   }
@@ -99,6 +124,7 @@ export const sendIncomingCallSignal = async (
   callerUserId: string,
   callerName: string
 ): Promise<boolean> => {
+  console.log(`📡 CallSignaling: 📞 Sending INCOMING_CALL signal to ${targetUserId.slice(0, 8)} from ${callerUserId.slice(0, 8)}`)
   return sendCallSignal({
     targetUserId,
     callerUserId,
@@ -165,6 +191,7 @@ export const sendCallCancelledSignal = async (
   callerUserId: string,
   callerName: string
 ): Promise<boolean> => {
+  console.log(`📡 CallSignaling: 📞 Sending CALL_CANCELLED signal to ${targetUserId.slice(0, 8)} from ${callerUserId.slice(0, 8)}`)
   return sendCallSignal({
     targetUserId,
     callerUserId,

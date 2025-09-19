@@ -26,6 +26,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 }) => {
   const { isCalling, targetUserId, endCall, error: callError, isInCall: isInCallStore } = useCallStore()
   const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'failed'>('idle')
+  const [isCancelling, setIsCancelling] = useState(false)
 
   // Определяем, звоним ли мы этому пользователю
   const isCallingThisUser = isCalling && targetUserId === chat.other_participant_id
@@ -35,13 +36,10 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   useEffect(() => {
     if (isCallingThisUser) {
       setCallStatus('calling')
-    } else if (callStatus === 'calling' && !isCallingThisUser) {
-      // Если только что перестали звонить этому пользователю
-      console.log('📞 Call state changed from calling to not calling, waiting for error handling')
-      // НЕ сбрасываем статус сразу - ждем обработки ошибки в отдельном useEffect
-      // Статус будет изменен либо на 'failed', либо на 'idle' в зависимости от наличия ошибки
+      setIsCancelling(false) // Сбрасываем состояние отмены при новом звонке
     }
-  }, [isCallingThisUser, callStatus])
+    // НЕ обрабатываем завершение звонка здесь - это делается в других эффектах
+  }, [isCallingThisUser])
 
   // Эффект для обработки таймаута звонка (если звонок длится слишком долго без ответа)
   useEffect(() => {
@@ -50,6 +48,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         // Если через 30 секунд звонок все еще в состоянии calling - считаем его неудачным
         if (callStatus === 'calling') {
           console.log('📞 Call timeout - showing failed state')
+          setIsCancelling(false) // Сбрасываем состояние отмены при таймауте
           setCallStatus('failed')
           setTimeout(() => {
             console.log('📞 Resetting call status to idle after timeout')
@@ -66,18 +65,14 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   useEffect(() => {
     // Если мы были в состоянии calling, но теперь не звоним и не в звонке
     if (callStatus === 'calling' && !isCalling && !isInCallStore) {
-      console.log('📞 Call ended - checking for error signal')
-      // Подождем больше времени для получения ошибки
-      const checkErrorTimeout = setTimeout(() => {
-        const currentError = useCallStore.getState().error
-        if (!currentError || currentError !== 'CALL_REJECTED_VISUAL') {
-          console.log('📞 No rejection error received, assuming call was ended normally')
-          setCallStatus('idle')
-        }
-        // Если есть ошибка CALL_REJECTED_VISUAL, она будет обработана в другом useEffect
-      }, 2000) // Увеличиваем до 2 секунд
+      console.log('📞 Call ended - immediately resetting to idle state')
 
-      return () => clearTimeout(checkErrorTimeout)
+      // Сразу устанавливаем статус в idle для мгновенного изменения цвета плашки
+      setCallStatus('idle')
+      // Сбрасываем состояние отмены сразу
+      setIsCancelling(false)
+
+      // Не ждем ошибки - плашка должна сразу стать серой
     }
   }, [callStatus, isCalling, isInCallStore])
 
@@ -86,12 +81,14 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
     // Если пришла ошибка CALL_REJECTED_VISUAL - показываем красную плашку
     if (callError === 'CALL_REJECTED_VISUAL') {
       console.log('📞 Call rejection detected, showing red indicator for 3 seconds')
+      setIsCancelling(false) // Сбрасываем состояние отмены при ошибке
       setCallStatus('failed')
-      // Через 3 секунды возвращаем к дефолтному состоянию
+      // Через 1 секунду возвращаем к дефолтному состоянию
       const timeoutId = setTimeout(() => {
-        console.log('📞 Resetting call status to idle after 3 second red indicator')
+        console.log('📞 Resetting call status to idle after 1 second red indicator')
         setCallStatus('idle')
-      }, 3000)
+        setIsCancelling(false) // Сбрасываем состояние отмены при возврате к idle
+      }, 1000) // Уменьшаем до 1 секунды
 
       return () => clearTimeout(timeoutId)
     }
@@ -104,22 +101,25 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                                    callError.includes('cancelled')
 
       if (shouldShowFailedState) {
-        console.log('📞 Call failed with other error, showing red indicator')
+        console.log('📞 Call failed with other error, showing red indicator briefly')
         setCallStatus('failed')
+        // Короткая задержка для показа красной плашки, затем сразу в idle
         setTimeout(() => {
           setCallStatus('idle')
-        }, 3000)
+          setIsCancelling(false)
+        }, 1000) // Уменьшаем до 1 секунды
       }
     }
   }, [callError, callStatus])
 
-  // Гарантированный сброс статуса failed через 3.5 секунды (для надежности)
+  // Гарантированный сброс статуса failed через 1.5 секунды (для надежности)
   useEffect(() => {
     if (callStatus === 'failed') {
       const safetyTimeoutId = setTimeout(() => {
         console.log('📞 Safety reset: ensuring call status returns to idle')
         setCallStatus('idle')
-      }, 3500)
+        setIsCancelling(false) // Гарантированный сброс состояния отмены при возврате к idle
+      }, 1500) // Уменьшаем до 1.5 секунд
 
       return () => clearTimeout(safetyTimeoutId)
     }
@@ -127,13 +127,30 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   // Обработчик отмены звонка
   const handleCancelCall = () => {
+    // Предотвращаем множественные нажатия
+    if (isCancelling) {
+      console.log('📞 Cancel button is already pressed, ignoring duplicate click')
+      return
+    }
+
+    setIsCancelling(true)
+    console.log('📞 HandleCancelCall: Starting call cancellation')
+
     if (onCancel) {
       onCancel()
     } else {
       // Fallback если onCancel не передан
       endCall()
     }
+
+    // Устанавливаем статус в idle сразу, чтобы плашка вернулась к нормальному состоянию
     setCallStatus('idle')
+
+    // Сбрасываем isCancelling через небольшую задержку, чтобы дать время на обработку отмены
+    setTimeout(() => {
+      setIsCancelling(false)
+      console.log('📞 Cancel button state reset after call cancellation')
+    }, 1000)
   }
   // Проверяем, печатает ли кто-то из собеседников (исключая текущего пользователя)
   const isOtherParticipantTyping = React.useMemo(() => {
@@ -232,8 +249,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                 {/* Мобильная версия - круглые иконки */}
                 <button
                   onClick={handleCancelCall}
-                  className="w-10 h-10 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 cursor-pointer transition-colors md:hidden"
-                  title="Отменить звонок"
+                  disabled={isCancelling}
+                  className="w-10 h-10 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed md:hidden"
+                  title={isCancelling ? "Отмена..." : "Отменить звонок"}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
@@ -253,13 +271,14 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                 {/* Десктопная версия - кнопки с текстом */}
                 <button
                   onClick={handleCancelCall}
-                  className="hidden md:flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 cursor-pointer transition-colors"
+                  disabled={isCancelling}
+                  className="hidden md:flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 9l6 6m0-6l-6 6"/>
                   </svg>
-                  Отменить
+                  {isCancelling ? 'Отмена...' : 'Отменить'}
                 </button>
                 <button
                   disabled={true}

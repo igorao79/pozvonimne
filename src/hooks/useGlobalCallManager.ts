@@ -72,9 +72,12 @@ export const useGlobalCallManager = ({ isAuthenticated, userId }: UseGlobalCallM
             return channel
               .on('broadcast', { event: 'incoming_call' }, (payload: any) => {
                 console.log('🌐 GlobalCallManager: 📞 ========== INCOMING CALL EVENT ==========')
+                console.log('🌐 GlobalCallManager: 📞 Timestamp:', new Date().toISOString())
                 console.log('🌐 GlobalCallManager: 📞 Raw payload:', payload)
                 console.log('🌐 GlobalCallManager: 📞 Received for user:', userId.slice(0, 8))
                 console.log('🌐 GlobalCallManager: 📞 Channel ID:', channelId)
+                console.log('🌐 GlobalCallManager: 📞 Event data:', payload.event)
+                console.log('🌐 GlobalCallManager: 📞 Event type:', typeof payload.event)
                 
                 const { caller_id, caller_name, timestamp } = payload.payload || {}
                 
@@ -150,15 +153,30 @@ export const useGlobalCallManager = ({ isAuthenticated, userId }: UseGlobalCallM
                 endCall()
               })
               .on('broadcast', { event: 'call_cancelled' }, (payload: any) => {
+                console.log('🌐 GlobalCallManager: 📞 ========== CALL CANCELLED EVENT ==========')
+                console.log('🌐 GlobalCallManager: 📞 Timestamp:', new Date().toISOString())
                 console.log('🌐 GlobalCallManager: 📞 Call cancelled by caller:', payload)
-                const { caller_id } = payload.payload
+                console.log('🌐 GlobalCallManager: 📞 Raw payload:', payload)
+
+                const { caller_id } = payload.payload || {}
+
+                console.log('🌐 GlobalCallManager: 📞 Caller ID from payload:', caller_id?.slice(0, 8))
 
                 const currentState = useCallStore.getState()
+                console.log('🌐 GlobalCallManager: 📞 Current state:', {
+                  isReceivingCall: currentState.isReceivingCall,
+                  callerId: currentState.callerId?.slice(0, 8),
+                  isInCall: currentState.isInCall
+                })
+
                 if (currentState.isReceivingCall && currentState.callerId === caller_id) {
-                  console.log('🌐 GlobalCallManager: 📞 Our incoming call was cancelled by:', caller_id.slice(0, 8))
+                  console.log('🌐 GlobalCallManager: 📞 ✅ Our incoming call was cancelled by:', caller_id.slice(0, 8))
                   setError('Звонок отменен звонящим')
                   endCall()
+                } else {
+                  console.log('🌐 GlobalCallManager: 📞 ❌ Call cancelled event ignored - not our call or not receiving')
                 }
+                console.log('🌐 GlobalCallManager: 📞 =============================================')
               })
           },
           onSubscribed: () => {
