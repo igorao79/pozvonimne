@@ -270,6 +270,18 @@ input:focus-visible {
 /* Special classes for smooth transitions */
 .bg-destructive\/10 { background-color: hsl(from var(--color-destructive) h s l / 0.1); }
 
+/* Debug hover effects for dark theme */
+.dark .theme-button:hover,
+.dark .profile-button:hover,
+.dark .logout-button:hover {
+  background-color: #4b5563 !important; /* gray-600 */
+  --tw-ring-color: #d1d5db !important; /* gray-300 */
+}
+
+.dark .chat-list-item-hover:hover {
+  background-color: #374151 !important; /* gray-700 */
+}
+
 /* Input focus states */
 .focus\:ring-ring:focus { --tw-ring-color: var(--color-ring); }
 .focus\:border-ring:focus { border-color: var(--color-ring); }

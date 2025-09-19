@@ -284,18 +284,21 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
               // Проверяем, что это отклонение нашего звонка
               if (currentState.isCalling && currentState.targetUserId === rejector_id) {
                 console.log('📞 Our call was rejected by:', rejector_id.slice(0, 8))
-                setError('Звонок отклонен')
-                endCall()
+                // Устанавливаем специальную ошибку для визуального изменения цвета плашки
+                setError('CALL_REJECTED_VISUAL')
+                // Небольшая задержка чтобы ошибка успела установиться
+                setTimeout(() => endCall(), 50)
               } else if (currentState.isReceivingCall && currentState.callerId === rejector_id) {
                 console.log('📞 Incoming call was rejected by:', rejector_id.slice(0, 8))
-                setError('Звонок отклонен')
-                endCall()
+                // Устанавливаем специальную ошибку для визуального изменения цвета плашки
+                setError('CALL_REJECTED_VISUAL')
+                // Небольшая задержка чтобы ошибка успела установиться
+                setTimeout(() => endCall(), 50)
               } else {
                 console.log('📞 Call rejected by unknown user:', rejector_id?.slice(0, 8))
                 // Даже если это неизвестный пользователь, завершаем звонок если мы в состоянии звонка
                 if (currentState.isInCall) {
-                  setError('Звонок завершен')
-                  endCall()
+                  setTimeout(() => endCall(), 50)
                 }
               }
             })
@@ -311,9 +314,15 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
               const currentState = useCallStore.getState()
               if (currentState.isReceivingCall && currentState.callerId === caller_id) {
                 console.log('📞 Our incoming call was cancelled by:', caller_id.slice(0, 8))
+                setError('Звонок отменен звонящим')
                 endCall()
               } else {
                 console.log('📞 Call cancelled by unknown caller:', caller_id?.slice(0, 8))
+                // Если мы в состоянии входящего звонка, завершаем его
+                if (currentState.isReceivingCall) {
+                  setError('Звонок отменен')
+                  endCall()
+                }
               }
             })
         },

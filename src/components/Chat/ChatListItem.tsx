@@ -46,7 +46,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`px-2 py-1.5 hover:bg-muted cursor-pointer transition-colors chat-list-item ${
+      className={`px-2 py-1.5 chat-list-item-hover hover:bg-muted cursor-pointer transition-colors chat-list-item ${
         isSelected ? 'bg-primary/10 border-r-2 border-primary' : ''
       }`}
     >

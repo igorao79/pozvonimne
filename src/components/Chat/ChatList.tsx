@@ -293,7 +293,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
           <h1 className="text-sm font-semibold text-foreground">Чаты</h1>
           <button
             onClick={onCreateNewChat}
-            className="p-1 text-primary hover:bg-primary/10 rounded-md transition-colors"
+            className="p-1 text-primary hover:bg-primary/10 rounded-md transition-colors chat-create-button"
             title="Создать новый чат"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -311,7 +311,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
               <p className="text-sm text-destructive">{error}</p>
               <button
                 onClick={() => loadChats(true)}
-                className="text-xs text-destructive hover:text-destructive/80 mt-1 transition-colors"
+                className="text-xs text-destructive hover:text-destructive/80 mt-1 transition-colors chat-retry-button"
               >
                 Попробовать снова
               </button>

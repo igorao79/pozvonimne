@@ -142,14 +142,14 @@ export default function Home() {
               <ThemeToggler />
               <button
                 onClick={() => setShowProfile(true)}
-                className="p-2 rounded-md hover:bg-secondary/80 hover:ring-2 hover:ring-secondary/60 dark:hover:bg-white dark:hover:ring-white transition-all duration-200 border border-border cursor-pointer"
+                className="p-2 rounded-md profile-button hover:bg-secondary/80 hover:ring-2 hover:ring-secondary/60 dark:hover:bg-gray-600 dark:hover:ring-gray-300 transition-all duration-200 border border-border cursor-pointer"
                 aria-label="Открыть профиль"
               >
                 <User className="h-5 w-5 text-foreground" />
               </button>
               <button
                 onClick={handleSignOut}
-                className="text-sm text-primary hover:text-primary/80 hover:bg-primary/10 hover:ring-1 hover:ring-primary/30 dark:hover:bg-white dark:hover:ring-white transition-all duration-200 px-3 py-1 rounded cursor-pointer"
+                className="text-sm logout-button text-primary hover:text-primary/80 hover:bg-primary/10 hover:ring-1 hover:ring-primary/30 dark:hover:bg-gray-600 dark:hover:ring-gray-300 transition-all duration-200 px-3 py-1 rounded cursor-pointer"
               >
                 Выйти
               </button>
@@ -158,8 +158,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Error Display */}
-      {error && (
+      {/* Error Display - не показываем специальную ошибку для визуального изменения цвета */}
+      {error && error !== 'CALL_REJECTED_VISUAL' && (
         <div className="bg-destructive/10 border-l-4 border-destructive p-2 flex-shrink-0">
           <div className="flex">
             <div className="ml-3">

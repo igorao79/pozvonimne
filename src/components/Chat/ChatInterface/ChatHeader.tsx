@@ -24,11 +24,12 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   typingUsers = [],
   currentUserId
 }) => {
-  const { isCalling, targetUserId, endCall, error: callError } = useCallStore()
+  const { isCalling, targetUserId, endCall, error: callError, isInCall: isInCallStore } = useCallStore()
   const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'failed'>('idle')
 
   // Определяем, звоним ли мы этому пользователю
   const isCallingThisUser = isCalling && targetUserId === chat.other_participant_id
+
 
   // Эффект для отслеживания состояния звонка
   useEffect(() => {
@@ -36,15 +37,11 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       setCallStatus('calling')
     } else if (callStatus === 'calling' && !isCallingThisUser) {
       // Если только что перестали звонить этому пользователю
-      if (callError && (callError.includes('отклонен') || callError.includes('завершен') || callError.includes('Не удалось'))) {
-        setCallStatus('failed')
-        // Через 3 секунды возвращаем к дефолтному состоянию
-        setTimeout(() => setCallStatus('idle'), 3000)
-      } else {
-        setCallStatus('idle')
-      }
+      console.log('📞 Call state changed from calling to not calling, waiting for error handling')
+      // НЕ сбрасываем статус сразу - ждем обработки ошибки в отдельном useEffect
+      // Статус будет изменен либо на 'failed', либо на 'idle' в зависимости от наличия ошибки
     }
-  }, [isCallingThisUser, callError, callStatus])
+  }, [isCallingThisUser, callStatus])
 
   // Эффект для обработки таймаута звонка (если звонок длится слишком долго без ответа)
   useEffect(() => {
@@ -52,12 +49,79 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       const timeoutId = setTimeout(() => {
         // Если через 30 секунд звонок все еще в состоянии calling - считаем его неудачным
         if (callStatus === 'calling') {
+          console.log('📞 Call timeout - showing failed state')
           setCallStatus('failed')
-          setTimeout(() => setCallStatus('idle'), 3000)
+          setTimeout(() => {
+            console.log('📞 Resetting call status to idle after timeout')
+            setCallStatus('idle')
+          }, 3000)
         }
       }, 30000) // 30 секунд таймаут
 
       return () => clearTimeout(timeoutId)
+    }
+  }, [callStatus])
+
+  // Эффект для отслеживания завершения звонка без ошибки
+  useEffect(() => {
+    // Если мы были в состоянии calling, но теперь не звоним и не в звонке
+    if (callStatus === 'calling' && !isCalling && !isInCallStore) {
+      console.log('📞 Call ended - checking for error signal')
+      // Подождем больше времени для получения ошибки
+      const checkErrorTimeout = setTimeout(() => {
+        const currentError = useCallStore.getState().error
+        if (!currentError || currentError !== 'CALL_REJECTED_VISUAL') {
+          console.log('📞 No rejection error received, assuming call was ended normally')
+          setCallStatus('idle')
+        }
+        // Если есть ошибка CALL_REJECTED_VISUAL, она будет обработана в другом useEffect
+      }, 2000) // Увеличиваем до 2 секунд
+
+      return () => clearTimeout(checkErrorTimeout)
+    }
+  }, [callStatus, isCalling, isInCallStore])
+
+  // Дополнительный эффект для отслеживания изменения callError
+  useEffect(() => {
+    // Если пришла ошибка CALL_REJECTED_VISUAL - показываем красную плашку
+    if (callError === 'CALL_REJECTED_VISUAL') {
+      console.log('📞 Call rejection detected, showing red indicator for 3 seconds')
+      setCallStatus('failed')
+      // Через 3 секунды возвращаем к дефолтному состоянию
+      const timeoutId = setTimeout(() => {
+        console.log('📞 Resetting call status to idle after 3 second red indicator')
+        setCallStatus('idle')
+      }, 3000)
+
+      return () => clearTimeout(timeoutId)
+    }
+    // Обработка других ошибок
+    else if (callError && callStatus === 'calling') {
+      const shouldShowFailedState = callError.includes('отклонен') ||
+                                   callError.includes('завершен') ||
+                                   callError.includes('Не удалось') ||
+                                   callError.includes('отменен') ||
+                                   callError.includes('cancelled')
+
+      if (shouldShowFailedState) {
+        console.log('📞 Call failed with other error, showing red indicator')
+        setCallStatus('failed')
+        setTimeout(() => {
+          setCallStatus('idle')
+        }, 3000)
+      }
+    }
+  }, [callError, callStatus])
+
+  // Гарантированный сброс статуса failed через 3.5 секунды (для надежности)
+  useEffect(() => {
+    if (callStatus === 'failed') {
+      const safetyTimeoutId = setTimeout(() => {
+        console.log('📞 Safety reset: ensuring call status returns to idle')
+        setCallStatus('idle')
+      }, 3500)
+
+      return () => clearTimeout(safetyTimeoutId)
     }
   }, [callStatus])
 
@@ -184,7 +248,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             ) : onCall ? (
               <button
                 onClick={onCall}
-                disabled={isInCall}
+                disabled={isInCall || callStatus === 'failed'}
                 className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
