@@ -4,6 +4,13 @@ import { useEffect, useRef, useState } from 'react'
 import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
 
+interface CallerInfo {
+  id: string
+  username: string
+  display_name: string
+  avatar_url?: string
+}
+
 const IncomingCall = () => {
   const {
     callerId,
@@ -14,10 +21,37 @@ const IncomingCall = () => {
   } = useCallStore()
 
   const supabase = createClient()
+  const [callerInfo, setCallerInfo] = useState<CallerInfo | null>(null)
 
+  // Загружаем информацию о звонящем при изменении callerId
+  useEffect(() => {
+    const fetchCallerInfo = async () => {
+      if (!callerId) {
+        setCallerInfo(null)
+        return
+      }
 
+      try {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('id, username, display_name, avatar_url')
+          .eq('id', callerId)
+          .single()
 
+        if (error) {
+          console.warn('Error fetching caller info:', error)
+          setCallerInfo(null)
+        } else {
+          setCallerInfo(data)
+        }
+      } catch (err) {
+        console.warn('Error fetching caller info:', err)
+        setCallerInfo(null)
+      }
+    }
 
+    fetchCallerInfo()
+  }, [callerId, supabase])
 
   const handleAccept = async () => {
     try {
@@ -176,19 +210,26 @@ const IncomingCall = () => {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="bg-card rounded-xl shadow-2xl p-8 max-w-sm w-full text-center border border-border">
         <div className="mb-6">
-          <div className="w-24 h-24 bg-primary rounded-full mx-auto mb-4 flex items-center justify-center">
-            <svg className="w-12 h-12 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
+          <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden">
+            {callerInfo?.avatar_url ? (
+              <img
+                src={callerInfo.avatar_url}
+                alt={callerInfo.display_name || callerInfo.username}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                <span className="text-white font-medium text-xl">
+                  {(callerInfo?.display_name || callerInfo?.username || callerName || '?').charAt(0)?.toUpperCase()}
+                </span>
+              </div>
+            )}
           </div>
           <h2 className="text-2xl font-bold text-foreground mb-2">
             Входящий звонок
           </h2>
           <p className="text-lg text-muted-foreground">
-            {callerName || `Пользователь ${callerId?.slice(0, 8)}...`}
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            ID: {callerId}
+            {callerInfo?.display_name || callerName || `Пользователь ${callerId?.slice(0, 8)}...`}
           </p>
         </div>
 
