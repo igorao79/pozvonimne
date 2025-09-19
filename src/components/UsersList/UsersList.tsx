@@ -4,6 +4,7 @@ import { useState } from 'react'
 import useUsers from '@/hooks/useUsers'
 import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
+import { sendIncomingCallSignal } from '@/utils/callSignaling'
 import { default as UserProfile } from '../Profile/UserProfile'
 import LoadingState from './LoadingState'
 import ErrorState from './ErrorState'
@@ -72,168 +73,33 @@ const UsersList = () => {
       return
     }
 
+    if (!userId) {
+      setError('Ошибка: пользователь не авторизован')
+      return
+    }
+
     setCallingUserId(targetUserId)
     setIsLoading(true)
     setError(null)
 
-    let callChannel: any = null
-
     try {
-      console.log('🔄 Starting call to user:', targetUserId)
+      console.log('📞 UsersList: Starting call to user:', targetUserId)
 
-      // Используем стандартный канал получателя для отправки сигнала
-      const receiverChannelId = `calls:${targetUserId}`
-      
-      // Быстрая проверка и переиспользование существующих каналов
-      let needsNewChannel = true
-      try {
-        const existingChannel = supabase.getChannels().find(ch => ch.topic === receiverChannelId)
-        
-        if (existingChannel && existingChannel.state !== 'closed') {
-          console.log('🔄 Reusing existing channel:', receiverChannelId, 'State:', existingChannel.state)
-          callChannel = existingChannel
-          needsNewChannel = false
-        } else if (existingChannel) {
-          console.log('🧹 Removing closed channel before creating new one')
-          try {
-            existingChannel.unsubscribe()
-            supabase.removeChannel(existingChannel)
-          } catch (err) {
-            console.warn('Error removing closed channel:', err)
-          }
-        }
-      } catch (err) {
-        console.warn('Error checking existing channels:', err)
-      }
+      // Используем надежную отправку сигнала входящего звонка
+      const signalSent = await sendIncomingCallSignal(
+        targetUserId,
+        userId,
+        displayName || targetUsername
+      )
 
-      // Создаём канал только если нужен новый
-      if (needsNewChannel) {
-        callChannel = supabase.channel(receiverChannelId)
-        console.log('📡 Created new call channel:', receiverChannelId)
-      }
-
-      // Добавляем обработчики ответов на звонок для дополнительной надежности
-      if (needsNewChannel) {
-        callChannel
-          .on('broadcast', { event: 'call_accepted' }, (payload: BroadcastPayload) => {
-            console.log('📞 Call accepted by receiver:', payload)
-            // Обработка принятия звонка уже есть в CallInterface
-          })
-          .on('broadcast', { event: 'call_rejected' }, (payload: BroadcastPayload) => {
-            console.log('📞 Call rejected by receiver:', payload)
-            const currentState = useCallStore.getState()
-            if (currentState.isCalling && currentState.targetUserId === targetUserId) {
-              console.log('📞 Our call was rejected - ending call from UsersList')
-              setError('Звонок отклонен')
-              endCall()
-            }
-          })
-          .on('broadcast', { event: 'call_ended' }, (payload: BroadcastPayload) => {
-            console.log('📞 Call ended by receiver:', payload)
-            const currentState = useCallStore.getState()
-            if (currentState.isInCall) {
-              console.log('📞 Call ended by other user from UsersList')
-              endCall()
-            }
-          })
-      }
-
-      // Быстрая оптимизированная подписка
-      if (needsNewChannel) {
-        console.log('📡 Subscribing to new channel...')
-
-        // Моментальная подписка без задержек
-        const subscriptionPromise = new Promise((resolve) => {
-          const timeout = setTimeout(() => {
-            console.warn('📡 New channel subscription timeout, continuing anyway')
-            resolve('timeout')
-          }, 200) // Минимум для надежности
-
-          callChannel?.subscribe((status: string) => {
-            clearTimeout(timeout)
-            console.log('📡 New channel subscription status:', status)
-
-            if (status === 'SUBSCRIBED') {
-              console.log('✅ New channel subscribed successfully')
-            } else {
-              console.warn('⚠️ New channel subscription issue, continuing:', status)
-            }
-            resolve(status)
-          })
-        })
-
-        await subscriptionPromise
+      if (signalSent) {
+        console.log('✅ UsersList: Call signal sent successfully')
+        // Запускаем локальную логику звонка
+        startCall(targetUserId)
+        console.log('✅ UsersList: Call initiated successfully')
       } else {
-        console.log('📡 Using existing channel, checking state...')
-        
-          // Для переиспользуемых каналов моментальная проверка
-        if (callChannel?.state !== 'joined' && callChannel?.state !== 'joining') {
-          console.log('🔄 Existing channel not ready, instant resubscribe')
-          callChannel?.subscribe(() => {})
-        }
+        throw new Error('Failed to send call signal')
       }
-
-      console.log('✅ Proceeding with call immediately')
-
-      // Убираем ненужные задержки для ускорения
-
-      // Send call signal with improved retry logic
-      let callSent = false
-      let attempts = 0
-      const maxAttempts = 3
-
-      while (!callSent && attempts < maxAttempts) {
-        attempts++
-        console.log(`📞 Attempting to send call signal (attempt ${attempts}/${maxAttempts})`)
-        console.log(`📞 Channel state before send:`, callChannel?.state)
-
-        try {
-          // Проверяем состояние канала перед отправкой
-          if (callChannel?.state === 'closed') {
-            console.warn('📞 Channel is closed, recreating...')
-            callChannel = supabase.channel(receiverChannelId)
-            // Мгновенная попытка подписки без ожидания
-            callChannel.subscribe(() => {})
-            // Убираем задержку для ускорения
-          }
-
-          const result = await callChannel?.send({
-            type: 'broadcast',
-            event: 'incoming_call',
-            payload: {
-              caller_id: userId,
-              caller_name: displayName || targetUsername,
-              timestamp: Date.now()
-            }
-          })
-
-          console.log('📞 Call signal send result:', result)
-
-          if (result === 'ok') {
-            callSent = true
-            console.log('✅ Call signal sent successfully to user:', targetUserId)
-          } else {
-            throw new Error(`Send failed with result: ${result}`)
-          }
-        } catch (sendErr) {
-          console.warn(`❌ Call signal send attempt ${attempts} failed:`, sendErr)
-
-          if (attempts < maxAttempts) {
-            console.log('🔄 Retrying call signal instantly...')
-            // Убираем задержку между попытками для максимальной скорости
-          }
-        }
-      }
-
-      if (!callSent) {
-        throw new Error('Failed to send call signal after all attempts')
-      }
-
-      // Start the call locally
-      startCall(targetUserId)
-
-      // Не закрываем канал сразу - он нужен для получения ответа
-      console.log('✅ Call initiated successfully, keeping channel open for response')
 
     } catch (err) {
       console.error('❌ Call error:', err)

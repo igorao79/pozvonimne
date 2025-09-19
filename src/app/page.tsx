@@ -11,6 +11,7 @@ import { UserProfile } from '@/components/Profile'
 import { getAssetPath } from '@/lib/utils'
 import { ThemeToggler } from '@/components/ui/theme-toggler'
 import { useGlobalTypingManager } from '@/hooks/useGlobalTypingManager'
+import { useGlobalCallManager } from '@/hooks/useGlobalCallManager'
 import { User } from 'lucide-react'
 
 export default function Home() {
@@ -32,6 +33,22 @@ export default function Home() {
 
   // Инициализируем глобальный typing менеджер
   useGlobalTypingManager()
+
+  // Инициализируем глобальный менеджер звонков
+  const { isGlobalCallManagerActive } = useGlobalCallManager({
+    isAuthenticated,
+    userId: user?.id || null
+  })
+
+  // Логирование состояния глобального менеджера звонков
+  useEffect(() => {
+    console.log('🌐 Page: Global call manager state:', {
+      isAuthenticated,
+      userId: user?.id?.slice(0, 8),
+      isGlobalCallManagerActive,
+      timestamp: new Date().toISOString()
+    })
+  }, [isAuthenticated, user?.id, isGlobalCallManagerActive])
 
   useEffect(() => {
     // Check initial session

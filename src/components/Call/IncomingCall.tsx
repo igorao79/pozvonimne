@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
+import { sendCallAcceptedSignal, sendCallRejectedSignal } from '@/utils/callSignaling'
 
 interface CallerInfo {
   id: string
@@ -83,58 +84,25 @@ const IncomingCall = () => {
         isCallActive: useCallStore.getState().isCallActive
       })
 
-      // Send accept signal back to caller - используем существующий канал или создаем новый
-      if (callerId) {
+      // Отправляем сигнал принятия звонка через надежную утилиту
+      if (callerId && userId) {
         console.log('🎯 IncomingCall: Sending accept signal to caller...')
 
-        // Используем broadcast на канале звонящего
-        const callerChannelId = `calls:${callerId}`
-
         try {
-          // Попробуем найти существующий канал или создать новый
-          let callerChannel = supabase.getChannels().find(ch => ch.topic === callerChannelId)
+          const signalSent = await sendCallAcceptedSignal(
+            callerId,
+            userId,
+            'Пользователь' // Можно добавить настоящее имя если нужно
+          )
 
-          if (!callerChannel) {
-            console.log('🎯 Creating new caller channel for accept signal')
-            callerChannel = supabase.channel(callerChannelId)
-
-            // Моментальная подписка для максимальной скорости
-            await new Promise((resolve) => {
-              const timeout = setTimeout(() => {
-                console.warn('🎯 Accept signal subscription timeout, trying anyway')
-                resolve('timeout')
-              }, 100) // Минимум для моментальной работы
-
-              callerChannel?.subscribe((status) => {
-                clearTimeout(timeout)
-                console.log('🎯 IncomingCall: Caller channel subscription status:', status)
-
-                if (status === 'SUBSCRIBED') {
-                  resolve(status)
-                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                  console.warn('🎯 Subscription failed, but continuing:', status)
-                  resolve(status) // Продолжаем даже при ошибке
-                }
-              })
-            })
+          if (signalSent) {
+            console.log('✅ IncomingCall: Call accept signal sent successfully')
+          } else {
+            console.warn('⚠️ IncomingCall: Failed to send accept signal, but continuing')
           }
-
-          // Пытаемся отправить сигнал принятия
-          const result = await callerChannel?.send({
-            type: 'broadcast',
-            event: 'call_accepted',
-            payload: {
-              accepter_id: userId,
-              timestamp: Date.now()
-            }
-          })
-
-          console.log('🎯 IncomingCall: Call accept signal sent to:', callerId, 'Result:', result)
-
-          // Убираем автоматическую очистку канала - пусть система сама управляет
-
-        } catch (channelError) {
-          console.warn('🎯 Error with caller channel, continuing anyway:', channelError)
+        } catch (signalError) {
+          console.warn('🎯 IncomingCall: Error sending accept signal:', signalError)
+          // Продолжаем даже при ошибке отправки сигнала
         }
       }
 
@@ -160,42 +128,24 @@ const IncomingCall = () => {
       console.log('📞 Rejecting call...')
       console.log('🎯 IncomingCall: Rejecting call from:', callerId)
 
-      // Send reject signal back to caller
-      if (callerId) {
-        const callerChannel = supabase.channel(`calls:${callerId}`)
+      // Отправляем сигнал отклонения звонка через надежную утилиту
+      if (callerId && userId) {
+        try {
+          const signalSent = await sendCallRejectedSignal(
+            callerId,
+            userId,
+            'Пользователь' // Можно добавить настоящее имя если нужно
+          )
 
-        await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Call reject subscription timeout'))
-          }, 3000)
-
-          callerChannel.subscribe((status) => {
-            clearTimeout(timeout)
-            console.log('🎯 IncomingCall: Reject channel subscription status:', status)
-
-            if (status === 'SUBSCRIBED') {
-              resolve(status)
-            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              reject(new Error(`Call reject subscription failed: ${status}`))
-            }
-          })
-        })
-
-        const result = await callerChannel.send({
-          type: 'broadcast',
-          event: 'call_rejected',
-          payload: {
-            rejector_id: userId,
-            timestamp: Date.now()
+          if (signalSent) {
+            console.log('✅ IncomingCall: Call reject signal sent successfully')
+          } else {
+            console.warn('⚠️ IncomingCall: Failed to send reject signal, but continuing')
           }
-        })
-
-        console.log('🎯 IncomingCall: Call reject signal sent:', result)
-
-        // Clean up channel
-        setTimeout(() => {
-          callerChannel.unsubscribe()
-        }, 500)
+        } catch (signalError) {
+          console.warn('🎯 IncomingCall: Error sending reject signal:', signalError)
+          // Продолжаем даже при ошибке отправки сигнала
+        }
       }
 
       rejectCall()
