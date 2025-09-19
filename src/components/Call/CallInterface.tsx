@@ -6,7 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import useWebRTC from '@/hooks/useWebRTC'
 import { CallControls, IncomingCall, CallScreen, DialPad } from '.'
 import { ChatApp } from '../Chat'
-import { sendCallEndedMessage, sendMissedCallMessage, findOrCreateChatWithUser } from '@/utils/callSystemMessages'
+import { sendCallEndedMessage, sendMissedCallMessage } from '@/utils/callSystemMessages'
 import { createSubscriptionHandler, createReconnectionManager, safeRemoveChannel } from '@/utils/subscriptionHelpers'
 import { resilientChannelManager } from '@/utils/resilientChannelManager'
 
@@ -41,8 +41,7 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
   const [isReconnecting, setIsReconnecting] = useState(false)
   const reconnectionManagerRef = useRef<ReturnType<typeof createReconnectionManager> | null>(null)
 
-  // Состояние для чата, который нужно открыть после звонка
-  const [chatToOpenAfterCall, setChatToOpenAfterCall] = useState<string | null>(null)
+  // УБРАНО: Больше не открываем чат автоматически после звонка
   
   // Состояние для автоматического восстановления чата из localStorage
   const [savedChatId, setSavedChatId] = useState<string | null>(null)
@@ -58,10 +57,7 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
     callerName: ''
   })
 
-  // Функция для поиска чата с конкретным пользователем (для перехода к чату)
-  const findChatWithUser = async (targetUserId: string) => {
-    return await findOrCreateChatWithUser(targetUserId)
-  }
+  // УБРАНО: Функция поиска чата больше не нужна
 
   // Восстановление сохраненного чата из localStorage при загрузке
   // УБРАНО: Автоматическое восстановление чата при входе в аккаунт
@@ -127,86 +123,8 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
     // Системные сообщения временно отключены из-за ошибок с несуществующими столбцами
   }
 
-  // Отслеживаем завершение звонка и находим соответствующий чат для перехода
-  useEffect(() => {
-    const wasInCall = isInCall || isCallActive || isCalling || isReceivingCall
-    const isCurrentlyInCall = isInCall || isCallActive || isCalling || isReceivingCall
-    
-    // Определяем ID пользователя для перехода к чату
-    const userToRedirect = targetUserId || callerId
-
-    console.log('📱 ПЕРЕХОД К ЧАТУ - Проверка состояния звонка:', {
-      wasInCall,
-      isCurrentlyInCall,
-      targetUserId: targetUserId?.substring(0, 8),
-      callerId: callerId?.substring(0, 8),
-      userToRedirect: userToRedirect?.substring(0, 8),
-      chatToOpenAfterCall,
-      timestamp: new Date().toISOString()
-    })
-
-    // Если звонок только что завершился (был в звонке, но сейчас нет)
-    if (wasInCall && !isCurrentlyInCall && userToRedirect && !chatToOpenAfterCall) {
-      console.log('📱 ПЕРЕХОД К ЧАТУ - Звонок завершился, ищем чат для перехода:', {
-        userToRedirect: userToRedirect.substring(0, 8),
-        wasInCall,
-        isCurrentlyInCall
-      })
-      
-      // Добавляем задержку для корректной обработки
-      setTimeout(async () => {
-        try {
-          console.log('📱 ПЕРЕХОД К ЧАТУ - Поиск/создание чата для пользователя:', userToRedirect.substring(0, 8))
-          
-          const chatId = await findOrCreateChatWithUser(userToRedirect)
-          
-          console.log('📱 ПЕРЕХОД К ЧАТУ - Результат поиска чата:', {
-            chatId,
-            userToRedirect: userToRedirect.substring(0, 8),
-            found: !!chatId
-          })
-
-          if (chatId) {
-            console.log('📱 ПЕРЕХОД К ЧАТУ - Установка чата для открытия:', {
-              chatId,
-              userToRedirect: userToRedirect.substring(0, 8)
-            })
-            setChatToOpenAfterCall(chatId)
-          } else {
-            console.error('❌ ПЕРЕХОД К ЧАТУ - Не удалось найти/создать чат для пользователя:', {
-              userToRedirect: userToRedirect.substring(0, 8)
-            })
-          }
-        } catch (error) {
-          console.error('❌ ПЕРЕХОД К ЧАТУ - Ошибка поиска чата после звонка:', {
-            error,
-            userToRedirect: userToRedirect.substring(0, 8),
-            message: error instanceof Error ? error.message : 'Unknown error'
-          })
-        }
-      }, 1500)
-    }
-
-    // Если звонок начался заново, очищаем состояние предыдущего чата
-    if (isCurrentlyInCall && chatToOpenAfterCall) {
-      console.log('📱 ПЕРЕХОД К ЧАТУ - Новый звонок начался, очищаем состояние чата:', {
-        chatToOpenAfterCall,
-        isCurrentlyInCall
-      })
-      setChatToOpenAfterCall(null)
-    }
-
-    // Очищаем состояние чата через некоторое время после завершения звонка
-    if (wasInCall && !isCurrentlyInCall && chatToOpenAfterCall) {
-      console.log('📱 ПЕРЕХОД К ЧАТУ - Планируем очистку состояния чата через 5 секунд:', {
-        chatToOpenAfterCall
-      })
-      setTimeout(() => {
-        console.log('🧹 ПЕРЕХОД К ЧАТУ - Очистка состояния чата после задержки')
-        setChatToOpenAfterCall(null)
-      }, 5000) // Увеличиваем время до 5 секунд
-    }
-  }, [isInCall, isCallActive, isCalling, isReceivingCall, targetUserId, callerId, chatToOpenAfterCall])
+  // УБРАНА НЕПРАВИЛЬНАЯ ЛОГИКА: Не переходим автоматически к чату после звонка!
+  // Как в Telegram/Discord - пользователь остается там, где был до звонка
 
   useEffect(() => {
     if (!userId) return
@@ -381,28 +299,41 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
     }
   }, [userId, supabase, isReconnecting])
 
-  if (isReceivingCall) {
-    return <IncomingCall />
-  }
-
-  if (isInCall && isCallActive) {
-    return <CallScreen />
-  }
-
-  // Убираем модальное окно - теперь индикация звонка в ChatHeader
-
-  // Определяем какой чат нужно открыть: после звонка имеет приоритет над сохраненным
-  const chatIdToOpen = chatToOpenAfterCall || savedChatId
-
+  // ПРАВИЛЬНО: ChatApp всегда остается смонтированным
+  // Компоненты звонка показываются поверх как модальные окна
+  
   console.log('📱 CALL INTERFACE - Рендер чата:', {
-    chatToOpenAfterCall,
     savedChatId,
-    chatIdToOpen,
-    hasAutoOpenChat: !!chatIdToOpen,
+    hasAutoOpenChat: !!savedChatId,
+    isInCall,
+    isCallActive,
+    isReceivingCall,
     timestamp: new Date().toISOString()
   })
 
-  return <ChatApp autoOpenChatId={chatIdToOpen || undefined} onResetChat={() => setChatToOpenAfterCall(null)} resetTrigger={resetChatTrigger} />
+  return (
+    <div className="relative h-full w-full">
+      {/* Основной чат - ВСЕГДА смонтирован */}
+      <ChatApp 
+        autoOpenChatId={savedChatId || undefined} 
+        onResetChat={() => {}} 
+        resetTrigger={resetChatTrigger} 
+      />
+
+      {/* Модальные окна звонков - показываются ПОВЕРХ чата */}
+      {isReceivingCall && (
+        <div className="absolute inset-0 z-50 bg-background">
+          <IncomingCall />
+        </div>
+      )}
+
+      {isInCall && isCallActive && (
+        <div className="absolute inset-0 z-50 bg-background">
+          <CallScreen />
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default CallInterface

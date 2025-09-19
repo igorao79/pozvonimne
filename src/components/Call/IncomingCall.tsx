@@ -82,22 +82,22 @@ const IncomingCall = () => {
         isCalling: useCallStore.getState().isCalling,
         isCallActive: useCallStore.getState().isCallActive
       })
-      
+
       // Send accept signal back to caller - используем существующий канал или создаем новый
       if (callerId) {
         console.log('🎯 IncomingCall: Sending accept signal to caller...')
-        
+
         // Используем broadcast на канале звонящего
         const callerChannelId = `calls:${callerId}`
-        
+
         try {
           // Попробуем найти существующий канал или создать новый
           let callerChannel = supabase.getChannels().find(ch => ch.topic === callerChannelId)
-          
+
           if (!callerChannel) {
             console.log('🎯 Creating new caller channel for accept signal')
             callerChannel = supabase.channel(callerChannelId)
-            
+
             // Моментальная подписка для максимальной скорости
             await new Promise((resolve) => {
               const timeout = setTimeout(() => {
@@ -108,7 +108,7 @@ const IncomingCall = () => {
               callerChannel?.subscribe((status) => {
                 clearTimeout(timeout)
                 console.log('🎯 IncomingCall: Caller channel subscription status:', status)
-                
+
                 if (status === 'SUBSCRIBED') {
                   resolve(status)
                 } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -118,7 +118,7 @@ const IncomingCall = () => {
               })
             })
           }
-        
+
           // Пытаемся отправить сигнал принятия
           const result = await callerChannel?.send({
             type: 'broadcast',
@@ -128,19 +128,19 @@ const IncomingCall = () => {
               timestamp: Date.now()
             }
           })
-          
+
           console.log('🎯 IncomingCall: Call accept signal sent to:', callerId, 'Result:', result)
-          
+
           // Убираем автоматическую очистку канала - пусть система сама управляет
-          
+
         } catch (channelError) {
           console.warn('🎯 Error with caller channel, continuing anyway:', channelError)
         }
       }
-      
+
       console.log('🎯 IncomingCall: Calling acceptCall() function...')
       acceptCall()
-      
+
       console.log('🎯 IncomingCall: State after acceptCall():', {
         isReceivingCall: useCallStore.getState().isReceivingCall,
         isInCall: useCallStore.getState().isInCall,
@@ -159,11 +159,11 @@ const IncomingCall = () => {
     try {
       console.log('📞 Rejecting call...')
       console.log('🎯 IncomingCall: Rejecting call from:', callerId)
-      
+
       // Send reject signal back to caller
       if (callerId) {
         const callerChannel = supabase.channel(`calls:${callerId}`)
-        
+
         await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error('Call reject subscription timeout'))
@@ -172,7 +172,7 @@ const IncomingCall = () => {
           callerChannel.subscribe((status) => {
             clearTimeout(timeout)
             console.log('🎯 IncomingCall: Reject channel subscription status:', status)
-            
+
             if (status === 'SUBSCRIBED') {
               resolve(status)
             } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -180,7 +180,7 @@ const IncomingCall = () => {
             }
           })
         })
-        
+
         const result = await callerChannel.send({
           type: 'broadcast',
           event: 'call_rejected',
@@ -189,15 +189,15 @@ const IncomingCall = () => {
             timestamp: Date.now()
           }
         })
-        
+
         console.log('🎯 IncomingCall: Call reject signal sent:', result)
-        
+
         // Clean up channel
         setTimeout(() => {
           callerChannel.unsubscribe()
         }, 500)
       }
-      
+
       rejectCall()
     } catch (err) {
       console.error('🎯 IncomingCall: Error rejecting call:', err)
@@ -239,16 +239,17 @@ const IncomingCall = () => {
             className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold py-4 px-6 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-destructive/50"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 9l6 6m0-6l-6 6"/>
             </svg>
           </button>
-          
+
           <button
             onClick={handleAccept}
             className="flex-1 bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white font-semibold py-4 px-6 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-green-400/50"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
             </svg>
           </button>
         </div>
