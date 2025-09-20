@@ -72,11 +72,14 @@ const AvatarSection = ({
               key={avatarUrl} // Важно для перерендеринга при изменении URL
               src={avatarUrl}
               alt="Avatar"
-              className={`w-full h-full object-cover absolute inset-0 transition-all duration-500 ease-in-out ${
+              className={`w-full h-full object-cover absolute inset-0 transition-all duration-500 ease-in-out select-none ${
                 imageLoading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
               }`}
               onLoad={handleImageLoad}
               onError={handleImageError}
+              onContextMenu={(e) => e.preventDefault()}
+              onDragStart={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
             />
           ) : (
             // Placeholder с первой буквой с плавным появлением

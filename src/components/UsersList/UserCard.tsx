@@ -25,7 +25,10 @@ const UserCard = ({ user, isInCall, callingUserId, formatLastSeen, onCallUser, o
             <img
               src={user.avatar_url}
               alt={user.display_name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover select-none"
+              onContextMenu={(e) => e.preventDefault()}
+              onDragStart={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">

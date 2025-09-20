@@ -2,13 +2,16 @@ import { useState, useEffect, useCallback } from 'react'
 import { Message, RealtimeMessagePayload } from '@/components/Chat/ChatInterface/types'
 import useSupabaseStore from '@/store/useSupabaseStore'
 import useChatSyncStore from '@/store/useChatSyncStore'
+import useChatConnectionMonitor from '@/hooks/useChatConnectionMonitor'
+import useChatPollingFallback from '@/hooks/useChatPollingFallback'
 
 interface UseChatMessagesProps {
   chatId: string
   userId?: string
+  isActive?: boolean // Активен ли чат в данный момент
 }
 
-export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
+export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMessagesProps) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -18,6 +21,37 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
 
   const { supabase } = useSupabaseStore()
   const { refreshChatList } = useChatSyncStore()
+  
+  // Мониторинг соединения и fallback polling
+  const {
+    updateMessageReceived,
+    isConnectionHealthy,
+    getConnectionScore,
+    sendPing
+  } = useChatConnectionMonitor({
+    chatId,
+    userId: userId || null,
+    isActive,
+    onConnectionIssue: () => {
+      console.warn('⚠️ ChatMessages: Connection issue detected, may need recovery')
+      setError('Проблемы с соединением, проверяем...')
+    }
+  })
+  
+  const {
+    isPollingActive,
+    forcePoll,
+    getPollingStats
+  } = useChatPollingFallback({
+    chatId,
+    userId: userId || null,
+    isActive,
+    onNewMessage: (message) => {
+      console.log('📊 ChatMessages: Message received via polling fallback')
+      handleNewMessage(message)
+    },
+    isRealtimeHealthy: isConnectionHealthy()
+  })
 
   // Загрузка сообщений
   const loadMessages = useCallback(async () => {
@@ -186,6 +220,14 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
 
   // Обработка новых сообщений из realtime
   const handleNewMessage = useCallback((messageData: RealtimeMessagePayload & { _isUpdate?: boolean, _oldRecord?: any }) => {
+    // Уведомляем монитор соединения о получении сообщения
+    updateMessageReceived()
+    
+    // Очищаем ошибки при получении сообщений
+    if (error) {
+      setError(undefined)
+    }
+    
     if (!messageData.id || !messageData.chat_id) {
       console.warn('📡 Неполные данные сообщения:', messageData)
       return
@@ -273,7 +315,7 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
 
     // Уведомляем о новом сообщении через Zustand для обновления списка чатов
     refreshChatList()
-  }, [chatId, userId, supabase, refreshChatList])
+  }, [chatId, userId, supabase, refreshChatList, updateMessageReceived, error])
 
   return {
     messages,
@@ -286,6 +328,15 @@ export const useChatMessages = ({ chatId, userId }: UseChatMessagesProps) => {
     loadMoreMessages,
     sendMessage,
     handleNewMessage,
-    setError
+    setError,
+    // Дополнительные диагностические данные
+    connectionHealth: {
+      isHealthy: isConnectionHealthy(),
+      score: getConnectionScore(),
+      isPollingActive,
+      pollingStats: getPollingStats(),
+      sendPing,
+      forcePoll
+    }
   }
 }

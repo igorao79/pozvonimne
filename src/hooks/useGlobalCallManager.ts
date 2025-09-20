@@ -57,8 +57,8 @@ export const useGlobalCallManager = ({ isAuthenticated, userId }: UseGlobalCallM
             // При переподключении перезапускаем настройку
             setupGlobalCallListener()
           },
-          5, // больше попыток для критично важного канала
-          3000 // 3 секунды между попытками
+          15, // больше попыток для критично важного канала звонков
+          1000 // 1 секунда между попытками (быстрее)
         )
       }
 
@@ -70,7 +70,7 @@ export const useGlobalCallManager = ({ isAuthenticated, userId }: UseGlobalCallM
             console.log('🌐 GlobalCallManager: Setting up channel listeners')
             
             return channel
-              .on('broadcast', { event: 'incoming_call' }, (payload: any) => {
+              .on('broadcast', { event: 'incoming_call' }, async (payload: any) => {
                 console.log('🌐 GlobalCallManager: 📞 ========== INCOMING CALL EVENT ==========')
                 console.log('🌐 GlobalCallManager: 📞 Timestamp:', new Date().toISOString())
                 console.log('🌐 GlobalCallManager: 📞 Raw payload:', payload)
@@ -79,17 +79,58 @@ export const useGlobalCallManager = ({ isAuthenticated, userId }: UseGlobalCallM
                 console.log('🌐 GlobalCallManager: 📞 Event data:', payload.event)
                 console.log('🌐 GlobalCallManager: 📞 Event type:', typeof payload.event)
                 
-                const { caller_id, caller_name, timestamp } = payload.payload || {}
+                const { caller_id, caller_name, timestamp, signal_id, expect_ack } = payload.payload || {}
                 
                 console.log('🌐 GlobalCallManager: 📞 Extracted data:', {
                   caller_id: caller_id?.slice(0, 8),
                   caller_name,
                   timestamp,
+                  signal_id,
+                  expect_ack,
                   age: timestamp ? Date.now() - timestamp : 'no timestamp'
                 })
                 
-                // Проверяем актуальность звонка (не старше 30 секунд)
-                if (timestamp && Date.now() - timestamp > 30000) {
+                // Отправляем acknowledgment если требуется
+                if (expect_ack && signal_id && caller_id) {
+                  console.log('🌐 GlobalCallManager: 📞 Sending acknowledgment for signal:', signal_id)
+                  try {
+                    const ackChannelId = `ack:${caller_id}`
+                    const ackChannel = supabase.channel(ackChannelId)
+                    
+                    // Быстрая подписка
+                    await new Promise<void>((resolve) => {
+                      const timeout = setTimeout(() => resolve(), 500)
+                      ackChannel.subscribe((status: any) => {
+                        clearTimeout(timeout)
+                        console.log('🌐 GlobalCallManager: 📞 ACK channel status:', status)
+                        resolve()
+                      })
+                    })
+                    
+                    // Отправляем acknowledgment
+                    await ackChannel.send({
+                      type: 'broadcast',
+                      event: 'call_signal_ack',
+                      payload: {
+                        signal_id,
+                        acknowledged_by: userId,
+                        timestamp: Date.now()
+                      }
+                    })
+                    
+                    console.log('🌐 GlobalCallManager: 📞 ✅ Acknowledgment sent for signal:', signal_id)
+                    
+                    // Очищаем канал
+                    setTimeout(() => {
+                      supabase.removeChannel(ackChannel)
+                    }, 1000)
+                  } catch (error) {
+                    console.error('🌐 GlobalCallManager: 📞 ❌ Failed to send acknowledgment:', error)
+                  }
+                }
+                
+                // Проверяем актуальность звонка (не старше 60 секунд, увеличили лимит)
+                if (timestamp && Date.now() - timestamp > 60000) {
                   console.log('🌐 GlobalCallManager: 📞 Ignoring old call signal (age:', Date.now() - timestamp, 'ms)')
                   return
                 }
@@ -112,10 +153,26 @@ export const useGlobalCallManager = ({ isAuthenticated, userId }: UseGlobalCallM
                 console.log('🌐 GlobalCallManager: 📞 ✅ Processing incoming call from:', caller_id?.slice(0, 8), 'name:', caller_name)
                 console.log('🌐 GlobalCallManager: 📞 Setting incoming call state...')
                 
-                // Устанавливаем состояние входящего звонка
-                setIsReceivingCall(true, caller_id, caller_name)
+                try {
+                  // Устанавливаем состояние входящего звонка
+                  setIsReceivingCall(true, caller_id, caller_name)
+                  
+                  console.log('🌐 GlobalCallManager: 📞 ✅ Incoming call state set successfully!')
+                  
+                  // Проверим, что состояние действительно установилось
+                  setTimeout(() => {
+                    const newState = useCallStore.getState()
+                    console.log('🌐 GlobalCallManager: 📞 State check after setIsReceivingCall:', {
+                      isReceivingCall: newState.isReceivingCall,
+                      callerId: newState.callerId?.slice(0, 8),
+                      callerName: newState.callerName
+                    })
+                  }, 100)
+                  
+                } catch (error) {
+                  console.error('🌐 GlobalCallManager: 📞 ❌ Error setting incoming call state:', error)
+                }
                 
-                console.log('🌐 GlobalCallManager: 📞 ✅ Incoming call state set successfully!')
                 console.log('🌐 GlobalCallManager: 📞 =============================================')
               })
               .on('broadcast', { event: 'call_accepted' }, (payload: any) => {
@@ -180,9 +237,12 @@ export const useGlobalCallManager = ({ isAuthenticated, userId }: UseGlobalCallM
               })
           },
           onSubscribed: () => {
+            const currentTime = new Date().toISOString()
             console.log('✅ GlobalCallManager: Global call listener successfully connected for user:', userId.slice(0, 8))
             console.log('🎯 GlobalCallManager: Channel ID:', channelId)
+            console.log('🎯 GlobalCallManager: Connection time:', currentTime)
             console.log('🎯 GlobalCallManager: Ready to receive incoming calls!')
+            console.log('🎯 GlobalCallManager: Keep-alive interval: 10s, Health check: 20s')
             setError(null) // Очищаем ошибки при успешном подключении
             
             // Сбрасываем менеджер переподключения при успехе
@@ -204,10 +264,10 @@ export const useGlobalCallManager = ({ isAuthenticated, userId }: UseGlobalCallM
               }
             }
           },
-          maxReconnectAttempts: 5, // Уменьшили количество попыток
-          reconnectDelay: 3000, // 3 секунды между попытками
-          keepAliveInterval: 45000, // Keep-alive каждые 45 секунд
-          healthCheckInterval: 90000 // Проверка здоровья каждые 1.5 минуты
+          maxReconnectAttempts: 15, // Больше попыток для критично важного канала звонков
+          reconnectDelay: 1000, // 1 секунда между попытками (быстрее)
+          keepAliveInterval: 10000, // Keep-alive каждые 10 секунд (агрессивно)
+          healthCheckInterval: 20000 // Проверка здоровья каждые 20 секунд (агрессивно)
         })
         
         console.log('✅ GlobalCallManager: Global call listener setup completed')

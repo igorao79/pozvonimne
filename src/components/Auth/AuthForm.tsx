@@ -87,7 +87,9 @@ const AuthForm = () => {
                 alt="Позвони.мне логотип"
                 width={32}
                 height={32}
-                className="mr-2"
+                className="mr-2 select-none"
+                onContextMenu={(e) => e.preventDefault()}
+                onDragStart={(e) => e.preventDefault()}
               />
               <h1 className="text-lg font-semibold text-foreground">
                 Позвони.мне

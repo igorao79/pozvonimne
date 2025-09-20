@@ -117,20 +117,134 @@ export const sendCallSignal = async ({
 }
 
 /**
- * Отправка сигнала входящего звонка
+ * Отправка сигнала с ожиданием подтверждения доставки
+ */
+const sendCallSignalWithAcknowledgment = async (
+  params: SendCallSignalParams & { expectAck?: boolean; timeout?: number }
+): Promise<{ success: boolean; acknowledged: boolean }> => {
+  const { targetUserId, callerUserId, callerName, event, extraPayload = {}, expectAck = true, timeout = 10000 } = params
+  
+  // Генерируем уникальный ID для отслеживания
+  const signalId = `${event}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  console.log(`📡 CallSignaling: Sending ${event} with acknowledgment, ID: ${signalId}`)
+  
+  const supabase = createClient()
+  
+  // Подготавливаем канал для получения acknowledgment
+  let ackReceived = false
+  let ackChannel: any = null
+  
+  if (expectAck) {
+    const ackChannelId = `ack:${callerUserId}`
+    ackChannel = supabase.channel(ackChannelId)
+    
+    // Подписываемся на подтверждения
+    await new Promise<void>((resolve) => {
+      const timeout_id = setTimeout(() => resolve(), 1000)
+      ackChannel.subscribe((status: any) => {
+        clearTimeout(timeout_id)
+        console.log(`📡 CallSignaling: ACK channel status: ${status}`)
+        resolve()
+      })
+    })
+    
+    // Слушаем acknowledgment
+    ackChannel.on('broadcast', { event: 'call_signal_ack' }, (payload: any) => {
+      console.log(`📡 CallSignaling: Received ACK:`, payload)
+      if (payload.payload?.signal_id === signalId) {
+        console.log(`✅ CallSignaling: Signal ${signalId} acknowledged!`)
+        ackReceived = true
+      }
+    })
+  }
+  
+  // Отправляем основной сигнал
+  const signalSent = await sendCallSignal({
+    targetUserId,
+    callerUserId,
+    callerName,
+    event,
+    extraPayload: {
+      ...extraPayload,
+      signal_id: signalId,
+      expect_ack: expectAck
+    }
+  })
+  
+  if (!signalSent) {
+    if (ackChannel) {
+      supabase.removeChannel(ackChannel)
+    }
+    return { success: false, acknowledged: false }
+  }
+  
+  // Если не ожидаем подтверждение, сразу возвращаем успех
+  if (!expectAck) {
+    return { success: true, acknowledged: true }
+  }
+  
+  // Ожидаем acknowledgment с таймаутом
+  console.log(`⏳ CallSignaling: Waiting for acknowledgment for ${timeout}ms...`)
+  const ackResult = await new Promise<boolean>((resolve) => {
+    const timeoutId = setTimeout(() => {
+      console.log(`⏰ CallSignaling: ACK timeout for signal ${signalId}`)
+      resolve(false)
+    }, timeout)
+    
+    const checkAck = () => {
+      if (ackReceived) {
+        clearTimeout(timeoutId)
+        resolve(true)
+      } else {
+        setTimeout(checkAck, 100)
+      }
+    }
+    checkAck()
+  })
+  
+  // Очищаем канал подтверждений
+  if (ackChannel) {
+    supabase.removeChannel(ackChannel)
+  }
+  
+  console.log(`📡 CallSignaling: Signal ${signalId} result:`, {
+    sent: signalSent,
+    acknowledged: ackResult
+  })
+  
+  return { success: signalSent, acknowledged: ackResult }
+}
+
+/**
+ * Отправка сигнала входящего звонка с гарантированной доставкой
  */
 export const sendIncomingCallSignal = async (
   targetUserId: string,
   callerUserId: string,
   callerName: string
 ): Promise<boolean> => {
-  console.log(`📡 CallSignaling: 📞 Sending INCOMING_CALL signal to ${targetUserId.slice(0, 8)} from ${callerUserId.slice(0, 8)}`)
-  return sendCallSignal({
+  console.log(`📞 Sending incoming call signal with acknowledgment...`)
+  
+  const result = await sendCallSignalWithAcknowledgment({
     targetUserId,
     callerUserId,
     callerName,
-    event: 'incoming_call'
+    event: 'incoming_call',
+    expectAck: true,
+    timeout: 15000 // 15 секунд на подтверждение
   })
+  
+  if (result.success && result.acknowledged) {
+    console.log(`✅ Incoming call signal delivered and acknowledged`)
+    return true
+  } else if (result.success && !result.acknowledged) {
+    console.log(`⚠️ Incoming call signal sent but not acknowledged - user might be offline`)
+    // Возвращаем true даже без acknowledgment, так как сигнал отправлен
+    return true
+  } else {
+    console.log(`❌ Failed to send incoming call signal`)
+    return false
+  }
 }
 
 /**

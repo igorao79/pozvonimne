@@ -16,6 +16,10 @@ interface CallState {
   callerId: string | null
   callerName: string | null
   
+  // Call protection state
+  isCallInitiating: boolean  // Блокировка повторных звонков
+  lastCallAttempt: number | null // Время последней попытки звонка
+  
   // Call tracking
   callStartTime: number | null // Время начала звонка в миллисекундах
   callDurationSeconds: number  // Продолжительность звонка в секундах
@@ -49,6 +53,10 @@ interface CallActions {
   setIsCalling: (isCalling: boolean) => void
   setIsReceivingCall: (isReceivingCall: boolean, callerId?: string, callerName?: string) => void
   
+  // Call protection actions
+  setIsCallInitiating: (isInitiating: boolean) => void
+  canInitiateCall: () => boolean
+  
   // Media actions
   toggleMic: () => void
   setLocalStream: (stream: MediaStream | null) => void
@@ -68,7 +76,7 @@ interface CallActions {
   setIsLoading: (isLoading: boolean) => void
   
   // Call management
-  startCall: (targetUserId: string) => void
+  startCall: (targetUserId: string) => boolean
   acceptCall: () => void
   rejectCall: () => void
   endCall: () => void
@@ -92,6 +100,9 @@ const useCallStore = create<CallStore>((set, get) => ({
   isReceivingCall: false,
   callerId: null,
   callerName: null,
+  
+  isCallInitiating: false,
+  lastCallAttempt: null,
   
   callStartTime: null,
   callDurationSeconds: 0,
@@ -133,6 +144,33 @@ const useCallStore = create<CallStore>((set, get) => ({
   setIsCalling: (isCalling) => set({ isCalling }),
   setIsReceivingCall: (isReceivingCall, callerId, callerName) => 
     set({ isReceivingCall, callerId: callerId || null, callerName: callerName || null }),
+  
+  // Call protection actions
+  setIsCallInitiating: (isInitiating) => set({ isCallInitiating: isInitiating }),
+  
+  canInitiateCall: () => {
+    const state = get()
+    const now = Date.now()
+    
+    // Проверяем блокирующие условия
+    if (state.isCallInitiating) {
+      console.log('❌ CanInitiateCall: Call is already being initiated')
+      return false
+    }
+    
+    if (state.isInCall || state.isCalling || state.isReceivingCall) {
+      console.log('❌ CanInitiateCall: Already in call state')
+      return false
+    }
+    
+    // Проверяем минимальный интервал между звонками (2 секунды)
+    if (state.lastCallAttempt && (now - state.lastCallAttempt < 2000)) {
+      console.log('❌ CanInitiateCall: Too soon since last call attempt')
+      return false
+    }
+    
+    return true
+  },
   
   // Media actions
   toggleMic: () => {
@@ -261,6 +299,17 @@ const useCallStore = create<CallStore>((set, get) => ({
   startCall: (targetUserId) => {
     console.log('🚀 StartCall: Starting new call to', targetUserId.slice(0, 8))
     
+    // Проверяем, можем ли мы инициировать звонок
+    const { canInitiateCall, setIsCallInitiating } = get()
+    if (!canInitiateCall()) {
+      console.log('🚀 StartCall: Cannot initiate call - blocked by protection')
+      return false
+    }
+    
+    // Блокируем повторные попытки
+    setIsCallInitiating(true)
+    const now = Date.now()
+    
     // Очищаем предыдущее состояние перед новым звонком
     const { peer, localStream, remoteStream } = get()
     
@@ -294,10 +343,13 @@ const useCallStore = create<CallStore>((set, get) => ({
       // Устанавливаем новое состояние
       targetUserId,
       isCalling: true,
-      isInCall: true
+      isInCall: true,
+      lastCallAttempt: now,
+      isCallInitiating: false // Разблокируем после установки состояния
     })
 
     console.log('🚀 StartCall: New outgoing call initiated, waiting for acceptance...')
+    return true
   },
   
   acceptCall: () => {
@@ -343,7 +395,10 @@ const useCallStore = create<CallStore>((set, get) => ({
     set({ 
       isReceivingCall: false, 
       callerId: null,
-      callerName: null
+      callerName: null,
+      // Сбрасываем блокировку звонков при отклонении
+      isCallInitiating: false,
+      lastCallAttempt: null
     })
   },
   
@@ -411,7 +466,9 @@ const useCallStore = create<CallStore>((set, get) => ({
       targetUserId: '', // ВАЖНО: очищаем targetUserId
       error: null,
       callStartTime: null,
-      callDurationSeconds // Сохраняем продолжительность для использования в компонентах
+      callDurationSeconds, // Сохраняем продолжительность для использования в компонентах
+      isCallInitiating: false, // Сбрасываем блокировку звонков
+      lastCallAttempt: null // Сбрасываем время последнего звонка
     })
 
     console.log('🔚 EndCall: Cleanup completed, call duration:', callDurationSeconds, 'seconds')
@@ -450,7 +507,9 @@ const useCallStore = create<CallStore>((set, get) => ({
       targetUserId: '',
       error: null,
       callStartTime: null,
-      callDurationSeconds: 0
+      callDurationSeconds: 0,
+      isCallInitiating: false,
+      lastCallAttempt: null
     })
   },
   

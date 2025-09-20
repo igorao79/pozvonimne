@@ -55,7 +55,7 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
     loadMoreMessages,
     sendMessage,
     handleNewMessage
-  } = useChatMessages({ chatId: chat.id, userId })
+  } = useChatMessages({ chatId: chat.id, userId, isActive: true })
 
   const { messagesEndRef, scrollToBottom, hasInitialScrolled } = useChatScroll({
     messagesLength: messages.length,

@@ -197,7 +197,10 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               <img
                 src={chat.avatar_url || chat.other_participant_avatar}
                 alt={chat.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover select-none"
+                onContextMenu={(e) => e.preventDefault()}
+                onDragStart={(e) => e.preventDefault()}
+                onMouseDown={(e) => e.preventDefault()}
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">

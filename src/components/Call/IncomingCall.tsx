@@ -185,7 +185,10 @@ const IncomingCall = () => {
               <img
                 src={callerInfo.avatar_url}
                 alt={callerInfo.display_name || callerInfo.username}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover select-none"
+                onContextMenu={(e) => e.preventDefault()}
+                onDragStart={(e) => e.preventDefault()}
+                onMouseDown={(e) => e.preventDefault()}
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">

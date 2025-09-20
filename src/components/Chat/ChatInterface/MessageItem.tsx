@@ -67,12 +67,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
         onClick={onClick}
       >
-        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-          isOwn
-            ? 'bg-primary/50 text-primary-foreground/50'
-            : 'bg-muted text-muted-foreground border border-border/50'
-        }`}>
-          <p className="text-sm italic">[Сообщение удалено]</p>
+    <div className={`max-w-[70vw] min-w-[120px] px-4 py-2 rounded-lg break-words overflow-hidden ${
+      isOwn
+        ? 'bg-primary/50 text-primary-foreground/50'
+        : 'bg-muted text-muted-foreground border border-border/50'
+    }`}>
+          <p className="text-sm italic message-content">[Сообщение удалено]</p>
           <p className={`text-xs mt-1 ${
             isOwn ? 'text-indigo-200/50 dark:text-indigo-100/50' : 'text-muted-foreground/50'
           }`}>
@@ -85,7 +85,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
   // Обычные сообщения с контекстным меню
   const messageContent = (
-    <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+    <div className={`max-w-[70vw] min-w-[120px] px-4 py-2 rounded-lg break-words overflow-hidden ${
       isOwn
         ? 'bg-primary text-primary-foreground'
         : 'bg-card text-foreground border border-border'
@@ -94,7 +94,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         <p className="text-xs text-muted-foreground mb-1">{message.sender_name}</p>
       )}
 
-      <p className="text-sm">{message.content}</p>
+      <p className="text-sm message-content">{message.content}</p>
 
       <div className="flex items-center justify-between mt-1">
         <p className={`text-xs ${

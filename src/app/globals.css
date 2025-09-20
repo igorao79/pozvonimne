@@ -434,3 +434,28 @@ input:focus-visible {
   animation: typing-dot 1.5s infinite;
   animation-delay: 400ms;
 }
+
+/* Message content styling for better link and text wrapping */
+.message-content {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Ensure links in messages break properly */
+.message-content a {
+  word-break: break-all;
+  overflow-wrap: break-word;
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* Additional styling for better text wrapping in messages */
+.message-content {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  /* Prevent horizontal overflow */
+  max-width: 100%;
+  white-space: pre-wrap;
+}

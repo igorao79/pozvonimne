@@ -164,7 +164,10 @@ const AudioCallInterface = ({
               <img
                 src={remoteUserAvatar}
                 alt="Avatar"
-                className="w-full h-full object-cover rounded-full"
+                className="w-full h-full object-cover rounded-full select-none"
+                onContextMenu={(e) => e.preventDefault()}
+                onDragStart={(e) => e.preventDefault()}
+                onMouseDown={(e) => e.preventDefault()}
                 onError={(e) => {
                   console.error('Failed to load remote user avatar:', remoteUserAvatar)
                   e.currentTarget.style.display = 'none'

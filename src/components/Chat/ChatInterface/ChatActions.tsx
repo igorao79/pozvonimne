@@ -9,7 +9,7 @@ interface UseChatActionsProps {
 }
 
 export const useChatActions = ({ chat, onError }: UseChatActionsProps) => {
-  const { userId, startCall, endCall } = useCallStore()
+  const { userId, startCall, endCall, canInitiateCall, isCallInitiating } = useCallStore()
 
   // Обработка звонка
   const handleCall = useCallback(async () => {
@@ -20,11 +20,32 @@ export const useChatActions = ({ chat, onError }: UseChatActionsProps) => {
       chatName: chat.name
     })
 
+    // Проверяем возможность инициации звонка
+    if (!canInitiateCall()) {
+      console.log('❌ HandleCall: Звонок заблокирован защитой')
+      onError('Подождите перед повторным звонком')
+      return
+    }
+
+    if (isCallInitiating) {
+      console.log('❌ HandleCall: Звонок уже инициируется')
+      return
+    }
+
     if (chat.type === 'private' && chat.other_participant_id && userId) {
       console.log('📞 HandleCall: Запускаем звонок к пользователю:', chat.other_participant_id)
 
       try {
-        // Используем надежную отправку сигнала входящего звонка
+        // Сначала устанавливаем локальное состояние звонка с защитой
+        const callStarted = startCall(chat.other_participant_id) as boolean
+        if (callStarted === false) {
+          console.log('❌ HandleCall: Не удалось запустить звонок - заблокировано')
+          onError('Не удалось инициировать звонок')
+          return
+        }
+
+        // Теперь отправляем сигнал
+        console.log('📞 HandleCall: Отправляем сигнал входящего звонка...')
         const signalSent = await sendIncomingCallSignal(
           chat.other_participant_id,
           userId,
@@ -33,14 +54,14 @@ export const useChatActions = ({ chat, onError }: UseChatActionsProps) => {
 
         if (signalSent) {
           console.log('✅ HandleCall: Сигнал incoming_call отправлен успешно')
-          // Запускаем локальную логику звонка
-          startCall(chat.other_participant_id)
         } else {
           console.error('❌ HandleCall: Не удалось отправить сигнал звонка')
+          endCall() // Отменяем локальный звонок если сигнал не отправился
           onError('Не удалось установить соединение для звонка')
         }
       } catch (err) {
         console.error('💥 HandleCall: Критическая ошибка при отправке сигнала:', err)
+        endCall() // Отменяем локальный звонок при ошибке
         onError('Ошибка подключения к звонку')
       }
     } else {
@@ -50,7 +71,7 @@ export const useChatActions = ({ chat, onError }: UseChatActionsProps) => {
         hasOtherParticipant: !!chat.other_participant_id
       })
     }
-  }, [chat.type, chat.other_participant_id, chat.id, chat.name, userId, startCall, onError])
+  }, [chat.type, chat.other_participant_id, chat.id, chat.name, userId, startCall, endCall, onError, canInitiateCall, isCallInitiating])
 
   // Обработка отмены звонка
   const handleCancelCall = useCallback(async () => {

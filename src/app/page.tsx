@@ -12,6 +12,7 @@ import { getAssetPath } from '@/lib/utils'
 import { ThemeToggler } from '@/components/ui/theme-toggler'
 import { useGlobalTypingManager } from '@/hooks/useGlobalTypingManager'
 import { useGlobalCallManager } from '@/hooks/useGlobalCallManager'
+import useCallStateSynchronizer from '@/hooks/useCallStateSynchronizer'
 import { User } from 'lucide-react'
 
 export default function Home() {
@@ -40,15 +41,22 @@ export default function Home() {
     userId: user?.id || null
   })
 
+  // Инициализируем синхронизатор состояний звонков
+  const { isStateSyncActive } = useCallStateSynchronizer({
+    isAuthenticated,
+    userId: user?.id || null
+  })
+
   // Логирование состояния глобального менеджера звонков
   useEffect(() => {
     console.log('🌐 Page: Global call manager state:', {
       isAuthenticated,
       userId: user?.id?.slice(0, 8),
       isGlobalCallManagerActive,
+      isStateSyncActive,
       timestamp: new Date().toISOString()
     })
-  }, [isAuthenticated, user?.id, isGlobalCallManagerActive])
+  }, [isAuthenticated, user?.id, isGlobalCallManagerActive, isStateSyncActive])
 
   useEffect(() => {
     // Check initial session
@@ -146,7 +154,9 @@ export default function Home() {
                 alt="Позвони.мне логотип"
                 width={32}
                 height={32}
-                className="mr-2"
+                className="mr-2 select-none"
+                onContextMenu={(e) => e.preventDefault()}
+                onDragStart={(e) => e.preventDefault()}
               />
               <h1
                 className="text-lg font-semibold text-foreground hover:text-primary hover:ring-2 hover:ring-primary/30 dark:hover:ring-primary/50 hover:ring-offset-1 transition-all duration-200 cursor-pointer rounded px-2 py-1"

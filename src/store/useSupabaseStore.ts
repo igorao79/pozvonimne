@@ -18,11 +18,14 @@ const cleanupChannels = () => {
   let cleanedCount = 0
 
   channels.forEach(channel => {
-    // Не удаляем глобальные каналы сообщений и статусов пользователей
+    // Не удаляем критически важные каналы:
+    // - глобальные каналы сообщений и статусов пользователей
+    // - каналы входящих звонков (calls:)
     // Они должны жить на протяжении сессии
     if (!channel.topic.includes('global_messages_') &&
         !channel.topic.includes('user_profiles_changes') &&
-        !channel.topic.includes('chat_user_status_')) {
+        !channel.topic.includes('chat_user_status_') &&
+        !channel.topic.includes('calls:')) {
       console.log('🗑️ Очищаем канал:', channel.topic)
       supabaseInstance.removeChannel(channel)
       cleanedCount++

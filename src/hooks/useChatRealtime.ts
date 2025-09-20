@@ -146,8 +146,8 @@ export const useChatRealtime = ({
       },
       maxReconnectAttempts: 12, // Много попыток для критически важного канала
       reconnectDelay: 1500,
-      keepAliveInterval: 20000, // Keep-alive каждые 20 секунд
-      healthCheckInterval: 40000 // Проверка здоровья каждые 40 секунд
+      keepAliveInterval: 15000, // Более агрессивный keep-alive для чатов (15 секунд)
+      healthCheckInterval: 30000 // Проверка здоровья каждые 30 секунд
     }).catch(error => {
       console.error('🌍 ❌ Не удалось создать устойчивый глобальный канал:', error)
     })
