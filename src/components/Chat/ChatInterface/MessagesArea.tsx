@@ -1,6 +1,7 @@
 import React, { forwardRef, useState, useCallback, useRef, useEffect } from 'react'
 import { Message, Chat } from './types'
 import { MessageItem } from './MessageItem'
+import { DateSeparator } from './DateSeparator'
 
 interface MessagesAreaProps {
   messages: Message[]
@@ -19,6 +20,29 @@ interface MessagesAreaProps {
   onScrollToBottom?: () => void
   hasInitialScrolled?: boolean
 }
+
+// Получаем стабильную дату на основе клиентского времени пользователя
+const getClientLocalDateString = (dateString: string) => {
+  // Создаем дату напрямую из строки в клиентском времени
+  const clientDate = new Date(dateString)
+  
+  // Получаем компоненты даты в клиентском часовом поясе
+  const year = clientDate.getFullYear()
+  const month = String(clientDate.getMonth() + 1).padStart(2, '0')
+  const day = String(clientDate.getDate()).padStart(2, '0')
+  
+  const dateKey = `${year}-${month}-${day}`
+  
+  console.log('🕒 Client date processing:', {
+    input: dateString,
+    clientDate: clientDate.toString(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    dateKey
+  })
+  
+  return dateKey
+}
+
 
 export const MessagesArea: React.FC<MessagesAreaProps> = ({
   messages,
@@ -42,6 +66,8 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
   const previousMessagesLength = useRef<number>(messages.length)
   const previousScrollTop = useRef<number>(0)
   const isLoadingMoreRef = useRef<boolean>(false)
+  const loadMoreAnchorRef = useRef<HTMLDivElement>(null)
+  const previousScrollHeight = useRef<number>(0)
 
   // Обработчик скролла для загрузки дополнительных сообщений и показа кнопки прокрутки
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -61,34 +87,51 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
     setShowScrollButton(distanceFromBottom > 100)
   }, [hasMoreMessages, loadingMore, onLoadMore, hasInitialScrolled])
 
-  // Эффект для сохранения позиции прокрутки при загрузке дополнительных сообщений
+  // Стабильная система сохранения позиции при Load more
   useEffect(() => {
     // До первоначального скролла вниз не вмешиваемся в позицию
     if (!hasInitialScrolled) return
 
     if (loadingMore && !isLoadingMoreRef.current) {
-      // Началась загрузка дополнительных сообщений - сохраняем текущее расстояние до низа
+      // Началась загрузка - сохраняем точную позицию
       if (messagesContainerRef.current) {
         const container = messagesContainerRef.current
-        previousScrollTop.current = container.scrollHeight - container.scrollTop
+        previousScrollTop.current = container.scrollTop
+        previousScrollHeight.current = container.scrollHeight
         previousMessagesLength.current = messages.length
-        console.log('💾 Сохранили расстояние до низа:', previousScrollTop.current, 'при', previousMessagesLength.current, 'сообщениях')
+        
+        console.log('💾 Якорь загрузки установлен:', {
+          scrollTop: previousScrollTop.current,
+          scrollHeight: previousScrollHeight.current,
+          messagesCount: previousMessagesLength.current,
+          distanceFromTop: previousScrollTop.current,
+          distanceFromBottom: previousScrollHeight.current - previousScrollTop.current - container.clientHeight
+        })
       }
       isLoadingMoreRef.current = true
     } else if (!loadingMore && isLoadingMoreRef.current) {
-      // Загрузка дополнительных сообщений завершена
+      // Загрузка завершена - восстанавливаем позицию
       if (messagesContainerRef.current && messages.length > previousMessagesLength.current) {
-        console.log('🔄 Восстанавливаем позицию: расстояние до низа было', previousScrollTop.current)
-
-        // Небольшая задержка для того, чтобы DOM полностью обновился
-        setTimeout(() => {
+        // Используем requestAnimationFrame для максимальной стабильности
+        requestAnimationFrame(() => {
           if (messagesContainerRef.current) {
             const container = messagesContainerRef.current
-            // Устанавливаем scrollTop так, чтобы сохранить расстояние до низа
-            container.scrollTop = container.scrollHeight - previousScrollTop.current
-            console.log('✅ Позиция прокрутки восстановлена, новый scrollTop:', container.scrollTop)
+            const heightDifference = container.scrollHeight - previousScrollHeight.current
+            
+            // Устанавливаем новую позицию с учетом добавленного контента
+            const newScrollTop = previousScrollTop.current + heightDifference
+            container.scrollTop = newScrollTop
+            
+            console.log('✅ Позиция стабилизирована:', {
+              oldHeight: previousScrollHeight.current,
+              newHeight: container.scrollHeight,
+              heightDifference,
+              oldScrollTop: previousScrollTop.current,
+              newScrollTop,
+              messagesAdded: messages.length - previousMessagesLength.current
+            })
           }
-        }, 50)
+        })
       }
       isLoadingMoreRef.current = false
     }
@@ -96,7 +139,7 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
 
   if (loading) {
     return (
-      <div className="flex-1 overflow-y-auto p-4 bg-background">
+      <div className="flex-1 overflow-y-auto p-4 chat-pattern-bg">
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto mb-2"></div>
@@ -109,7 +152,7 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
 
   if (error) {
     return (
-      <div className="flex-1 overflow-y-auto p-4 bg-background">
+      <div className="flex-1 overflow-y-auto p-4 chat-pattern-bg">
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <p className="text-destructive mb-2">{error}</p>
@@ -151,26 +194,67 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
       onScroll={handleScroll}
     >
       <div className="space-y-4">
+        {/* Якорь для стабилизации позиции при загрузке */}
+        <div ref={loadMoreAnchorRef} className="h-0" />
+        
         {/* Индикатор загрузки дополнительных сообщений */}
         {loadingMore && hasMoreMessages && (
-          <div className="flex justify-center py-2">
+          <div className="flex justify-center py-2 sticky top-0 bg-background/80 backdrop-blur-sm z-10">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
             <span className="ml-2 text-sm text-muted-foreground">Загрузка сообщений...</span>
           </div>
         )}
 
-        {/* Сообщения */}
-        {messages.map((message) => (
-          <MessageItem
-            key={`${message.id}-${message.updated_at}`}
-            message={message}
-            chat={chat}
-            userId={userId}
-            onClick={onMessageClick}
-            onEdit={onEditMessage}
-            onDelete={onDeleteMessage}
-          />
-        ))}
+        {/* Сообщения с inline проверкой дат */}
+        {(() => {
+          // Фильтруем дубликаты
+          const uniqueMessages = messages.filter((message, index, arr) =>
+            arr.findIndex(m => m.id === message.id) === index
+          )
+
+          console.log('📅 MessagesArea rendering:', uniqueMessages.length, 'messages')
+
+          return uniqueMessages.map((message, index) => {
+            const currentMessageDate = getClientLocalDateString(message.created_at)
+            const previousMessage = index > 0 ? uniqueMessages[index - 1] : null
+            const previousMessageDate = previousMessage ? getClientLocalDateString(previousMessage.created_at) : null
+            
+            // Показываем плашку даты если:
+            // 1. Это первое сообщение 
+            // 2. Дата отличается от предыдущего сообщения
+            const shouldShowDateSeparator = index === 0 || currentMessageDate !== previousMessageDate
+
+            // Детальное логирование только для отладки
+            if (shouldShowDateSeparator) {
+              console.log('📅 Показываем плашку даты:', {
+                messageId: message.id.slice(0, 8),
+                index,
+                date: currentMessageDate,
+                messageTime: message.created_at
+              })
+            }
+
+            return (
+              <React.Fragment key={`message-wrapper-${message.id}`}>
+                {shouldShowDateSeparator && (
+                  <DateSeparator 
+                    key={`date-separator-${currentMessageDate}`}
+                    date={message.created_at} 
+                  />
+                )}
+                <MessageItem
+                  key={`message-${message.id}`}
+                  message={message}
+                  chat={chat}
+                  userId={userId}
+                  onClick={onMessageClick}
+                  onEdit={onEditMessage}
+                  onDelete={onDeleteMessage}
+                />
+              </React.Fragment>
+            )
+          })
+        })()}
 
         <div ref={messagesEndRef} />
       </div>

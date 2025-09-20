@@ -14,6 +14,8 @@ export interface Message {
   reply_to_content?: string
   reply_to_sender_name?: string
   metadata: any
+  delivered_at?: string  // Простое поле доставки
+  read_at?: string       // Простое поле прочтения
 }
 
 // Типы для realtime payload
@@ -28,6 +30,8 @@ export interface RealtimeMessagePayload {
   edited_at?: string
   is_deleted?: boolean
   metadata?: any
+  delivered_at?: string  // Простое поле доставки
+  read_at?: string       // Простое поле прочтения
 }
 
 export interface RealtimePayload {

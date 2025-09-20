@@ -83,26 +83,26 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
         return
       }
 
-      // Сообщения приходят в обратном порядке (новые первые), переворачиваем
-      const reversedMessages = (data || []).reverse()
-      console.log('📨 Загружено сообщений:', reversedMessages.length)
+      // Сообщения приходят в обратном порядке (новые первые), сортируем по времени (старые первыми)
+      const sortedMessages = (data || []).sort((a: Message, b: Message) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      )
+      console.log('📨 Загружено сообщений:', sortedMessages.length)
 
       // Проверяем, есть ли еще сообщения для загрузки
-      setHasMoreMessages(reversedMessages.length >= 30)
+      setHasMoreMessages(sortedMessages.length >= 30)
 
-      setMessages(reversedMessages)
+      // Фильтруем дубликаты перед установкой сообщений
+      const uniqueMessages = sortedMessages.filter((message: Message, index: number, arr: Message[]) =>
+        arr.findIndex((m: Message) => m.id === message.id) === index
+      )
 
-      // Помечаем сообщения как прочитанные сразу после загрузки
-      if (reversedMessages.length > 0) {
-        try {
-          console.log('📖 Помечаем сообщения как прочитанные для чата:', chatId)
-          await supabase.rpc('mark_messages_as_read', { chat_uuid: chatId })
-          console.log('✅ Сообщения помечены как прочитанные')
-        } catch (markError) {
-          console.warn('Не удалось пометить сообщения как прочитанные:', markError)
-          // Это не критичная ошибка
-        }
-      }
+      console.log(`📨 Загружено ${sortedMessages.length} сообщений, уникальных: ${uniqueMessages.length}`)
+      setMessages(uniqueMessages)
+
+      // УБРАНО: Автоматическая пометка всех сообщений как прочитанных при загрузке
+      // Теперь сообщения помечаются как прочитанные только при их фактической видимости
+      // Это предотвращает ложную пометку непросмотренных сообщений
     } catch (err) {
       console.error('Ошибка:', err)
       setError('Ошибка подключения')
@@ -140,7 +140,31 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
 
       // Добавляем новые сообщения в начало массива (старые сообщения)
       if (newMessages.length > 0) {
-        setMessages(prev => [...newMessages, ...prev])
+        setMessages(prev => {
+          // Фильтруем дубликаты среди новых сообщений
+          const uniqueNewMessages = newMessages.filter((message: Message, index: number, arr: Message[]) =>
+            arr.findIndex((m: Message) => m.id === message.id) === index
+          )
+
+          // Объединяем сообщения: новые старые сообщения + существующие
+          const combined = [...uniqueNewMessages, ...prev]
+          const finalUnique = combined.filter((message: Message, index: number, arr: Message[]) =>
+            arr.findIndex((m: Message) => m.id === message.id) === index
+          )
+
+          // Сортируем по времени создания (старые сообщения первыми для корректной группировки по дням)
+          finalUnique.sort((a: Message, b: Message) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          )
+
+          console.log('📜 Финальная сортировка сообщений:', {
+            total: finalUnique.length,
+            first: finalUnique[0]?.created_at,
+            last: finalUnique[finalUnique.length - 1]?.created_at
+          })
+
+          return finalUnique
+        })
       }
 
     } catch (err) {
@@ -176,8 +200,14 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
         type: 'text',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        edited_at: undefined,
         is_deleted: false,
-        metadata: {}
+        reply_to_id: undefined,
+        reply_to_content: undefined,
+        reply_to_sender_name: undefined,
+        metadata: {},
+        delivered_at: undefined, // Пока не доставлено
+        read_at: undefined      // Пока не прочитано
       }
 
       // Добавляем сообщение локально для немедленного отображения
@@ -253,7 +283,12 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
               updated_at: messageData.updated_at,
               edited_at: messageData.edited_at,
               is_deleted: messageData.is_deleted || false,
-              metadata: messageData.metadata || {}
+              reply_to_id: undefined,
+              reply_to_content: undefined,
+              reply_to_sender_name: undefined,
+              metadata: messageData.metadata || {},
+              delivered_at: messageData.delivered_at, // Поле доставки
+              read_at: messageData.read_at          // Поле прочтения
             }
           }
           return msg
@@ -296,22 +331,26 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
         updated_at: messageData.updated_at,
         edited_at: messageData.edited_at,
         is_deleted: messageData.is_deleted || false,
-        metadata: messageData.metadata || {}
+        reply_to_id: undefined,
+        reply_to_content: undefined,
+        reply_to_sender_name: undefined,
+        metadata: messageData.metadata || {},
+        delivered_at: messageData.delivered_at, // Поле доставки
+        read_at: messageData.read_at          // Поле прочтения
       }
 
-      return [...prev, newMessage]
+      // Добавляем новое сообщение, предварительно фильтруя дубликаты
+      const newMessages = [...prev, newMessage]
+      const uniqueMessages = newMessages.filter((message: Message, index: number, arr: Message[]) =>
+        arr.findIndex((m: Message) => m.id === message.id) === index
+      )
+
+      return uniqueMessages
     })
 
-    // Помечаем как прочитанное, если это не наше сообщение
-    if (messageData.sender_id !== userId) {
-      setTimeout(async () => {
-        try {
-          await supabase.rpc('mark_messages_as_read', { chat_uuid: chatId })
-        } catch (err) {
-          console.warn('Ошибка пометки как прочитанного:', err)
-        }
-      }, 200)
-    }
+    // УБРАНО: Автоматическая пометка как прочитанного при получении сообщения
+    // Теперь это обрабатывается через отслеживание видимости в MessageItem компоненте
+    // Это предотвращает автоматическую пометку сообщений как прочитанных без их просмотра
 
     // Уведомляем о новом сообщении через Zustand для обновления списка чатов
     refreshChatList()

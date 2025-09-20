@@ -16,6 +16,9 @@ import { useChatScroll } from '@/hooks/useChatScroll'
 import { useChatFocus } from '@/hooks/useChatFocus'
 import { useChatActions } from './ChatActions'
 import { useMessageActions } from '@/hooks/useMessageActions'
+// Временно отключены:
+import { useSimpleReadSync } from '@/hooks/useSimpleReadSync'
+import { useSimpleChatRead } from '@/hooks/useSimpleChatRead'
 
 const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
   const [newMessage, setNewMessage] = useState('')
@@ -81,6 +84,18 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
     onNewMessage: handleNewMessage
   })
 
+  // Синхронизация статуса прочитанности
+  useSimpleReadSync({
+    userId,
+    isActive: true
+  })
+
+  useSimpleChatRead({
+    chatId: chat.id,
+    userId,
+    isActive: true
+  })
+
   // Получение статуса пользователя
   const getUserStatus = useCallback((userId?: string) => {
     if (!userId) return 'Неизвестно'
@@ -136,10 +151,13 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
       // Если отправка не удалась, возвращаем текст
       setNewMessage(result.text || messageText)
     } else {
+      // Автоматическая прокрутка вниз только при успешной отправке собственного сообщения (как в Telegram)
+      console.log('📜 Автоматическая прокрутка вниз после отправки сообщения')
+      scrollToBottom()
       // Всегда восстанавливаем фокус после отправки сообщения
       focusAfterSend()
     }
-  }, [newMessage, sending, userId, sendMessage, focusAfterSend])
+  }, [newMessage, sending, userId, sendMessage, focusAfterSend, scrollToBottom])
 
   // Обработчик начала редактирования сообщения
   const handleEditMessage = useCallback((messageId: string, currentContent: string) => {
