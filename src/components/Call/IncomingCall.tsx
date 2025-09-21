@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
 import { sendCallAcceptedSignal, sendCallRejectedSignal } from '@/utils/callSignaling'
+import { useRingtone } from '@/hooks/useRingtone'
 
 interface CallerInfo {
   id: string
@@ -24,6 +25,9 @@ const IncomingCall = () => {
   const supabase = createClient()
   const [callerInfo, setCallerInfo] = useState<CallerInfo | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+
+  // Хук для управления рингтоном
+  const { stopRingtone } = useRingtone()
 
   // Отслеживаем размер окна для адаптивности
   useEffect(() => {
@@ -75,6 +79,9 @@ const IncomingCall = () => {
   const handleAccept = async () => {
     try {
       console.log('📞 Accepting call...')
+
+      // Останавливаем рингтон
+      stopRingtone()
 
       // Пытаемся остановить любые системные звуки
       try {
@@ -144,6 +151,10 @@ const IncomingCall = () => {
   const handleReject = async () => {
     try {
       console.log('📞 Rejecting call...')
+
+      // Останавливаем рингтон
+      stopRingtone()
+
       console.log('🎯 IncomingCall: Rejecting call from:', callerId)
 
       // Отправляем сигнал отклонения звонка через надежную утилиту

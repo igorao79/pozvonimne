@@ -81,12 +81,19 @@ export const DateSeparator: React.FC<DateSeparatorProps> = ({ date }) => {
   // Всегда отображаем плашку с соответствующим текстом
 
   return (
-    <div className="flex items-center justify-center my-4">
-      <div className="bg-muted/50 border border-muted rounded-full px-4 py-1">
-        <span className="text-sm text-muted-foreground font-medium">
+    <div className="flex items-center justify-center my-6 px-4">
+      {/* Левая разделительная линия */}
+      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-400 dark:via-slate-700 to-transparent"></div>
+
+      {/* Центральный элемент с текстом */}
+      <div className="mx-4 bg-white/70 dark:bg-slate-900/70 border border-slate-300 dark:border-slate-600 rounded-full px-4 py-1.5 shadow-sm backdrop-blur-sm">
+        <span className="text-xs text-slate-700 dark:text-slate-300 font-semibold tracking-wide uppercase">
           {displayText}
         </span>
       </div>
+
+      {/* Правая разделительная линия */}
+      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-400 dark:via-slate-700 to-transparent"></div>
     </div>
   )
 }
