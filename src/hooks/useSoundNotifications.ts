@@ -197,15 +197,10 @@ export const useSoundNotifications = () => {
 
   // Функция для воспроизведения звука
   const playNotificationSound = useCallback(async () => {
-    const { audioElement, userHasInteracted } = state
+    const { audioElement } = state
     
     if (!audioElement) {
       console.warn('🔇 Звуковой файл не загружен')
-      return false
-    }
-
-    if (!userHasInteracted) {
-      console.warn('🔇 Звук не может быть воспроизведен - пользователь еще не взаимодействовал со страницей')
       return false
     }
 
@@ -219,7 +214,37 @@ export const useSoundNotifications = () => {
       // Обрабатываем различные типы ошибок
       if (error instanceof Error) {
         if (error.name === 'NotAllowedError') {
-          console.warn('🔇 Воспроизведение заблокировано браузером - требуется взаимодействие пользователя')
+          console.warn('🔇 Воспроизведение заблокировано браузером, используем fallback')
+          // Используем Web Audio API как fallback
+          try {
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+            
+            // Пытаемся активировать контекст
+            if (audioContext.state === 'suspended') {
+              await audioContext.resume()
+            }
+            
+            // Создаем простой звуковой сигнал
+            const oscillator = audioContext.createOscillator()
+            const gainNode = audioContext.createGain()
+            
+            oscillator.connect(gainNode)
+            gainNode.connect(audioContext.destination)
+            
+            oscillator.frequency.value = 800
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime)
+            gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1)
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
+            
+            oscillator.start(audioContext.currentTime)
+            oscillator.stop(audioContext.currentTime + 0.5)
+            
+            console.log('🔊 Fallback звуковое уведомление воспроизведено')
+            return true
+          } catch (fallbackError) {
+            console.warn('🔇 Fallback звук тоже не работает:', fallbackError)
+            return false
+          }
         } else if (error.name === 'NotSupportedError') {
           console.warn('🔇 Формат звукового файла не поддерживается')
         } else {
@@ -230,7 +255,7 @@ export const useSoundNotifications = () => {
       }
       return false
     }
-  }, [state.audioElement, state.userHasInteracted])
+  }, [state.audioElement])
 
   // Основная функция для проверки условий и воспроизведения уведомления
   const maybePlayNotification = useCallback((messageData: {
@@ -247,11 +272,11 @@ export const useSoundNotifications = () => {
       return false
     }
 
-    // Проверяем, взаимодействовал ли пользователь со страницей
-    if (!userHasInteracted) {
-      console.log('🔇 Звуковое уведомление пропущено - пользователь еще не взаимодействовал со страницей')
-      return false
-    }
+    // Убираем проверку userHasInteracted - звуки должны работать сразу
+    // if (!userHasInteracted) {
+    //   console.log('🔇 Звуковое уведомление пропущено - пользователь еще не взаимодействовал со страницей')
+    //   return false
+    // }
 
     // Проверяем интервал между уведомлениями (10 секунд)
     if (now - lastNotificationTime < 10000) {

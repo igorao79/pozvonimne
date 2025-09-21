@@ -61,20 +61,25 @@ export default function Home() {
       isAuthenticated,
       userId: user?.id?.slice(0, 8)
     })
+
+    // Регистрируем колбэк сразу при аутентификации, независимо от других условий
+    // maybePlayNotification сам проверит условия внутри
     console.log('🔊 Регистрация звуковых уведомлений')
 
     const unsubscribe = registerSoundNotificationCallback((messageData) => {
       console.log('🔊 Получено уведомление о новом сообщении:', {
         chatId: messageData.chatId?.slice(0, 8),
         senderId: messageData.senderId?.slice(0, 8),
-        content: messageData.content?.slice(0, 50)
+        content: messageData.content?.slice(0, 50),
+        soundLoaded,
+        userHasInteracted
       })
       
       maybePlayNotification(messageData)
     })
 
     return unsubscribe
-  }, [isAuthenticated, user?.id, soundLoaded, userHasInteracted, registerSoundNotificationCallback, maybePlayNotification])
+  }, [isAuthenticated, user?.id, registerSoundNotificationCallback, maybePlayNotification])
 
   // Логирование состояния глобального менеджера звонков
   useEffect(() => {

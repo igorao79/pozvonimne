@@ -66,9 +66,9 @@ export const useMessageReadTracking = ({
   const hasMarkedAsRead = useRef(false)
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Дебаунсированная функция для пометки сообщения как прочитанное
+  // Дебаунсированная функция для пометки как прочитанное
   const markAsRead = useCallback(async () => {
-    if (!messageId || !userId || isOwn || hasMarkedAsRead.current) return
+    if (!messageId || !userId || !chatId || isOwn || hasMarkedAsRead.current) return
 
     // Очищаем предыдущий таймер
     if (debounceTimeoutRef.current) {
@@ -79,25 +79,23 @@ export const useMessageReadTracking = ({
       try {
         console.log('👁️ Помечаем сообщение как прочитанное:', messageId.slice(0, 8))
 
-        // Помечаем ТОЛЬКО это конкретное сообщение как прочитанное
-        const { error } = await supabase
-          .from('messages')
-          .update({
-            read_at: new Date().toISOString()
-          })
-          .eq('id', messageId)
+        // Используем функцию mark_chat_as_read для пометки всего чата
+        const { data: updatedCount, error } = await supabase.rpc('mark_chat_as_read', {
+          chat_uuid: chatId,
+          user_uuid: userId
+        })
 
         if (error) {
-          console.warn('Ошибка при пометке сообщения как прочитанного:', error)
+          console.warn('Ошибка при пометке чата как прочитанного:', error)
         } else {
-          console.log('✅ Сообщение помечено как прочитанное:', messageId.slice(0, 8))
+          console.log('✅ Чат помечен как прочитанный, обновлено сообщений:', updatedCount)
           hasMarkedAsRead.current = true
         }
       } catch (error) {
         console.warn('Ошибка при пометке сообщения как прочитанного:', error)
       }
-    }, 1000) // 1 секунда задержки для уверенности в видимости
-  }, [messageId, userId, isOwn, supabase])
+    }, 500) // 500ms задержка для уверенности в видимости
+  }, [messageId, userId, chatId, isOwn, supabase])
 
   useEffect(() => {
     if (isVisible && !isOwn && !hasMarkedAsRead.current) {
