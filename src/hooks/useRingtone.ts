@@ -20,7 +20,15 @@ export const useRingtone = () => {
     userHasInteracted: false
   })
 
+  // Ref для хранения ID таймаута повторения сигнала
   const ringtoneTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  // Ref для текущего состояния звонка (чтобы избежать stale closures)
+  const isReceivingCallRef = useRef(isReceivingCall)
+
+  // Обновляем ref при изменении состояния звонка
+  useEffect(() => {
+    isReceivingCallRef.current = isReceivingCall
+  }, [isReceivingCall])
 
   // Загружаем рингтон из Supabase storage
   useEffect(() => {
@@ -229,6 +237,12 @@ export const useRingtone = () => {
     if (isReceivingCall && !state.isPlaying) {
       console.log('🔔 Начинаем воспроизведение рингтона - входящий звонок')
 
+      // Очищаем предыдущий таймаут, если он существует
+      if (ringtoneTimeoutRef.current) {
+        clearTimeout(ringtoneTimeoutRef.current)
+        ringtoneTimeoutRef.current = null
+      }
+
       // Всегда пытаемся воспроизвести рингтон, независимо от "взаимодействия"
       // Если браузер заблокирует, используем fallback через Web Audio API
       audioElement.play().then(() => {
@@ -249,7 +263,8 @@ export const useRingtone = () => {
           }
 
           const playRingtoneBeep = () => {
-            if (!isReceivingCall) return // Прекращаем если звонок уже завершен
+            // Проверяем актуальное состояние через ref, чтобы избежать stale closures
+            if (!isReceivingCallRef.current) return // Прекращаем если звонок уже завершен
 
             const oscillator = audioContext.createOscillator()
             const gainNode = audioContext.createGain()
@@ -265,9 +280,9 @@ export const useRingtone = () => {
             oscillator.start(audioContext.currentTime)
             oscillator.stop(audioContext.currentTime + 0.3)
 
-            // Повторяем сигнал каждые 1.5 секунды
-            setTimeout(() => {
-              if (isReceivingCall && !state.isPlaying) {
+            // Повторяем сигнал каждые 1.5 секунды, но только если все еще идет звонок
+            ringtoneTimeoutRef.current = setTimeout(() => {
+              if (isReceivingCallRef.current) {
                 playRingtoneBeep()
               }
             }, 1500)
@@ -284,6 +299,13 @@ export const useRingtone = () => {
     } else if (!isReceivingCall && state.isPlaying) {
       // Останавливаем воспроизведение рингтона
       console.log('🔔 Останавливаем рингтон - звонок завершен')
+
+      // Очищаем таймаут повторения сигнала
+      if (ringtoneTimeoutRef.current) {
+        clearTimeout(ringtoneTimeoutRef.current)
+        ringtoneTimeoutRef.current = null
+      }
+
       audioElement.pause()
       audioElement.currentTime = 0
       setState(prev => ({ ...prev, isPlaying: false }))
@@ -297,6 +319,13 @@ export const useRingtone = () => {
     const { audioElement } = state
     if (audioElement && state.isPlaying) {
       console.log('🔔 Принудительная остановка рингтона')
+
+      // Очищаем таймаут повторения сигнала
+      if (ringtoneTimeoutRef.current) {
+        clearTimeout(ringtoneTimeoutRef.current)
+        ringtoneTimeoutRef.current = null
+      }
+
       audioElement.pause()
       audioElement.currentTime = 0
       setState(prev => ({ ...prev, isPlaying: false }))
@@ -306,14 +335,18 @@ export const useRingtone = () => {
   // Очистка при размонтировании компонента
   useEffect(() => {
     return () => {
-      const { audioElement } = state
-      if (audioElement) {
-        console.log('🔔 Очистка рингтона при размонтировании')
-        audioElement.pause()
-        audioElement.src = ''
-      }
+      console.log('🔔 Очистка рингтона при размонтировании')
+
+      // Очищаем таймаут повторения сигнала
       if (ringtoneTimeoutRef.current) {
         clearTimeout(ringtoneTimeoutRef.current)
+        ringtoneTimeoutRef.current = null
+      }
+
+      const { audioElement } = state
+      if (audioElement) {
+        audioElement.pause()
+        audioElement.src = ''
       }
     }
   }, [state.audioElement])

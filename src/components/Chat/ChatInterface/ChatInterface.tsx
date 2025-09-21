@@ -18,7 +18,6 @@ import { useChatActions } from './ChatActions'
 import { useMessageActions } from '@/hooks/useMessageActions'
 // Временно отключены:
 // import { useSimpleReadSync } from '@/hooks/useSimpleReadSync' - заменен на глобальную систему
-import { useSimpleChatRead } from '@/hooks/useSimpleChatRead'
 
 const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
   const [newMessage, setNewMessage] = useState('')
@@ -84,13 +83,8 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
     onNewMessage: handleNewMessage
   })
 
-  // Синхронизация статуса прочитанности - теперь обрабатывается глобальной системой
-
-  useSimpleChatRead({
-    chatId: chat.id,
-    userId,
-    isActive: true
-  })
+  // Синхронизация статуса прочитанности - теперь обрабатывается на уровне отдельных сообщений
+  // useSimpleChatRead отключен, чтобы сообщения помечались как прочитанные только при видимости
 
   // Получение статуса пользователя
   const getUserStatus = useCallback((userId?: string) => {

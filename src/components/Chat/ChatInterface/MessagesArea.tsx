@@ -33,12 +33,7 @@ const getClientLocalDateString = (dateString: string) => {
   
   const dateKey = `${year}-${month}-${day}`
   
-  console.log('🕒 Client date processing:', {
-    input: dateString,
-    clientDate: clientDate.toString(),
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    dateKey
-  })
+  
   
   return dateKey
 }
