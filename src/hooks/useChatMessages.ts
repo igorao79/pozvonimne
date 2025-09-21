@@ -272,12 +272,17 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
     setMessages(prev => {
       // Если это обновление существующего сообщения
       if (messageData._isUpdate) {
-        console.log('📡 Обновляем существующее сообщение:', messageData.id)
+        console.log('📡 Обновляем существующее сообщение:', {
+          messageId: messageData.id?.slice(0, 8),
+          oldReadAt: messageData._oldRecord?.read_at,
+          newReadAt: messageData.read_at,
+          isReadStatusUpdate: !messageData._oldRecord?.read_at && messageData.read_at
+        })
 
         return prev.map(msg => {
           if (msg.id === messageData.id) {
             // Обновляем сообщение новыми данными
-            return {
+            const updatedMessage = {
               ...msg,
               content: messageData.content,
               updated_at: messageData.updated_at,
@@ -290,6 +295,15 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
               delivered_at: messageData.delivered_at, // Поле доставки
               read_at: messageData.read_at          // Поле прочтения
             }
+            
+            console.log('✅ Сообщение обновлено:', {
+              messageId: msg.id?.slice(0, 8),
+              wasRead: !!msg.read_at,
+              nowRead: !!updatedMessage.read_at,
+              readAtValue: updatedMessage.read_at
+            })
+            
+            return updatedMessage
           }
           return msg
         })

@@ -26,9 +26,10 @@ interface ChatAppProps {
   onResetChat?: () => void // Callback для сброса состояния чата
   resetTrigger?: number // Триггер для принудительного сброса состояния
   isInCall?: boolean // Флаг, указывающий что пользователь в звонке
+  onCurrentChatChange?: (chatId: string | null) => void // Callback для отслеживания активного чата
 }
 
-const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall }: ChatAppProps = {}) => {
+const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurrentChatChange }: ChatAppProps = {}) => {
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isLoading, setIsLoading] = useState(!!autoOpenChatId) // Простая логика загрузки
@@ -36,6 +37,14 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall }: ChatAp
   
   // Ref для debouncing сохранения в localStorage
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Уведомляем систему звуков об изменении активного чата
+  useEffect(() => {
+    if (onCurrentChatChange) {
+      onCurrentChatChange(selectedChat?.id || null)
+      console.log('💬 Активный чат изменился:', selectedChat?.id?.slice(0, 8) || 'нет')
+    }
+  }, [selectedChat?.id, onCurrentChatChange])
 
   // Функция для сброса состояния чата
   const resetChatState = () => {

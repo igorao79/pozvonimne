@@ -6,6 +6,7 @@ import useChatSyncStore from '@/store/useChatSyncStore'
 import useCallStore from '@/store/useCallStore'
 import { ChatListItem } from './ChatListItem'
 import { RandomFact } from '@/components/ui/random-fact'
+import { useSoundNotifications } from '@/hooks/useSoundNotifications'
 
 interface Chat {
   id: string
@@ -32,9 +33,22 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
   const [chats, setChats] = useState<Chat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentTime, setCurrentTime] = useState<number>(Date.now())
   const { userId } = useCallStore()
   const { supabase } = useSupabaseStore()
-  const { refreshChatList, registerRefreshCallback, lastMessageUpdate } = useChatSyncStore()
+  const { refreshChatList, registerRefreshCallback, lastMessageUpdate, isGlobalSyncActive, reconnectAttempts } = useChatSyncStore()
+  
+  // Импортируем хук звуковых уведомлений для тестирования
+  const { testSound } = useSoundNotifications()
+
+  // Сортировка чатов по времени последнего сообщения (новые сверху)
+  const sortChatsByLastMessage = (chatsToSort: Chat[]) => {
+    return [...chatsToSort].sort((a, b) => {
+      const timeA = a.last_message_at ? new Date(a.last_message_at).getTime() : 0
+      const timeB = b.last_message_at ? new Date(b.last_message_at).getTime() : 0
+      return timeB - timeA // Новые сверху
+    })
+  }
 
   // Загрузка чатов с опциональным лоадером
   const loadChats = async (showLoader = false) => {
@@ -54,7 +68,9 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
         return
       }
 
-      setChats(data || [])
+      // Сортируем чаты по времени последнего сообщения
+      const sortedChats = sortChatsByLastMessage(data || [])
+      setChats(sortedChats)
     } catch (err) {
       console.error('Ошибка:', err)
       setError('Ошибка подключения')
@@ -82,6 +98,39 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       loadChats(false)
     }
   }, [lastMessageUpdate])
+
+  // Периодическое обновление времени для корректного отображения "сейчас", "1 мин" и т.д.
+  useEffect(() => {
+    const timeUpdateInterval = setInterval(() => {
+      console.log('⏰ Обновление времени в ChatList для live статусов')
+      setCurrentTime(Date.now())
+    }, 15000) // Обновляем каждые 15 секунд для более отзывчивого интерфейса
+
+    return () => clearInterval(timeUpdateInterval)
+  }, [])
+
+  // Автоматическая пересортировка чатов когда время обновляется
+  useEffect(() => {
+    if (chats.length > 0) {
+      const sortedChats = sortChatsByLastMessage(chats)
+      // Проверяем, изменился ли порядок, чтобы избежать лишних ререндеров
+      const hasOrderChanged = chats.some((chat, index) => chat.id !== sortedChats[index]?.id)
+      if (hasOrderChanged) {
+        console.log('🔄 Пересортировка чатов после обновления времени')
+        setChats(sortedChats)
+      }
+    }
+  }, [currentTime])
+
+  // Мониторинг состояния real-time соединения
+  useEffect(() => {
+    console.log('📊 ChatList: Real-time состояние изменилось:', {
+      isGlobalSyncActive,
+      reconnectAttempts,
+      userId: userId?.slice(0, 8),
+      timestamp: new Date().toISOString()
+    })
+  }, [isGlobalSyncActive, reconnectAttempts, userId])
 
   // Экспортируем методы для внешнего использования
   useImperativeHandle(ref, () => ({
@@ -237,12 +286,12 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
     }
   */
 
-  // Форматирование времени последнего сообщения
+  // Форматирование времени последнего сообщения с учетом currentTime
   const formatLastMessageTime = (timestamp?: string) => {
     if (!timestamp) return ''
 
     const messageDate = new Date(timestamp)
-    const now = new Date()
+    const now = new Date(currentTime) // Используем currentTime для live обновлений
     const diffInMinutes = Math.floor((now.getTime() - messageDate.getTime()) / (1000 * 60))
 
     if (diffInMinutes < 1) return 'сейчас'
@@ -290,7 +339,34 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       {/* Ультракомпактный заголовок */}
       <div className="px-2 py-1 border-b border-border bg-card flex-shrink-0">
         <div className="flex items-center justify-between min-h-[32px]">
-          <h1 className="text-sm font-semibold text-foreground">Чаты</h1>
+            <div className="flex items-center space-x-2">
+            <h1 className="text-sm font-semibold text-foreground">Чаты</h1>
+            {/* Индикатор real-time статуса */}
+            <div 
+              className={`w-2 h-2 rounded-full transition-colors ${
+                isGlobalSyncActive ? 'bg-green-500 animate-pulse' : 
+                reconnectAttempts > 0 ? 'bg-yellow-500' : 'bg-gray-400'
+              }`}
+              title={
+                isGlobalSyncActive 
+                  ? 'Real-time синхронизация активна • Обновления приходят мгновенно' 
+                  : reconnectAttempts > 0 
+                    ? `Переподключение... (попытка ${reconnectAttempts})` 
+                    : 'Real-time синхронизация неактивна • Требуется обновление страницы'
+              }
+            />
+            {/* Кнопка тестирования звука */}
+            <button
+              onClick={() => {
+                console.log('🧪 Тестирование звука по клику пользователя')
+                testSound()
+              }}
+              className="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
+              title="Проверить звуковые уведомления"
+            >
+              🔊
+            </button>
+          </div>
           <button
             onClick={onCreateNewChat}
             className="p-1 text-primary hover:bg-primary/10 rounded-md transition-colors chat-create-button"

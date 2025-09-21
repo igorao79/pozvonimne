@@ -13,16 +13,21 @@ export const useSimpleReadSync = ({ userId, isActive = true }: UseSimpleReadSync
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastUpdateRef = useRef<string>('')
 
-  // Дебаунсированное обновление списка чатов
-  const debouncedRefresh = useCallback(() => {
+  // Быстрое обновление списка чатов при изменении статуса прочтения
+  const quickRefresh = useCallback(() => {
+    // Немедленное обновление
+    console.log('🔄 Immediate refresh due to read status change')
+    refreshChatList()
+    
+    // Дополнительное обновление через 500мс для подстраховки
     if (refreshTimeoutRef.current) {
       clearTimeout(refreshTimeoutRef.current)
     }
     
     refreshTimeoutRef.current = setTimeout(() => {
-      console.log('🔄 Refreshing chat list due to read status change (debounced)')
+      console.log('🔄 Follow-up refresh for read status change')
       refreshChatList()
-    }, 2000) // 2 секунды задержки
+    }, 500)
   }, [refreshChatList])
 
   // Обработчик изменений статуса прочтения
@@ -37,9 +42,9 @@ export const useSimpleReadSync = ({ userId, isActive = true }: UseSimpleReadSync
     
     console.log('📖 Message read status changed:', payload.new.id?.slice(0, 8))
     
-    // Обновляем список чатов с задержкой
-    debouncedRefresh()
-  }, [debouncedRefresh])
+    // Быстрое обновление списка чатов
+    quickRefresh()
+  }, [quickRefresh])
 
   useEffect(() => {
     if (!userId || !isActive) return
@@ -69,3 +74,4 @@ export const useSimpleReadSync = ({ userId, isActive = true }: UseSimpleReadSync
     }
   }, [userId, isActive, supabase, handleReadStatusChange])
 }
+

@@ -24,9 +24,10 @@ interface Chat {
 
 interface CallInterfaceProps {
   resetChatTrigger?: number
+  onCurrentChatChange?: (chatId: string | null) => void
 }
 
-const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
+const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceProps = {}) => {
   const {
     userId,
     isInCall,
@@ -151,11 +152,21 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
       chatName: chat.name
     })
     setSelectedChat(chat)
+    
+    // Уведомляем систему звуков об изменении активного чата
+    if (onCurrentChatChange) {
+      onCurrentChatChange(chat.id)
+    }
   }
 
   const handleBackToList = () => {
     console.log('💾 CALL INTERFACE - Очищаем выбранный чат')
     setSelectedChat(null)
+    
+    // Уведомляем систему звуков об очистке активного чата
+    if (onCurrentChatChange) {
+      onCurrentChatChange(null)
+    }
   }
 
   const handleCreateNewChat = () => {
@@ -236,6 +247,7 @@ const CallInterface = ({ resetChatTrigger }: CallInterfaceProps = {}) => {
           autoOpenChatId={savedChatId || undefined}
           onResetChat={() => {}}
           resetTrigger={resetChatTrigger}
+          onCurrentChatChange={onCurrentChatChange}
         />
 
         {/* Модальные окна звонков на мобильных */}

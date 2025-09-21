@@ -24,6 +24,15 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ['lucide-react'],
     // Disable tracing to avoid OneDrive permission issues
     disableOptimizedLoading: true,
+    // Turbopack configuration for Supabase compatibility
+    turbo: {
+      resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.json'],
+      rules: {
+        '*.{js,ts,tsx,jsx}': {
+          loaders: ['js'],
+        },
+      },
+    },
   },
 
   // Server external packages

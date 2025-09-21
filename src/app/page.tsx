@@ -13,6 +13,7 @@ import { ThemeToggler } from '@/components/ui/theme-toggler'
 import { useGlobalTypingManager } from '@/hooks/useGlobalTypingManager'
 import { useGlobalCallManager } from '@/hooks/useGlobalCallManager'
 import useCallStateSynchronizer from '@/hooks/useCallStateSynchronizer'
+import { useSoundNotifications } from '@/hooks/useSoundNotifications'
 import { User } from 'lucide-react'
 
 export default function Home() {
@@ -20,7 +21,7 @@ export default function Home() {
   const [showProfile, setShowProfile] = useState(false)
   const [resetChatTrigger, setResetChatTrigger] = useState(0)
   const { supabase } = useSupabaseStore()
-  const { startGlobalSync, stopGlobalSync } = useChatSyncStore()
+  const { startGlobalSync, stopGlobalSync, registerSoundNotificationCallback } = useChatSyncStore()
   
   const {
     isAuthenticated,
@@ -46,6 +47,34 @@ export default function Home() {
     isAuthenticated,
     userId: user?.id || null
   })
+
+  // Инициализируем систему звуковых уведомлений
+  const { maybePlayNotification, setCurrentChat, soundLoaded, userHasInteracted } = useSoundNotifications()
+
+  // Интегрируем звуковые уведомления с глобальной системой
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return
+
+    console.log('🔊 Sound notification state:', {
+      soundLoaded,
+      userHasInteracted,
+      isAuthenticated,
+      userId: user?.id?.slice(0, 8)
+    })
+    console.log('🔊 Регистрация звуковых уведомлений')
+
+    const unsubscribe = registerSoundNotificationCallback((messageData) => {
+      console.log('🔊 Получено уведомление о новом сообщении:', {
+        chatId: messageData.chatId?.slice(0, 8),
+        senderId: messageData.senderId?.slice(0, 8),
+        content: messageData.content?.slice(0, 50)
+      })
+      
+      maybePlayNotification(messageData)
+    })
+
+    return unsubscribe
+  }, [isAuthenticated, user?.id, soundLoaded, userHasInteracted, registerSoundNotificationCallback, maybePlayNotification])
 
   // Логирование состояния глобального менеджера звонков
   useEffect(() => {
@@ -111,6 +140,29 @@ export default function Home() {
       stopGlobalSync()
     }
   }, [isAuthenticated, user?.id, startGlobalSync, stopGlobalSync])
+
+  // Регистрируем звуковые уведомления
+  useEffect(() => {
+    console.log('🔊 Sound notification state:', { 
+      isAuthenticated, 
+      soundLoaded, 
+      userHasInteracted 
+    })
+    
+    if (isAuthenticated && soundLoaded) {
+      console.log('🔊 Регистрация звуковых уведомлений')
+      const unsubscribe = registerSoundNotificationCallback(maybePlayNotification)
+      
+      return unsubscribe
+    } else {
+      console.log('🔇 Звуковые уведомления не активны:', { 
+        isAuthenticated, 
+        soundLoaded,
+        userHasInteracted,
+        reason: !isAuthenticated ? 'не авторизован' : 'звук не загружен'
+      })
+    }
+  }, [isAuthenticated, soundLoaded, userHasInteracted, registerSoundNotificationCallback, maybePlayNotification])
 
   const handleSignOut = async () => {
     try {
@@ -198,7 +250,10 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
-        <CallInterface resetChatTrigger={resetChatTrigger} />
+        <CallInterface 
+          resetChatTrigger={resetChatTrigger}
+          onCurrentChatChange={setCurrentChat}
+        />
       </main>
 
       {/* Profile Modal */}

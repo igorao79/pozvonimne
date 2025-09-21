@@ -22,7 +22,7 @@ export const useTyping = ({ chatId, enabled = true }: UseTypingProps): UseTyping
   const { supabase } = useSupabaseStore()
   const { startTyping: startTypingStore, stopTyping: stopTypingStore } = useTypingStore()
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastServerUpdateRef = useRef<number>(0)
   const isInitializedRef = useRef(false)
 
   // Логируем только при первой инициализации
@@ -35,15 +35,10 @@ export const useTyping = ({ chatId, enabled = true }: UseTypingProps): UseTyping
     if (!enabled || !userId || !chatId) return
     
     console.log(`🛑 [useTyping] Остановка typing для пользователя ${userId} в чате ${chatId}`)
-    
+
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current)
       typingTimeoutRef.current = null
-    }
-    
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current)
-      debounceTimeoutRef.current = null
     }
 
     // Очищаем таймаут в GlobalTypingManager если он есть
@@ -83,13 +78,10 @@ export const useTyping = ({ chatId, enabled = true }: UseTypingProps): UseTyping
     if (!enabled || !userId || !chatId) return
     
     try {
-      console.log(`📝 [useTyping] Запуск typing для пользователя ${userId} в чате ${chatId}`)
-      
-      // Сначала обновляем локальное состояние
+      // 🚀 ОПТИМИЗАЦИЯ: Сначала быстро обновляем локальное состояние (UI)
       startTypingStore(chatId, userId)
       
-      // Затем отправляем в базу данных
-      // Используем исправленную функцию с явной передачей user_id
+      // Затем асинхронно отправляем в базу данных (не блокирует UI)
       const { data, error } = await supabase.rpc('set_typing_indicator_fixed', {
         chat_uuid: chatId,
         user_uuid: userId
@@ -101,8 +93,6 @@ export const useTyping = ({ chatId, enabled = true }: UseTypingProps): UseTyping
         stopTypingStore(chatId, userId)
         return
       }
-      
-      console.log(`✅ [useTyping] Typing indicator успешно установлен`, data)
       
       // Автоматически останавливаем через 3 секунды
       if (typingTimeoutRef.current) {
@@ -119,26 +109,38 @@ export const useTyping = ({ chatId, enabled = true }: UseTypingProps): UseTyping
   }, [enabled, userId, chatId, startTypingStore, stopTypingStore, supabase, stopTyping])
 
   const handleInputChange = useCallback((value: string) => {
-    if (!enabled) return
-    
+    if (!enabled || !chatId || !userId) return
+
     if (value.trim()) {
-      // Есть текст - запускаем typing
-      startTyping()
-      
-      // Очищаем предыдущий debounce таймер
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current)
+      // 🚀 МГНОВЕННОЕ UI: Обновляем локальное состояние сразу
+      startTypingStore(chatId, userId)
+
+      // AUTO-STOP: Таймер на авто-остановку при бездействии (2.5 сек)
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
       }
-      
-      // Устанавливаем debounce - если пользователь перестал печатать на 1.5 сек
-      debounceTimeoutRef.current = setTimeout(() => {
+      typingTimeoutRef.current = setTimeout(() => {
         stopTyping()
-      }, 1500)
+      }, 2500)
+
+      // 🚀 МАКСИМАЛЬНАЯ ОПТИМИЗАЦИЯ: Сервер обновляется максимум раз в 10 секунд
+      // Это предотвращает перегрузку сервера при активном наборе текста
+      const now = Date.now()
+      if (now - lastServerUpdateRef.current > 10000) { // 10 сек интервал
+        lastServerUpdateRef.current = now
+
+        // Асинхронная отправка - не блокирует UI
+        startTyping().catch(error => {
+          console.warn('❌ Typing update failed:', error)
+          // При ошибке откатываем локальное состояние
+          stopTypingStore(chatId, userId)
+        })
+      }
     } else {
       // Нет текста - сразу останавливаем
       stopTyping()
     }
-  }, [enabled, startTyping, stopTyping])
+  }, [enabled, chatId, userId, startTypingStore, startTyping, stopTyping, stopTypingStore])
 
   const handleSubmit = useCallback(() => {
     // При отправке сразу останавливаем typing
@@ -150,9 +152,6 @@ export const useTyping = ({ chatId, enabled = true }: UseTypingProps): UseTyping
     return () => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current)
-      }
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current)
       }
       if (enabled && userId && chatId) {
         stopTypingStore(chatId, userId)

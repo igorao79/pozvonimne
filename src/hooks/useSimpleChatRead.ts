@@ -48,3 +48,5 @@ export const useSimpleChatRead = ({ chatId, userId, isActive = true }: UseSimple
     hasMarkedAsRead.current = false
   }, [chatId])
 }
+
+

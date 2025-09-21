@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import useSupabaseStore from '@/store/useSupabaseStore'
+import useChatSyncStore from '@/store/useChatSyncStore'
 import { resilientChannelManager } from '@/utils/resilientChannelManager'
 
 interface UseChatRealtimeProps {
@@ -16,6 +17,7 @@ export const useChatRealtime = ({
   onNewMessage
 }: UseChatRealtimeProps) => {
   const { supabase, cleanupChannels } = useSupabaseStore()
+  const { registerMessageCallback } = useChatSyncStore()
 
   // Оптимизированная подписка на изменения пользователей (ТОЛЬКО если есть собеседник)
   useEffect(() => {
@@ -73,102 +75,94 @@ export const useChatRealtime = ({
   }, [otherParticipantId, chatId, userId, supabase])
 
 
-  // Глобальная подписка на все изменения сообщений (ТОЛЬКО ОДНА НА ПОЛЬЗОВАТЕЛЯ)
-  useEffect(() => {
-    if (!userId) return
-
-    // Уникальное имя глобального канала для этого пользователя
-    const globalChannelName = `global_messages_${userId}`
-
-    // Проверяем, существует ли уже глобальный канал для этого пользователя
-    const existingGlobalChannel = supabase.getChannels().find(ch => ch.topic === globalChannelName)
-
-    if (existingGlobalChannel) {
-      console.log('🌍 Глобальный канал уже существует:', globalChannelName)
-      return // Не создаем дублированный канал
-    }
-
-    console.log('🌍 Создаем глобальную подписку на все сообщения для пользователя:', userId)
-
-    // Очищаем СТАРЫЕ глобальные каналы этого пользователя (если есть с другим userId)
-    const oldGlobalChannels = supabase.getChannels().filter(ch =>
-      ch.topic.includes('global_messages_') && ch.topic !== globalChannelName
-    )
-    oldGlobalChannels.forEach(ch => {
-      console.log('🧹 Очищаем старый глобальный канал:', ch.topic)
-      supabase.removeChannel(ch)
-    })
-
-    resilientChannelManager.createResilientChannel({
-      channelName: globalChannelName,
-      setup: (channel) => {
-        return channel
-          .on('postgres_changes',
-            {
-              event: 'INSERT', // Все новые сообщения в системе
-              schema: 'public',
-              table: 'messages'
-              // Без фильтра - подписка на все сообщения
-            },
-            (payload: any) => {
-              // Тихий лог только для текущего чата
-              if (payload.new.chat_id === chatId) {
-                console.log('🌍 Новое сообщение в текущем чате:', payload.new.id)
-                onNewMessage(payload.new)
-              }
-            }
-          )
-          .on('postgres_changes',
-            {
-              event: 'UPDATE', // Все обновления сообщений в системе
-              schema: 'public',
-              table: 'messages'
-              // Без фильтра - подписка на все обновления
-            },
-            (payload: any) => {
-              // Тихий лог только для текущего чата
-              if (payload.new.chat_id === chatId) {
-                console.log('🌍 Сообщение обновлено в текущем чате:', payload.new.id)
-                onNewMessage({
-                  ...payload.new,
-                  _isUpdate: true,
-                  _oldRecord: payload.old
-                })
-              }
-            }
-          )
-      },
-      onSubscribed: () => {
-        console.log('🌍 ✅ Устойчивый глобальный канал успешно подключен')
-      },
-      onError: (error) => {
-        console.error('🌍 ❌ Ошибка устойчивого глобального канала:', error)
-      },
-      maxReconnectAttempts: 12, // Много попыток для критически важного канала
-      reconnectDelay: 1500,
-      keepAliveInterval: 15000, // Более агрессивный keep-alive для чатов (15 секунд)
-      healthCheckInterval: 30000 // Проверка здоровья каждые 30 секунд
-    }).catch(error => {
-      console.error('🌍 ❌ Не удалось создать устойчивый глобальный канал:', error)
-    })
-
-    return () => {
-      // Удаляем устойчивый глобальный канал при размонтировании
-      resilientChannelManager.removeChannel(globalChannelName)
-      console.log('🌍 Компонент размонтирован, устойчивый глобальный канал очищен')
-    }
-  }, [userId, supabase]) // Убрали chatId и onNewMessage из зависимостей!
-
-  // Отдельный эффект для обработки сообщений текущего чата
+  // Подписка на сообщения через глобальный store (вместо прямых postgres_changes)
   useEffect(() => {
     if (!userId || !chatId) return
 
-    console.log('🎯 Настраиваем обработку сообщений для чата:', chatId)
+    console.log('📨 Подписываемся на сообщения через глобальный store для чата:', chatId?.slice(0, 8))
 
-    // Здесь мы можем добавить дополнительную логику если нужно
-    // Но основная подписка уже работает в эффекте выше
+    // Регистрируем callback для получения уведомлений о сообщениях
+    const unsubscribe = registerMessageCallback((messageData) => {
+      // Обрабатываем только сообщения для текущего чата
+      if (messageData.chatId === chatId) {
+        console.log('📨 Получено сообщение для текущего чата:', {
+          messageId: messageData.messageId?.slice(0, 8),
+          event: messageData.event,
+          hasReadAt: !!messageData.fullPayload?.read_at,
+          chatId: chatId?.slice(0, 8)
+        })
+        
+        // Вызываем onNewMessage с адаптированными данными
+        if (messageData.event === 'INSERT') {
+          onNewMessage(messageData.fullPayload)
+        } else if (messageData.event === 'UPDATE') {
+          console.log('🔄 Передаем UPDATE событие в useChatMessages:', {
+            messageId: messageData.messageId?.slice(0, 8),
+            oldReadAt: messageData.oldPayload?.read_at,
+            newReadAt: messageData.fullPayload?.read_at
+          })
+          onNewMessage({
+            ...messageData.fullPayload,
+            _isUpdate: true,
+            _oldRecord: messageData.oldPayload
+          })
+        }
+      }
+    })
 
-  }, [chatId, userId])
+    return () => {
+      console.log('📨 Отписываемся от сообщений через глобальный store')
+      unsubscribe()
+    }
+  }, [userId, chatId, registerMessageCallback, onNewMessage])
+
+  // ВРЕМЕННАЯ прямая подписка на сообщения (пока не исправим глобальную систему)
+  useEffect(() => {
+    if (!userId || !chatId) return
+
+    console.log('🔧 ВРЕМЕННО: создаем прямую подписку на сообщения для чата:', chatId?.slice(0, 8))
+
+    const directChannelName = `direct_messages_${chatId.substring(0, 8)}_${Date.now()}`
+    
+    const directChannel = supabase
+      .channel(directChannelName)
+      .on('postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `chat_id=eq.${chatId}` // Фильтруем только по текущему чату
+        },
+        (payload: any) => {
+          console.log('🔧 ВРЕМЕННО: Новое сообщение через прямую подписку:', payload.new.id?.slice(0, 8))
+          onNewMessage(payload.new)
+        }
+      )
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `chat_id=eq.${chatId}` // Фильтруем только по текущему чату
+        },
+        (payload: any) => {
+          console.log('🔧 ВРЕМЕННО: Обновление сообщения через прямую подписку:', payload.new.id?.slice(0, 8))
+          onNewMessage({
+            ...payload.new,
+            _isUpdate: true,
+            _oldRecord: payload.old
+          })
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔧 ВРЕМЕННО: Статус прямой подписки:', status)
+      })
+
+    return () => {
+      console.log('🔧 ВРЕМЕННО: Убираем прямую подписку')
+      supabase.removeChannel(directChannel)
+    }
+  }, [userId, chatId, supabase, onNewMessage])
 
   // Эффект для очистки каналов при уходе со страницы
   useEffect(() => {

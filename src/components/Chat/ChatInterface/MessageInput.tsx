@@ -1,4 +1,4 @@
-import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react'
+import React, { useState, useRef, useImperativeHandle, forwardRef, useCallback } from 'react'
 import { EmojiPicker } from './EmojiPicker'
 import { EmojiAutocomplete } from './EmojiAutocomplete'
 import { useTyping } from '@/hooks/useTyping'
@@ -25,9 +25,20 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
   chatId
 }, ref) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+
+  // 🚀 МГНОВЕННЫЙ ОТКЛИК: Локальное состояние для UI
+  const [localValue, setLocalValue] = useState(value)
+
+  // Синхронизация с внешним значением при изменении извне
+  React.useEffect(() => {
+    setLocalValue(value)
+  }, [value])
+
+  // 🚀 ОПТИМИЗАЦИЯ: Мемоизируем тяжелые значения
+  const inputDisabled = sending || disabled
   const inputRef = useRef<HTMLInputElement>(null)
   
-  // Используем простой typing hook
+  // Используем простой typing hook с отложенным значением
   const { handleInputChange: handleTypingChange, handleSubmit: handleTypingSubmit } = useTyping({
     chatId,
     enabled: !disabled
@@ -87,13 +98,14 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
     // Останавливаем typing при отправке сообщения
     handleTypingSubmit()
     
-    console.log(`📨 [MessageInput] Отправляем сообщение: "${value}"`)
+    console.log(`📨 [MessageInput] Отправляем сообщение: "${localValue}"`)
 
     // Преобразуем emoji shortcodes в emoji перед отправкой
-    const convertedValue = convertEmojiShortcodes(value)
+    const convertedValue = convertEmojiShortcodes(localValue)
 
     // Если текст изменился после преобразования, обновляем значение
-    if (convertedValue !== value) {
+    if (convertedValue !== localValue) {
+      setLocalValue(convertedValue)
       onChange(convertedValue)
     }
 
@@ -108,19 +120,25 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
     onSubmit(syntheticEvent)
   }
 
-  // Обработчик изменения текста с typing logic
-  const handleInputChangeInternal = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 🚀 МГНОВЕННЫЙ ОБРАБОТЧИК: UI обновляется сразу, typing асинхронно
+  const handleInputChangeInternal = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
-    console.log(`📝 [MessageInput] handleInputChangeInternal: "${newValue}"`)
+
+    // 🚀 ПРИОРИТЕТ 1: Мгновенное обновление UI (локальное состояние)
+    setLocalValue(newValue)
+
+    // 🚀 ПРИОРИТЕТ 2: Обновление внешнего состояния (синхронно)
     onChange(newValue)
 
-    // Обрабатываем typing через новый хук
-    console.log(`📝 [MessageInput] Вызываем handleTypingChange`)
+    // 🚀 ПРИОРИТЕТ 3: Typing обновляется асинхронно (не блокирует UI)
     handleTypingChange(newValue)
-  }
+  }, [onChange, handleTypingChange])
 
-  const handleEmojiSelect = (emoji: string) => {
-    const newValue = value + emoji
+
+  // Мемоизированные обработчики для предотвращения ненужных ререндеров
+  const handleEmojiSelect = useCallback((emoji: string) => {
+    const newValue = localValue + emoji
+    setLocalValue(newValue)
     onChange(newValue)
 
     // Фокус на input после выбора emoji
@@ -130,14 +148,15 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
       const len = newValue.length
       inputRef.current.setSelectionRange(len, len)
     }
-  }
+  }, [localValue, onChange])
 
-  const handleAutocompleteEmojiSelect = (emoji: string) => {
+  const handleAutocompleteEmojiSelect = useCallback((emoji: string) => {
     // Заменяем последний :shortcode: на emoji
-    const colonMatch = value.match(/:([^:\s]+)$/)
+    const colonMatch = localValue.match(/:([^:\s]+)$/)
     if (colonMatch) {
       const shortcode = colonMatch[0]
-      const newValue = value.replace(shortcode, emoji)
+      const newValue = localValue.replace(shortcode, emoji)
+      setLocalValue(newValue)
       onChange(newValue)
 
       // Фокус на input
@@ -145,12 +164,12 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
         inputRef.current.focus()
       }
     }
-  }
+  }, [localValue, onChange])
 
-  const toggleEmojiPicker = () => {
+  const toggleEmojiPicker = useCallback(() => {
     // Emoji picker toggle
     setShowEmojiPicker(!showEmojiPicker)
-  }
+  }, [showEmojiPicker])
 
   return (
     <div className="p-4 bg-card border-t border-border relative">
@@ -159,10 +178,10 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
           <input
             ref={inputRef}
             type="text"
-            value={value}
+            value={localValue}
             onChange={handleInputChangeInternal}
             placeholder="Напишите сообщение..."
-            disabled={sending || disabled}
+            disabled={inputDisabled}
             className="w-full px-4 py-2 pr-12 border border-border bg-background text-foreground rounded-lg focus:ring-0 focus:border-border placeholder:text-muted-foreground disabled:opacity-50"
           />
 
@@ -170,7 +189,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
           <button
             type="button"
             onClick={toggleEmojiPicker}
-            disabled={sending || disabled}
+            disabled={inputDisabled}
             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-secondary/50 hover:ring-1 hover:ring-secondary/30 transition-all duration-200 p-1 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -181,7 +200,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
 
         <button
           type="submit"
-          disabled={!value.trim() || sending || disabled}
+          disabled={!localValue.trim() || inputDisabled}
           className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 hover:ring-2 hover:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
         >
           {sending ? (
@@ -196,7 +215,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
 
       {/* Emoji Autocomplete */}
       <EmojiAutocomplete
-        inputValue={value}
+        inputValue={localValue}
         onEmojiSelect={handleAutocompleteEmojiSelect}
         onClose={() => {}} // Автоматически закрывается при выборе
       />

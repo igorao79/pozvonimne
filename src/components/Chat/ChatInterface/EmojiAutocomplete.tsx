@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import * as emoji from 'node-emoji'
 
 interface EmojiSuggestion {
@@ -80,44 +80,44 @@ export const EmojiAutocomplete: React.FC<EmojiAutocompleteProps> = ({
     analyzeText()
   }, [inputValue])
 
-  // Обработка клавиш
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isVisible || suggestions.length === 0) return
+  // 🚀 ОПТИМИЗАЦИЯ: Мемоизированные обработчики клавиш
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!isVisible || suggestions.length === 0) return
 
-      switch (e.key) {
-        case 'ArrowDown':
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedIndex(prev =>
+          prev < suggestions.length - 1 ? prev + 1 : prev
+        )
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedIndex(prev => prev > 0 ? prev - 1 : prev)
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (suggestions[selectedIndex]) {
+          handleEmojiSelect(suggestions[selectedIndex])
+        }
+        break
+      case 'Escape':
+        e.preventDefault()
+        onClose()
+        break
+      case 'Tab':
+        if (suggestions[selectedIndex]) {
           e.preventDefault()
-          setSelectedIndex(prev =>
-            prev < suggestions.length - 1 ? prev + 1 : prev
-          )
-          break
-        case 'ArrowUp':
-          e.preventDefault()
-          setSelectedIndex(prev => prev > 0 ? prev - 1 : prev)
-          break
-        case 'Enter':
-          e.preventDefault()
-          if (suggestions[selectedIndex]) {
-            handleEmojiSelect(suggestions[selectedIndex])
-          }
-          break
-        case 'Escape':
-          e.preventDefault()
-          onClose()
-          break
-        case 'Tab':
-          if (suggestions[selectedIndex]) {
-            e.preventDefault()
-            handleEmojiSelect(suggestions[selectedIndex])
-          }
-          break
-      }
+          handleEmojiSelect(suggestions[selectedIndex])
+        }
+        break
     }
+  }, [isVisible, suggestions, selectedIndex, onClose])
 
+  useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isVisible, suggestions, selectedIndex, onClose])
+  }, [handleKeyDown])
 
   // Закрытие при клике вне компонента
   useEffect(() => {
