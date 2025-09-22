@@ -5,6 +5,7 @@ import ChatList from './ChatList'
 import ChatInterface from './ChatInterface'
 import CreateChatModal from './CreateChatModal'
 import { RandomFact } from '@/components/ui/random-fact'
+import useChatSyncStore from '@/store/useChatSyncStore'
 
 interface Chat {
   id: string
@@ -33,10 +34,25 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isLoading, setIsLoading] = useState(!!autoOpenChatId) // Простая логика загрузки
+  const [chatsUpdateTrigger, setChatsUpdateTrigger] = useState(0) // Триггер для обновления списка чатов
   const chatListRef = useRef<any>(null)
-  
+
   // Ref для debouncing сохранения в localStorage
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Подписываемся на глобальные обновления чатов через Zustand
+  const { registerRefreshCallback } = useChatSyncStore()
+
+  // Подписываемся на глобальные обновления чатов
+  useEffect(() => {
+    console.log('🌐 ChatApp: Подписываемся на глобальные обновления чатов')
+    const unsubscribe = registerRefreshCallback(() => {
+      console.log('🔄 ChatApp: Получено уведомление об обновлении чатов, триггерим перезагрузку')
+      setChatsUpdateTrigger(prev => prev + 1)
+    })
+
+    return unsubscribe
+  }, [registerRefreshCallback])
 
   // Уведомляем систему звуков об изменении активного чата
   useEffect(() => {
@@ -263,23 +279,26 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
 
   return (
     <div className="h-full flex bg-muted overflow-hidden">
-      {/* Мобильная версия - показываем либо список, либо чат */}
+      {/* Мобильная версия - ChatList всегда смонтирован для получения уведомлений */}
       <div className="flex-1 md:hidden overflow-hidden">
-        {selectedChat ? (
+        {/* ChatList всегда смонтирован, но скрыт когда пользователь в чате */}
+        <div className={`${selectedChat ? 'hidden' : 'block'} bg-card h-full overflow-hidden`}>
+          <ChatList
+            ref={chatListRef}
+            onChatSelect={handleChatSelect}
+            onCreateNewChat={handleCreateNewChat}
+            selectedChatId={undefined}
+            externalUpdateTrigger={chatsUpdateTrigger}
+          />
+        </div>
+
+        {/* ChatInterface показывается когда выбран чат */}
+        {selectedChat && (
           <ChatInterface
             chat={selectedChat}
             onBack={handleBackToList}
             isInCall={isInCall}
           />
-        ) : (
-          <div className="bg-card h-full overflow-hidden">
-            <ChatList
-              ref={chatListRef}
-              onChatSelect={handleChatSelect}
-              onCreateNewChat={handleCreateNewChat}
-              selectedChatId={undefined}
-            />
-          </div>
         )}
       </div>
 
@@ -292,6 +311,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
             onChatSelect={handleChatSelect}
             onCreateNewChat={handleCreateNewChat}
             selectedChatId={selectedChat?.id}
+            externalUpdateTrigger={chatsUpdateTrigger}
           />
         </div>
 

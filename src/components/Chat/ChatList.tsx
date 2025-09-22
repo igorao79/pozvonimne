@@ -27,9 +27,10 @@ interface ChatListProps {
   onChatSelect: (chat: Chat) => void
   onCreateNewChat: () => void
   selectedChatId?: string | undefined
+  externalUpdateTrigger?: number // Внешний триггер для обновления данных
 }
 
-const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat, selectedChatId }, ref) => {
+const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat, selectedChatId, externalUpdateTrigger }, ref) => {
   const [chats, setChats] = useState<Chat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -86,11 +87,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
     loadChats(true)
   }, [userId])
 
-  // Подписываемся на глобальные обновления через Zustand (без лоадера)
-  useEffect(() => {
-    const unsubscribe = registerRefreshCallback(() => loadChats(false))
-    return unsubscribe
-  }, [registerRefreshCallback])
+  // Подписка на обновления теперь обрабатывается в ChatApp для мобильной версии
 
   // Реагируем на изменения lastMessageUpdate (без лоадера)
   useEffect(() => {
@@ -98,6 +95,14 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       loadChats(false)
     }
   }, [lastMessageUpdate])
+
+  // Реагируем на внешний триггер обновления (для мобильной версии)
+  useEffect(() => {
+    if (externalUpdateTrigger && externalUpdateTrigger > 0) {
+      console.log('🔄 ChatList: Внешний триггер обновления, перезагружаем чаты')
+      loadChats(false)
+    }
+  }, [externalUpdateTrigger])
 
   // Периодическое обновление времени для корректного отображения "сейчас", "1 мин" и т.д.
   useEffect(() => {
