@@ -1,5 +1,6 @@
 import type { PeerRefs } from './types'
 import { checkKeepAliveActivity } from './keepAlive'
+import useCallStore from '@/store/useCallStore'
 
 // Функция для мониторинга состояния соединения
 export const startConnectionMonitoring = (
@@ -34,8 +35,11 @@ export const startConnectionMonitoring = (
 
         // Проверяем критические состояния
         if (connectionState === 'failed' || iceConnectionState === 'failed') {
-          console.error(`📊 [User ${userId?.slice(0, 8)}] Connection failed, attempting reconnection`)
-          attemptReconnection()
+          console.error(`📊 [User ${userId?.slice(0, 8)}] Connection failed - ending call`)
+          // Вместо переподключения завершаем звонок
+          const { endCall, setError } = useCallStore.getState()
+          setError('Соединение потеряно')
+          endCall()
         } else if (connectionState === 'disconnected' || iceConnectionState === 'disconnected') {
           console.warn(`📊 [User ${userId?.slice(0, 8)}] Connection disconnected, monitoring...`)
           // Уменьшаем время ожидания для более быстрого реагирования
@@ -43,11 +47,14 @@ export const startConnectionMonitoring = (
             if (peerRef.current && !peerRef.current.destroyed) {
               const currentState = (peerRef.current as any)._pc?.connectionState
               const currentIceState = (peerRef.current as any)._pc?.iceConnectionState
-              
-              if (currentState === 'disconnected' || currentState === 'failed' || 
+
+              if (currentState === 'disconnected' || currentState === 'failed' ||
                   currentIceState === 'disconnected' || currentIceState === 'failed') {
-                console.error(`📊 [User ${userId?.slice(0, 8)}] Connection still problematic after 5s (${currentState}/${currentIceState}), attempting reconnection`)
-                attemptReconnection()
+                console.error(`📊 [User ${userId?.slice(0, 8)}] Connection still problematic after 5s (${currentState}/${currentIceState}) - ending call`)
+                // Вместо переподключения завершаем звонок
+                const { endCall, setError } = useCallStore.getState()
+                setError('Соединение потеряно')
+                endCall()
               }
             }
           }, 5000) // Уменьшили с 10 до 5 секунд
@@ -59,8 +66,11 @@ export const startConnectionMonitoring = (
               const currentIceState = (peerRef.current as any)._pc?.iceConnectionState
               
               if (currentState === 'new' || currentIceState === 'new') {
-                console.error(`📊 [User ${userId?.slice(0, 8)}] ICE gathering timeout (${currentState}/${currentIceState}), attempting reconnection`)
-                attemptReconnection()
+                console.error(`📊 [User ${userId?.slice(0, 8)}] ICE gathering timeout (${currentState}/${currentIceState}) - ending call`)
+                // Вместо переподключения завершаем звонок
+                const { endCall, setError } = useCallStore.getState()
+                setError('Не удалось установить соединение')
+                endCall()
               }
             }
           }, 15000) // 15 секунд таймаут для ICE gathering

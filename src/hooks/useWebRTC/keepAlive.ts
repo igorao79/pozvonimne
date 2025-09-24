@@ -40,7 +40,7 @@ export const startKeepAlive = (
         console.warn(`💓 [User ${userId?.slice(0, 8)}] Keep-alive error:`, err)
       }
     }
-  }, 20000) // Уменьшаем интервал для раннего обнаружения проблем
+  }, 10000) // Каждые 10 секунд для быстрого обнаружения проблем
 }
 
 // Функция для остановки keep-alive
@@ -93,9 +93,16 @@ export const checkKeepAliveActivity = (
 ): boolean => {
   const { lastKeepAliveRef } = peerRefs
 
-  // Проверяем последний keep-alive (не должен быть старше 2 минут)
-  if (lastKeepAliveRef.current && Date.now() - lastKeepAliveRef.current > 120000) {
-    console.warn(`📊 [User ${userId?.slice(0, 8)}] No keep-alive response for 2+ minutes`)
+  // Проверяем последний keep-alive (не должен быть старше 45 секунд)
+  const maxAge = 45000 // 45 секунд для быстрого реагирования
+  if (lastKeepAliveRef.current && Date.now() - lastKeepAliveRef.current > maxAge) {
+    console.error(`📊 [User ${userId?.slice(0, 8)}] No keep-alive response for ${maxAge/1000}s - ending call`)
+
+    // Автоматически завершаем звонок при отсутствии keep-alive
+    const { endCall, setError } = useCallStore.getState()
+    setError('Потеряна связь с собеседником')
+    endCall()
+
     return false
   }
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import useSupabaseStore from '@/store/useSupabaseStore'
+import useChatSyncStore from '@/store/useChatSyncStore'
 
 interface UseSimpleChatReadProps {
   chatId: string
@@ -9,6 +10,7 @@ interface UseSimpleChatReadProps {
 
 export const useSimpleChatRead = ({ chatId, userId, isActive = true }: UseSimpleChatReadProps) => {
   const { supabase } = useSupabaseStore()
+  const { refreshChatList } = useChatSyncStore()
   const hasMarkedAsRead = useRef(false)
 
   useEffect(() => {
@@ -29,6 +31,10 @@ export const useSimpleChatRead = ({ chatId, userId, isActive = true }: UseSimple
         } else {
           console.log('✅ Chat marked as read, updated messages:', updatedCount)
           hasMarkedAsRead.current = true
+
+          // 🔥 ОБНОВЛЕНИЕ: Отправляем сигнал обновления для ChatList после прочтения чата
+          console.log('📖 Отправляем сигнал обновления ChatList после прочтения чата')
+          refreshChatList()
         }
       } catch (error) {
         console.error('Ошибка при пометке чата как прочитанного:', error)

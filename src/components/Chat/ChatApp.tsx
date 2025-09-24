@@ -289,6 +289,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
             chat={selectedChat}
             onBack={handleBackToList}
             isInCall={isInCall}
+            hasUnreadMessages={selectedChat.unread_count > 0}
           />
         )}
       </div>
@@ -313,6 +314,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
               chat={selectedChat}
               onBack={handleBackToList}
               isInCall={isInCall}
+              hasUnreadMessages={selectedChat.unread_count > 0}
             />
           ) : (
             <div className="h-full flex items-center justify-center p-4 chat-pattern-bg">

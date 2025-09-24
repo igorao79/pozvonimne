@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import useUsers from '@/hooks/useUsers'
 import useCallStore from '@/store/useCallStore'
 import useSupabaseStore from '@/store/useSupabaseStore'
+import useChatSyncStore from '@/store/useChatSyncStore'
 
 import { ChatHeader } from './ChatHeader'
 import { MessagesArea } from './MessagesArea'
@@ -17,9 +18,10 @@ import { useChatScroll } from '@/hooks/useChatScroll'
 import { useChatFocus } from '@/hooks/useChatFocus'
 import { useChatActions } from './ChatActions'
 import { useMessageActions } from '@/hooks/useMessageActions'
+import { useCallMessages } from '@/hooks/useCallMessages'
 
 
-const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
+const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterfaceProps) => {
   const [newMessage, setNewMessage] = useState('')
   const [error, setError] = useState<string | undefined>(undefined)
   const [isMobile, setIsMobile] = useState(false)
@@ -38,12 +40,20 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
   const { userId: rawUserId, isInCall: storeIsInCall } = useCallStore()
   const { users } = useUsers()
   const { supabase } = useSupabaseStore()
+  const { refreshChatList } = useChatSyncStore()
 
   // Преобразуем null в undefined для совместимости с хуками
   const userId = rawUserId || undefined
 
   // Ref для отслеживания, был ли чат уже помечен как прочитанный в этой сессии
   const hasMarkedAsReadRef = useRef(false)
+
+  // Состояние для отслеживания переключения между чатами
+  const [isSwitchingChat, setIsSwitchingChat] = useState(false)
+  const [isAutoScrolling, setIsAutoScrolling] = useState(false)
+
+  // Ref для отслеживания, была ли выполнена первоначальная прокрутка для текущего чата
+  const hasScrolledToUnreadRef = useRef(false)
 
   // Определяем мобильное устройство при монтировании
   useEffect(() => {
@@ -76,7 +86,7 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
     handleNewMessage
   } = useChatMessages({ chatId: chat.id, userId, isActive: true })
 
-  const { messagesEndRef, scrollToBottom, hasInitialScrolled } = useChatScroll({
+  const { messagesEndRef, scrollToBottom, scrollToElement, hasInitialScrolled } = useChatScroll({
     messagesLength: messages.length,
     loading,
     loadingMore
@@ -92,6 +102,9 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
   // Хуки для работы с сообщениями
   const { editMessage, deleteMessage } = useMessageActions()
 
+  // Хук для создания сообщений о звонках
+  useCallMessages({ chatId: chat.id, userId })
+
   // Настраиваем realtime подписки
   useChatRealtime({
     chatId: chat.id,
@@ -100,7 +113,10 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
     onNewMessage: handleNewMessage
   })
 
-  // Автоматическая пометка чата как прочитанного при открытии
+  // ОТКЛЮЧЕНО: Автоматическая пометка чата как прочитанного при открытии
+  // Это мешает показу плашки "Непрочитанные сообщения"
+  // Чат помечается как прочитанный только при реальном просмотре сообщений
+  /*
   useEffect(() => {
     if (!userId || !chat.id || hasMarkedAsReadRef.current) return
 
@@ -118,6 +134,10 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
         } else {
           console.log('✅ Чат автоматически помечен как прочитанный при открытии, обновлено сообщений:', updatedCount)
           hasMarkedAsReadRef.current = true
+
+          // 🔥 ОБНОВЛЕНИЕ: Отправляем сигнал обновления для ChatList после прочтения чата
+          console.log('📖 Отправляем сигнал обновления ChatList после прочтения чата при открытии')
+          refreshChatList()
         }
       } catch (error) {
         console.warn('Ошибка при автоматической пометке чата как прочитанного:', error)
@@ -131,11 +151,84 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
 
     return () => clearTimeout(timer)
   }, [chat.id, userId, supabase])
+  */
 
-  // Сброс флага при смене чата
+  // Сброс флагов при смене чата
   useEffect(() => {
     hasMarkedAsReadRef.current = false
+    hasScrolledToUnreadRef.current = false
   }, [chat.id])
+
+  // Управление состоянием переключения чата
+  useEffect(() => {
+    setIsSwitchingChat(true)
+
+    // Через 300мс снимаем флаг переключения, давая время на загрузку сообщений
+    const timer = setTimeout(() => {
+      setIsSwitchingChat(false)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [chat.id])
+
+  // Прокрутка к плашке непрочитанных сообщений при загрузке чата
+  useLayoutEffect(() => {
+    if (!loading && messages.length > 0 && !hasScrolledToUnreadRef.current) {
+      // Важно: отключаем любые другие прокрутки, устанавливая флаг сразу
+      hasScrolledToUnreadRef.current = true
+
+      // Находим первое непрочитанное сообщение (которое не от текущего пользователя и не прочитано)
+      const hasUnreadMessages = messages.some(message =>
+        message.sender_id !== userId && !message.read_at
+      )
+
+      if (hasUnreadMessages) {
+        console.log('📜 Прокрутка к плашке непрочитанных сообщений (приоритетная, useLayoutEffect)')
+
+        // Используем setTimeout для гарантированной работы после всех layout изменений
+        setTimeout(() => {
+          // Начинаем автоматический скролл
+          setIsAutoScrolling(true)
+          
+          // Находим плашку непрочитанных сообщений
+          const unreadSeparator = document.getElementById('unread-separator') as HTMLElement
+          if (unreadSeparator) {
+            console.log('📜 Найдена плашка непрочитанных, прокручиваем к ней')
+            scrollToElement(unreadSeparator)
+          } else {
+            // Если плашки еще нет, пробуем найти первое непрочитанное сообщение
+            const firstUnreadMessage = messages.find(message =>
+              message.sender_id !== userId && !message.read_at
+            )
+            if (firstUnreadMessage) {
+              const messageElement = document.querySelector(`[data-message-id="${firstUnreadMessage.id}"]`) as HTMLElement
+              if (messageElement) {
+                console.log('📜 Найдено первое непрочитанное сообщение, прокручиваем к нему')
+                scrollToElement(messageElement)
+              } else {
+                console.log('📜 Не найдено ни плашки, ни сообщения для прокрутки')
+              }
+            }
+          }
+          
+          // Заканчиваем автоматический скролл через небольшую задержку
+          setTimeout(() => {
+            setIsAutoScrolling(false)
+          }, 300)
+        }, 200) // Увеличенная задержка для надежности
+      } else {
+        // Если нет непрочитанных сообщений, прокручиваем к низу
+        console.log('📜 Нет непрочитанных сообщений, прокрутка к низу')
+        setTimeout(() => {
+          setIsAutoScrolling(true)
+          scrollToBottom()
+          setTimeout(() => {
+            setIsAutoScrolling(false)
+          }, 300)
+        }, 200)
+      }
+    }
+  }, [loading, messages, userId, scrollToElement, scrollToBottom])
 
   // Синхронизация статуса прочитанности - теперь обрабатывается через visibility-based систему в MessageItem
   // useSimpleChatRead убран, но заменен на автоматическую пометку при открытии чата
@@ -289,6 +382,9 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
         onDeleteMessage={handleDeleteMessage}
         hasInitialScrolled={hasInitialScrolled}
         onScrollToBottom={scrollToBottom}
+        isSwitchingChat={isSwitchingChat}
+        isAutoScrolling={isAutoScrolling}
+        hasUnreadMessages={hasUnreadMessages}
       />
 
       <MessageInput

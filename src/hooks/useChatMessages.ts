@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Message, RealtimeMessagePayload } from '@/components/Chat/ChatInterface/types'
 import useSupabaseStore from '@/store/useSupabaseStore'
 import useChatSyncStore from '@/store/useChatSyncStore'
@@ -18,6 +18,9 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMoreMessages, setHasMoreMessages] = useState(true)
   const [error, setError] = useState<string | undefined>(undefined)
+
+  // Ref для отслеживания текущего активного запроса загрузки сообщений
+  const currentLoadRequestRef = useRef<AbortController | null>(null)
 
   const { supabase } = useSupabaseStore()
   const { refreshChatList } = useChatSyncStore()
@@ -61,9 +64,27 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
 
   // Загрузка сообщений
   const loadMessages = useCallback(async () => {
+    // Отменяем предыдущий запрос, если он еще активен
+    if (currentLoadRequestRef.current) {
+      console.log('🚫 Отменяем предыдущий запрос загрузки сообщений')
+      currentLoadRequestRef.current.abort()
+    }
+
+    // Создаем новый AbortController для этого запроса
+    const abortController = new AbortController()
+    currentLoadRequestRef.current = abortController
+
     try {
       setLoading(true)
       setError(undefined)
+
+      console.log('📨 Начинаем загрузку сообщений для чата:', chatId.slice(0, 8))
+
+      // Проверяем, не был ли запрос отменен
+      if (abortController.signal.aborted) {
+        console.log('🚫 Запрос загрузки сообщений был отменен')
+        return
+      }
 
       // Пропускаем проверку участников для избежания рекурсии RLS
       // Функция get_chat_messages уже проверяет доступ внутри
@@ -71,8 +92,14 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
       // Теперь безопасно загружаем сообщения
       const { data, error: messagesError } = await supabase.rpc('get_chat_messages', {
         chat_uuid: chatId,
-        limit_count: 30
+        limit_count: 50
       })
+
+      // Проверяем, не был ли запрос отменен после получения ответа
+      if (abortController.signal.aborted) {
+        console.log('🚫 Запрос загрузки сообщений был отменен после получения данных')
+        return
+      }
 
       if (messagesError) {
         console.error('Ошибка загрузки сообщений:', messagesError)
@@ -96,7 +123,7 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
       console.log('📨 Загружено сообщений:', sortedMessages.length)
 
       // Проверяем, есть ли еще сообщения для загрузки
-      setHasMoreMessages(sortedMessages.length >= 30)
+      setHasMoreMessages(sortedMessages.length >= 50)
 
       // Фильтруем дубликаты перед установкой сообщений
       const uniqueMessages = sortedMessages.filter((message: Message, index: number, arr: Message[]) =>
@@ -110,10 +137,20 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
       // Теперь сообщения помечаются как прочитанные только при их фактической видимости
       // Это предотвращает ложную пометку непросмотренных сообщений
     } catch (err) {
+      // Проверяем, была ли ошибка вызвана отменой запроса
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('🚫 Запрос загрузки сообщений был отменен - игнорируем ошибку')
+        return
+      }
+
       console.error('Ошибка:', err)
       setError('Ошибка подключения')
       setHasMoreMessages(false)
     } finally {
+      // Очищаем ref только если это был наш активный запрос
+      if (currentLoadRequestRef.current === abortController) {
+        currentLoadRequestRef.current = null
+      }
       setLoading(false)
     }
   }, [chatId, supabase])
@@ -142,7 +179,7 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
       console.log('📜 Загружено дополнительных сообщений:', newMessages.length)
 
       // Проверяем, есть ли еще сообщения
-      setHasMoreMessages(newMessages.length >= 30)
+      setHasMoreMessages(newMessages.length >= 50)
 
       // Добавляем новые сообщения в начало массива (старые сообщения)
       if (newMessages.length > 0) {
@@ -181,10 +218,35 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
     }
   }, [chatId, messages.length, hasMoreMessages, loadingMore, supabase])
 
-  // Загружаем сообщения при монтировании
+  // Очищаем сообщения при смене чата
   useEffect(() => {
-    console.log('🔄 Загружаем сообщения для чата:', chatId)
-    loadMessages()
+    console.log('🧹 Очищаем сообщения при смене чата:', chatId.slice(0, 8))
+    setMessages([])
+    setLoading(true)
+    setError(undefined)
+    setHasMoreMessages(true)
+    setLoadingMore(false)
+
+    // Отменяем любой активный запрос
+    if (currentLoadRequestRef.current) {
+      console.log('🚫 Отменяем активный запрос при смене чата')
+      currentLoadRequestRef.current.abort()
+      currentLoadRequestRef.current = null
+    }
+  }, [chatId])
+
+  // Загружаем сообщения при монтировании и смене чата
+  useEffect(() => {
+    console.log('🔄 Загружаем сообщения для чата:', chatId.slice(0, 8))
+
+    // Небольшая задержка при смене чата для предотвращения race condition
+    const loadTimer = setTimeout(() => {
+      loadMessages()
+    }, 50) // 50мс задержка
+
+    return () => {
+      clearTimeout(loadTimer)
+    }
   }, [chatId, loadMessages])
 
   // Отправка сообщения

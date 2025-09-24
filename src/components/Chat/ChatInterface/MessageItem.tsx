@@ -4,6 +4,7 @@ import { formatMessageTime } from './utils'
 import { MessageContextMenu } from './MessageContextMenu'
 import { SimpleMessageStatus } from './SimpleMessageStatus'
 import { useMessageVisibility, useMessageReadTracking } from '@/hooks/useMessageVisibility'
+// CallMessage импортируется в MessagesArea, а не здесь
 
 interface MessageItemProps {
   message: Message

@@ -157,6 +157,13 @@ export const useCallStateSynchronizer = ({ isAuthenticated, userId }: UseCallSta
         useCallStore.getState().setIsInCall(true)
       } else if (!state.isCallActive && !state.isCalling && !state.isReceivingCall && currentState.isInCall) {
         console.log('🔄 CallStateSynchronizer: Ending call based on sync')
+        // Немедленное завершение звонка при получении сигнала о завершении
+        useCallStore.getState().endCall()
+      }
+
+      // Дополнительная проверка: если другая сторона сообщает о завершении звонка
+      if (state.isCallActive === false && currentState.isCallActive === true) {
+        console.log('🔄 CallStateSynchronizer: Remote peer ended call, synchronizing...')
         useCallStore.getState().endCall()
       }
     }
@@ -205,14 +212,14 @@ export const useCallStateSynchronizer = ({ isAuthenticated, userId }: UseCallSta
 
     console.log('🔄 CallStateSynchronizer: Call state changed, scheduling sync to', targetUser.slice(0, 8))
 
-    // Дебаунсинг - отправляем синхронизацию через 500мс
+    // Дебаунсинг - отправляем синхронизацию через 200мс для быстрой синхронизации
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current)
     }
 
     syncTimeoutRef.current = setTimeout(() => {
       syncCallState(targetUser)
-    }, 500)
+    }, 200)
 
     return () => {
       if (syncTimeoutRef.current) {

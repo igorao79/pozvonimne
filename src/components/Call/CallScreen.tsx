@@ -35,6 +35,7 @@ const CallScreen = () => {
   const [isResizing, setIsResizing] = useState(false)
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 })
   const [isMobile, setIsMobile] = useState(false)
+  const [isStreamHidden, setIsStreamHidden] = useState(false)
 
   // Отслеживаем размер окна для адаптивности
   useEffect(() => {
@@ -254,22 +255,76 @@ const CallScreen = () => {
     }
   }, [targetUserId])
 
+  // Синхронизация состояния видимости стрима между пользователями
+  useEffect(() => {
+    if (!userId || !targetUserId) return
+
+    const streamVisibilityChannel = supabase
+      .channel(`stream_visibility:${userId}`)
+      .on('broadcast', { event: 'stream_visibility_change' }, (payload) => {
+        const { user_id, is_hidden } = payload.payload
+        if (user_id === targetUserId) {
+          console.log('👁️ Received stream visibility from', user_id, ':', is_hidden)
+          setIsStreamHidden(is_hidden)
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(streamVisibilityChannel)
+    }
+  }, [userId, targetUserId, supabase])
+
+  // Отправка состояния видимости стрима при изменении
+  useEffect(() => {
+    if (!userId || !targetUserId) return
+
+    const sendStreamVisibility = async () => {
+      try {
+        const channel = supabase.channel(`stream_visibility:${targetUserId}`)
+        await channel.subscribe()
+        await channel.send({
+          type: 'broadcast',
+          event: 'stream_visibility_change',
+          payload: {
+            user_id: userId,
+            is_hidden: isStreamHidden
+          }
+        })
+        console.log('👁️ Sent stream visibility to', targetUserId, ':', isStreamHidden)
+      } catch (err) {
+        console.error('Error sending stream visibility:', err)
+      }
+    }
+
+    sendStreamVisibility()
+  }, [isStreamHidden, targetUserId, userId, supabase])
+
+  // Функция для переключения видимости стрима
+  const toggleStreamVisibility = useCallback(() => {
+    setIsStreamHidden(prev => !prev)
+  }, [])
+
   // Screen window controls
-  const handleMouseDown = useCallback((e: React.MouseEvent, type: 'drag' | 'resize' = 'drag') => {
+  const handleMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent, type: 'drag' | 'resize' = 'drag') => {
     if (isScreenFullscreen) return
+
+    // Определяем координаты для mouse или touch событий
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
 
     if (type === 'drag') {
       setIsDragging(true)
       const rect = e.currentTarget.getBoundingClientRect()
       setDragOffset({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
+        x: clientX - rect.left,
+        y: clientY - rect.top
       })
     } else if (type === 'resize') {
       setIsResizing(true)
       setResizeStart({
-        x: e.clientX,
-        y: e.clientY,
+        x: clientX,
+        y: clientY,
         width: screenWindowSize.width,
         height: screenWindowSize.height
       })
@@ -278,14 +333,18 @@ const CallScreen = () => {
     e.preventDefault()
   }, [isScreenFullscreen, screenWindowSize])
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  const handleMouseMove = useCallback((e: MouseEvent | TouchEvent) => {
+    // Определяем координаты для mouse или touch событий
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+
     if (isDragging) {
-      const newX = Math.max(0, Math.min(e.clientX - dragOffset.x, window.innerWidth - screenWindowSize.width))
-      const newY = Math.max(0, Math.min(e.clientY - dragOffset.y, window.innerHeight - screenWindowSize.height))
+      const newX = Math.max(0, Math.min(clientX - dragOffset.x, window.innerWidth - screenWindowSize.width))
+      const newY = Math.max(0, Math.min(clientY - dragOffset.y, window.innerHeight - screenWindowSize.height))
       setScreenWindowPosition({ x: newX, y: newY })
     } else if (isResizing) {
-      const deltaX = e.clientX - resizeStart.x
-      const deltaY = e.clientY - resizeStart.y
+      const deltaX = clientX - resizeStart.x
+      const deltaY = clientY - resizeStart.y
       const newWidth = Math.max(100, Math.min(resizeStart.width + deltaX, window.innerWidth - screenWindowPosition.x))
       const newHeight = Math.max(80, Math.min(resizeStart.height + deltaY, window.innerHeight - screenWindowPosition.y))
       setScreenWindowSize({ width: newWidth, height: newHeight })
@@ -297,18 +356,30 @@ const CallScreen = () => {
     setIsResizing(false)
   }, [])
 
-  // Add global mouse event listeners
+  // Add global mouse and touch event listeners
   useEffect(() => {
     if (isDragging || isResizing) {
-      document.addEventListener('mousemove', handleMouseMove)
+      // Mouse events
+      document.addEventListener('mousemove', handleMouseMove as EventListener)
       document.addEventListener('mouseup', handleMouseUp)
+
+      // Touch events
+      document.addEventListener('touchmove', handleMouseMove as EventListener, { passive: false })
+      document.addEventListener('touchend', handleMouseUp, { passive: false })
+
       document.body.style.cursor = isDragging ? 'move' : 'nw-resize'
       document.body.style.userSelect = 'none'
     }
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
+      // Mouse events
+      document.removeEventListener('mousemove', handleMouseMove as EventListener)
       document.removeEventListener('mouseup', handleMouseUp)
+
+      // Touch events
+      document.removeEventListener('touchmove', handleMouseMove as EventListener)
+      document.removeEventListener('touchend', handleMouseUp)
+
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
     }
@@ -318,11 +389,97 @@ const CallScreen = () => {
     setIsScreenFullscreen(!isScreenFullscreen)
   }, [isScreenFullscreen])
 
-  const resetPosition = useCallback(() => {
+  const resetPosition = useCallback(async () => {
+    console.log('🔄 Starting full stream reconnection...')
+
+    // Сбрасываем позицию и размер окна
     setScreenWindowPosition({ x: 20, y: 20 })
     setScreenWindowSize({ width: 400, height: 300 })
     setIsScreenFullscreen(false)
-  }, [])
+
+    // Полная переподключка к стриму
+    if (screenVideoRef.current) {
+      const videoElement = screenVideoRef.current
+
+      try {
+        // Останавливаем текущий стрим
+        console.log('🔄 Stopping current stream...')
+        videoElement.pause()
+        videoElement.currentTime = 0
+        videoElement.srcObject = null
+
+        // Ждем немного для полной очистки
+        await new Promise(resolve => setTimeout(resolve, 300))
+
+        // Выбираем stream для переподключения
+        const streamToShow = remoteScreenStream || screenStream
+
+        if (streamToShow) {
+          console.log('🔄 Reconnecting to stream:', streamToShow.id)
+
+          // Убеждаемся, что tracks активны
+          const videoTracks = streamToShow.getVideoTracks()
+          const activeTracks = videoTracks.filter(track => track.readyState === 'live' && track.enabled)
+
+          if (activeTracks.length > 0) {
+            // Переподключаем stream
+            videoElement.srcObject = streamToShow
+
+            // Принудительно перезагружаем видео элемент
+            videoElement.load()
+
+            // Небольшая задержка перед запуском
+            await new Promise(resolve => setTimeout(resolve, 100))
+
+            // Запускаем воспроизведение
+            try {
+              await videoElement.play()
+              console.log('✅ Stream reconnection successful')
+
+              // Дополнительная проверка через некоторое время
+              setTimeout(() => {
+                if (videoElement && videoElement.paused && videoElement.srcObject) {
+                  console.log('🔄 Additional attempt to start playback')
+                  videoElement.play().catch(console.error)
+                }
+              }, 1000)
+
+            } catch (playError) {
+              console.warn('⚠️ Auto-play failed after reconnection, waiting for user interaction')
+              // Ждем взаимодействия пользователя
+              const startPlayback = () => {
+                if (videoElement && videoElement.srcObject) {
+                  videoElement.play().catch(console.error)
+                  document.removeEventListener('click', startPlayback)
+                  document.removeEventListener('touchstart', startPlayback)
+                }
+              }
+              document.addEventListener('click', startPlayback)
+              document.addEventListener('touchstart', startPlayback)
+            }
+          } else {
+            console.warn('⚠️ No active video tracks in stream')
+          }
+        } else {
+          console.log('⚠️ No stream available for reconnection')
+        }
+      } catch (error) {
+        console.error('❌ Error during stream reconnection:', error)
+
+        // Попытка восстановления в случае ошибки
+        setTimeout(() => {
+          if (screenVideoRef.current) {
+            const streamToShow = remoteScreenStream || screenStream
+            if (streamToShow) {
+              console.log('🔄 Recovery attempt after error')
+              screenVideoRef.current.srcObject = streamToShow
+              screenVideoRef.current.play().catch(console.error)
+            }
+          }
+        }, 2000)
+      }
+    }
+  }, [remoteScreenStream, screenStream])
 
   // Save screen window position and size
   useEffect(() => {
@@ -426,8 +583,10 @@ const CallScreen = () => {
           isScreenFullscreen={isScreenFullscreen}
           screenWindowPosition={screenWindowPosition}
           screenWindowSize={screenWindowSize}
+          isStreamHidden={isStreamHidden}
           onMouseDown={handleMouseDown}
           onToggleFullscreen={toggleFullscreen}
+          onToggleStreamVisibility={toggleStreamVisibility}
           onStopVideo={() => {
             if (screenVideoRef.current) {
               console.log('📺 Stopping video playback')
@@ -460,7 +619,10 @@ const CallScreen = () => {
             : 'bg-white/40 backdrop-blur-md border-t border-white/30'
         }`}>
           <div className="flex flex-col items-center space-y-4">
-            <CallControls />
+            <CallControls
+              isStreamHidden={isStreamHidden}
+              onToggleStreamVisibility={toggleStreamVisibility}
+            />
           </div>
         </div>
 

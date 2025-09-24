@@ -2,6 +2,27 @@ import React, { forwardRef, useState, useCallback, useRef, useEffect } from 'rea
 import { Message, Chat } from './types'
 import { MessageItem } from './MessageItem'
 import { DateSeparator } from './DateSeparator'
+import { CallMessage } from './CallMessage'
+
+// Компонент для разделителя непрочитанных сообщений
+const UnreadSeparator: React.FC = () => {
+  return (
+    <div id="unread-separator" className="flex items-center justify-center my-6 px-4">
+      {/* Левая разделительная линия */}
+      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-400 dark:via-blue-600 to-transparent"></div>
+
+      {/* Центральный элемент с текстом */}
+      <div className="mx-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-600 rounded-full px-4 py-1.5 shadow-sm backdrop-blur-sm">
+        <span className="text-xs text-blue-700 dark:text-blue-300 font-semibold tracking-wide uppercase">
+          Непрочитанные сообщения
+        </span>
+      </div>
+
+      {/* Правая разделительная линия */}
+      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-400 dark:via-blue-600 to-transparent"></div>
+    </div>
+  )
+}
 
 interface MessagesAreaProps {
   messages: Message[]
@@ -19,6 +40,9 @@ interface MessagesAreaProps {
   onDeleteMessage?: (messageId: string) => void
   onScrollToBottom?: () => void
   hasInitialScrolled?: boolean
+  isSwitchingChat?: boolean
+  isAutoScrolling?: boolean
+  hasUnreadMessages?: boolean
 }
 
 // Получаем стабильную дату на основе клиентского времени пользователя
@@ -54,15 +78,35 @@ const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
   onEditMessage,
   onDeleteMessage,
   onScrollToBottom,
-  hasInitialScrolled = false
+  hasInitialScrolled = false,
+  isSwitchingChat = false,
+  isAutoScrolling = false,
+  hasUnreadMessages = false
 }) => {
   const [showScrollButton, setShowScrollButton] = useState(false)
+  
+  // Простая логика плашки: показываем если есть непрочитанные сообщения и пользователь не скроллил активно
+  const [hasUserScrolled, setHasUserScrolled] = useState(false)
+  const [showUnreadSeparator, setShowUnreadSeparator] = useState(true)
+
+  // Таймер для принудительного скрытия плашки через некоторое время
+  const unreadSeparatorTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Запоминаем состояние непрочитанных для каждого чата
+  const chatUnreadStateRef = useRef<{[chatId: string]: boolean}>({}) // Запоминаем состояние непрочитанных для каждого чата
+  
+  // Обновляем локальный флаг автоскролла
+  useEffect(() => {
+    console.log('🤖 Автоскролл изменился:', isAutoScrolling)
+  }, [isAutoScrolling])
+  
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const previousMessagesLength = useRef<number>(messages.length)
   const previousScrollTop = useRef<number>(0)
   const isLoadingMoreRef = useRef<boolean>(false)
   const loadMoreAnchorRef = useRef<HTMLDivElement>(null)
   const previousScrollHeight = useRef<number>(0)
+  const lastScrollTop = useRef<number>(0)
 
   // Обработчик скролла для загрузки дополнительных сообщений и показа кнопки прокрутки
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -70,7 +114,8 @@ const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
     const { scrollTop, scrollHeight, clientHeight } = target
 
     // Если пользователь прокрутил до верха (в пределах 100px) и есть еще сообщения
-    if (hasInitialScrolled && scrollTop <= 100 && hasMoreMessages && !loadingMore && onLoadMore) {
+    // НО только если пользователь уже скроллил (чтобы не мешать начальному позиционированию)
+    if (hasInitialScrolled && scrollTop <= 100 && hasMoreMessages && !loadingMore && onLoadMore && hasUserScrolled) {
       console.log('🎯 Пользователь прокрутил до верха, загружаем дополнительные сообщения')
       onLoadMore()
     }
@@ -80,7 +125,126 @@ const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
 
     // Показываем кнопку, если пользователь ушел вверх более чем на 100px от последнего сообщения
     setShowScrollButton(distanceFromBottom > 100)
-  }, [hasMoreMessages, loadingMore, onLoadMore, hasInitialScrolled])
+
+    // Отмечаем что пользователь начал скроллить (только если это НЕ автоматический скролл)
+    const scrollDiff = Math.abs(lastScrollTop.current - scrollTop)
+    if (scrollDiff > 150) { // Увеличен порог с 10px до 150px для предотвращения случайного скрытия
+      if (isAutoScrolling) {
+        console.log('🤖 Автоматический скролл обнаружен, НЕ засчитываем как пользовательский. Diff:', scrollDiff)
+      } else {
+        if (!hasUserScrolled) {
+          console.log('🖱️ Пользователь НАМЕРЕННО прокручивает чат (>150px). Diff:', scrollDiff)
+          setHasUserScrolled(true)
+        }
+        
+        // Скрываем плашку только при ЗНАЧИТЕЛЬНОМ скролле пользователя (не случайном)
+        if (showUnreadSeparator) {
+          console.log('📜 Пользователь значительно прокручивает чат, скрываем плашку непрочитанных')
+          setShowUnreadSeparator(false)
+        }
+      }
+    } else if (scrollDiff > 10) {
+      // Небольшие движения скролла (10-150px) - только логируем, но не скрываем плашку
+      if (!isAutoScrolling) {
+        console.log('🐭 Небольшое движение скролла (не скрываем плашку). Diff:', scrollDiff)
+      }
+    }
+
+    lastScrollTop.current = scrollTop
+  }, [hasMoreMessages, loadingMore, onLoadMore, hasInitialScrolled, showUnreadSeparator, isAutoScrolling])
+
+  // Сброс состояния при смене чата
+  useEffect(() => {
+    console.log('🧹 Сброс состояния при смене чата:', chat.id)
+
+    // Очищаем таймер при смене чата
+    if (unreadSeparatorTimerRef.current) {
+      clearTimeout(unreadSeparatorTimerRef.current)
+      unreadSeparatorTimerRef.current = null
+    }
+
+    setHasUserScrolled(false)
+    // При заходе в новый чат сбрасываем плашку - пусть useEffect определит на основе сообщений
+    setShowUnreadSeparator(false)
+  }, [chat.id])
+
+  // Простая логика показа плашки: показываем если есть непрочитанные сообщения
+  useEffect(() => {
+    // Очищаем предыдущий таймер
+    if (unreadSeparatorTimerRef.current) {
+      clearTimeout(unreadSeparatorTimerRef.current)
+      unreadSeparatorTimerRef.current = null
+    }
+
+    // Используем информацию из пропса ИЛИ проверяем сообщения (исключая системные сообщения о звонках)
+    const hasUnread = hasUnreadMessages || messages.some(message =>
+      message.sender_id !== userId && !message.read_at && message.type !== 'call'
+    )
+
+    // Запоминаем состояние непрочитанных для этого чата
+    chatUnreadStateRef.current[chat.id] = hasUnread
+
+    // Простая логика: показываем плашку только если есть непрочитанные И пользователь не скроллил
+    if (hasUnread && !hasUserScrolled) {
+      if (!showUnreadSeparator) {
+        console.log('📧 Есть непрочитанные и пользователь не скроллил - показываем плашку')
+        setShowUnreadSeparator(true)
+      }
+
+      // Запускаем таймер на автоматическое скрытие через 3 секунды
+      unreadSeparatorTimerRef.current = setTimeout(() => {
+        console.log('📧 Таймер истек, скрываем плашку непрочитанных')
+        setShowUnreadSeparator(false)
+      }, 3000) // 3 секунды
+    } else {
+      if (showUnreadSeparator) {
+        console.log('📧 Нет непрочитанных ИЛИ пользователь скроллил - скрываем плашку')
+        setShowUnreadSeparator(false)
+      }
+    }
+
+    // Очистка таймера при размонтировании компонента
+    return () => {
+      if (unreadSeparatorTimerRef.current) {
+        clearTimeout(unreadSeparatorTimerRef.current)
+        unreadSeparatorTimerRef.current = null
+      }
+    }
+  }, [messages, userId, chat.id, hasUnreadMessages]) // Добавили hasUnreadMessages в зависимости
+
+  // Отдельная логика для сброса флага скролла когда непрочитанные сообщения становятся видимы
+  // Но только через некоторое время после входа в чат, чтобы плашка успела показаться
+  useEffect(() => {
+    if (!hasUserScrolled) return // Если уже не скроллил, ничего не делаем
+
+    const container = messagesContainerRef.current
+    if (!container) return
+
+    // Находим первое непрочитанное сообщение
+    const firstUnreadIndex = messages.findIndex(message =>
+      message.sender_id !== userId && !message.read_at
+    )
+
+    if (firstUnreadIndex === -1) return
+
+    const unreadMessageElement = document.querySelector(`[data-message-id="${messages[firstUnreadIndex].id}"]`) as HTMLElement
+    if (unreadMessageElement) {
+      const messageRect = unreadMessageElement.getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+
+      // Проверяем, находится ли сообщение в видимой области
+      const isVisible = messageRect.top >= containerRect.top && messageRect.bottom <= containerRect.bottom
+
+      if (isVisible) {
+        // Добавляем небольшую задержку перед сбросом флага скролла,
+        // чтобы плашка успела отобразиться для пользователя
+        setTimeout(() => {
+          console.log('📧 Непрочитанные сообщения стали видимы, сбрасываем флаг скролла')
+          setHasUserScrolled(false)
+        }, 1000) // 1 секунда задержки
+      }
+    }
+  }, [lastScrollTop.current]) // Срабатывает при изменении скролла
 
   // Стабильная система сохранения позиции при Load more
   useEffect(() => {
@@ -94,7 +258,7 @@ const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
         previousScrollTop.current = container.scrollTop
         previousScrollHeight.current = container.scrollHeight
         previousMessagesLength.current = messages.length
-        
+
         console.log('💾 Якорь загрузки установлен:', {
           scrollTop: previousScrollTop.current,
           scrollHeight: previousScrollHeight.current,
@@ -112,11 +276,11 @@ const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
           if (messagesContainerRef.current) {
             const container = messagesContainerRef.current
             const heightDifference = container.scrollHeight - previousScrollHeight.current
-            
+
             // Устанавливаем новую позицию с учетом добавленного контента
             const newScrollTop = previousScrollTop.current + heightDifference
             container.scrollTop = newScrollTop
-            
+
             console.log('✅ Позиция стабилизирована:', {
               oldHeight: previousScrollHeight.current,
               newHeight: container.scrollHeight,
@@ -154,7 +318,11 @@ const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
     )
   }
 
-  if (messages.length === 0) {
+  // Показываем плашку "Сообщений пока нет" только если:
+  // 1. Нет сообщений
+  // 2. Не переключаемся между чатами
+  // 3. Не идет загрузка
+  if (messages.length === 0 && !isSwitchingChat && !loading) {
     return (
       <div className="flex-1 overflow-y-auto p-4 chat-pattern-bg">
         <div className="flex items-center justify-center h-full">
@@ -199,15 +367,31 @@ const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
           // Логирование отключено для предотвращения лишних рендеров
           // console.log('📅 MessagesArea rendering:', uniqueMessages.length, 'messages')
 
+          // Находим индекс первого непрочитанного сообщения (не от текущего пользователя, исключая системные сообщения о звонках)
+          let firstUnreadIndex = -1
+          for (let i = 0; i < uniqueMessages.length; i++) {
+            const message = uniqueMessages[i]
+            if (message.sender_id !== userId && !message.read_at && message.type !== 'call') {
+              firstUnreadIndex = i
+              break
+            }
+          }
+
           return uniqueMessages.map((message, index) => {
             const currentMessageDate = getClientLocalDateString(message.created_at)
             const previousMessage = index > 0 ? uniqueMessages[index - 1] : null
             const previousMessageDate = previousMessage ? getClientLocalDateString(previousMessage.created_at) : null
-            
+
             // Показываем плашку даты если:
-            // 1. Это первое сообщение 
+            // 1. Это первое сообщение
             // 2. Дата отличается от предыдущего сообщения
             const shouldShowDateSeparator = index === 0 || currentMessageDate !== previousMessageDate
+
+            // Показываем плашку непрочитанных сообщений если:
+            // 1. Это первое непрочитанное сообщение 
+            // 2. Плашка должна быть показана
+            // 3. Есть непрочитанные сообщения в принципе
+            const shouldShowUnreadSeparator = index === firstUnreadIndex && firstUnreadIndex !== -1 && showUnreadSeparator
 
             // Детальное логирование только для отладки
             if (shouldShowDateSeparator) {
@@ -219,23 +403,45 @@ const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
               })
             }
 
+            if (shouldShowUnreadSeparator) {
+              console.log('📧 Показываем плашку непрочитанных сообщений:', {
+                messageId: message.id.slice(0, 8),
+                index,
+                firstUnreadIndex
+              })
+            }
+
             return (
               <React.Fragment key={`message-wrapper-${message.id}`}>
                 {shouldShowDateSeparator && (
-                  <DateSeparator 
+                  <DateSeparator
                     key={`date-separator-${currentMessageDate}`}
-                    date={message.created_at} 
+                    date={message.created_at}
                   />
                 )}
-                <MessageItem
-                  key={`message-${message.id}`}
-                  message={message}
-                  chat={chat}
-                  userId={userId}
-                  onClick={onMessageClick}
-                  onEdit={onEditMessage}
-                  onDelete={onDeleteMessage}
-                />
+                {shouldShowUnreadSeparator && (
+                  <UnreadSeparator
+                    key={`unread-separator-${message.id}`}
+                  />
+                )}
+                <div key={`message-${message.id}`} data-message-id={message.id}>
+                  {message.type === 'call' ? (
+                    <CallMessage
+                      message={message}
+                      chat={chat}
+                      userId={userId}
+                    />
+                  ) : (
+                    <MessageItem
+                      message={message}
+                      chat={chat}
+                      userId={userId}
+                      onClick={onMessageClick}
+                      onEdit={onEditMessage}
+                      onDelete={onDeleteMessage}
+                    />
+                  )}
+                </div>
               </React.Fragment>
             )
           })

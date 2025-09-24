@@ -12,6 +12,7 @@ import { startKeepAlive, stopKeepAlive } from './keepAlive'
 import { startConnectionMonitoring, stopConnectionMonitoring } from './connectionMonitor'
 import { attemptReconnection, resetReconnectionCounter, cleanupAllPeerResources } from './reconnection'
 import { initializePeer } from './peerInitialization'
+import { useNetworkConnection } from '@/hooks/useNetworkConnection'
 
 const useWebRTC = (): WebRTCHooks => {
   const peerRef = useRef<SimplePeer.Instance | null>(null)
@@ -26,6 +27,9 @@ const useWebRTC = (): WebRTCHooks => {
   const peerInitTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isInitializingRef = useRef<boolean>(false) // Флаг для предотвращения race conditions
   const supabase = createClient()
+
+  // Мониторинг интернет-соединения
+  const { isOnline } = useNetworkConnection()
 
   const peerRefs: PeerRefs = {
     peerRef,
@@ -110,7 +114,34 @@ const useWebRTC = (): WebRTCHooks => {
     console.log('Setting up WebRTC signal listener for user:', userId)
 
     // Обработчик для очистки при закрытии/обновлении страницы
-    const handleBeforeUnload = () => {
+    const handleBeforeUnload = async () => {
+      console.log('🚨 Page unloading - checking for active call')
+
+      // Если есть активный звонок, отправляем сигнал завершения
+      if (isInCall && targetUserId) {
+        console.log('🚨 Active call detected, sending end call signal before unload')
+
+        try {
+          const otherUserChannel = supabase.channel(`calls:${targetUserId}`)
+          await otherUserChannel.subscribe()
+
+          // Синхронная отправка сигнала завершения
+          await otherUserChannel.send({
+            type: 'broadcast',
+            event: 'call_ended',
+            payload: {
+              ended_by: userId,
+              reason: 'page_unload'
+            }
+          })
+
+          console.log('🚨 End call signal sent before page unload')
+        } catch (err) {
+          console.error('🚨 Failed to send end call signal on page unload:', err)
+        }
+      }
+
+      // Очищаем peer соединение
       if (peerRef.current && !peerRef.current.destroyed) {
         try {
           peerRef.current.destroy()

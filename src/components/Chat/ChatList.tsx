@@ -8,6 +8,7 @@ import ChatListItem from './ChatListItem'
 import { RandomFact } from '@/components/ui/random-fact'
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
 import { useChatListRealtime } from '@/hooks/useChatListRealtime' // 🔥 ПРЯМАЯ ПОДПИСКА
+import { Volume2 } from 'lucide-react'
 
 interface Chat {
   id: string
@@ -130,11 +131,11 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
 
       // 🔥 КРИТИЧЕСКАЯ ПРОБЛЕМА: Принудительно обходим кэш Supabase!
       // Добавляем случайный параметр чтобы каждый запрос был уникальным
-      const forceRefresh = Math.random().toString(36).substring(7)
-      const { data, error: chatsError } = await supabase.rpc('get_user_chats', { 
+      const forceRefresh = Math.random().toString(36).substring(7) + '_' + Date.now()
+      const { data, error: chatsError } = await supabase.rpc('get_user_chats', {
         cache_buster: forceRefresh,
-        sync_timestamp: syncTimestamp 
-      })
+        sync_timestamp: syncTimestamp
+      }).abortSignal(AbortSignal.timeout(5000)) // Добавляем таймаут
 
       if (chatsError) {
         console.error(`❌ СИНХРОНИЗАЦИЯ [${instanceId.current}]: Ошибка загрузки чатов:`, chatsError)
@@ -147,7 +148,9 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
         count: data?.length || 0,
         timestamp: syncTimestamp,
         firstChatLastMessage: data?.[0]?.last_message?.slice(0, 20),
-        firstChatId: data?.[0]?.id?.slice(0, 8)
+        firstChatId: data?.[0]?.id?.slice(0, 8),
+        firstChatUnreadCount: data?.[0]?.unread_count,
+        chatsWithUnread: data?.filter((c: any) => c.unread_count > 0).length || 0
       })
 
       // Сортируем чаты по времени последнего сообщения
@@ -480,7 +483,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
               className="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
               title="Проверить звуковые уведомления"
             >
-              🔊
+              <Volume2 className="w-4 h-4" />
             </button>
           </div>
           <button

@@ -55,10 +55,10 @@ class ResilientChannelManager {
     const {
       channelName,
       setup,
-      maxReconnectAttempts = 3,  // Уменьшили количество попыток
-      reconnectDelay = 5000,     // Увеличили задержку между попытками
-      keepAliveInterval = 60000, // Увеличили интервал keep-alive до 1 минуты
-      healthCheckInterval = 120000 // Проверка здоровья каждые 2 минуты
+      maxReconnectAttempts = 5,  // Больше попыток для важных каналов
+      reconnectDelay = 3000,     // Умеренная задержка между попытками
+      keepAliveInterval = 45000, // Keep-alive каждые 45 секунд (оптимально для чатов)
+      healthCheckInterval = 90000 // Проверка здоровья каждые 1.5 минуты
     } = config
 
     console.log(`🏗️ [ResilientChannel] Creating resilient channel: ${channelName}`)
@@ -317,9 +317,12 @@ class ResilientChannelManager {
         channelState: channelState.channel?.state
       })
 
-      // Проверяем критические условия (с защитой от дублирования)
-      if (timeSinceLastActivity > 600000) { // Увеличили до 10 минут без активности
-        console.warn(`⚠️ [ResilientChannel] No activity for 10+ minutes in ${channelName}, reconnecting`)
+      // Проверяем критические условия для чатов - увеличиваем таймаут
+      const isMessageChannel = channelName.includes('chat_messages_')
+      const maxInactivityTime = isMessageChannel ? 900000 : 600000 // 15 минут для чатов, 10 для остальных
+      
+      if (timeSinceLastActivity > maxInactivityTime) {
+        console.warn(`⚠️ [ResilientChannel] No activity for ${Math.round(maxInactivityTime/60000)}+ minutes in ${channelName}, reconnecting`)
         channelState.isHealthy = false
         if (!channelState.isReconnecting) {
           this.attemptReconnection(channelState)
@@ -349,12 +352,12 @@ class ResilientChannelManager {
       
       console.log(`🌍 [ResilientChannel] Global health check:`, stats)
 
-      // Более консервативная проверка для массового переподключения
-      if (stats.unhealthyChannels > 2 && stats.unhealthyChannels > stats.totalChannels * 0.7 && stats.totalChannels > 0) {
+      // Очень консервативная проверка для массового переподключения (только в критических случаях)
+      if (stats.unhealthyChannels > 3 && stats.unhealthyChannels > stats.totalChannels * 0.8 && stats.totalChannels > 2) {
         console.warn(`🚨 [ResilientChannel] Too many unhealthy channels (${stats.unhealthyChannels}/${stats.totalChannels}), triggering mass reconnection`)
         this.massReconnection()
       }
-    }, 300000) // Увеличили до 5 минут
+    }, 600000) // Увеличили до 10 минут для меньшей нагрузки
   }
 
   // Настройка глобальной обработки ошибок

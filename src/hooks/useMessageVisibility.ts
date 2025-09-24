@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useInView } from 'react-intersection-observer'
 import useSupabaseStore from '@/store/useSupabaseStore'
+import useChatSyncStore from '@/store/useChatSyncStore'
 
 interface UseMessageVisibilityProps {
   threshold?: number
@@ -63,6 +64,7 @@ export const useMessageReadTracking = ({
   chatId
 }: UseMessageReadTrackingProps) => {
   const { supabase } = useSupabaseStore()
+  const { refreshChatList } = useChatSyncStore()
   const hasMarkedAsRead = useRef(false)
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -90,6 +92,10 @@ export const useMessageReadTracking = ({
         } else {
           console.log('✅ Чат помечен как прочитанный, обновлено сообщений:', updatedCount)
           hasMarkedAsRead.current = true
+
+          // 🔥 ОБНОВЛЕНИЕ: Отправляем сигнал обновления для ChatList после прочтения сообщений
+          console.log('📖 Отправляем сигнал обновления ChatList после прочтения сообщений')
+          refreshChatList()
         }
       } catch (error) {
         console.warn('Ошибка при пометке сообщения как прочитанного:', error)
@@ -134,6 +140,7 @@ export const useChatReadTracking = ({
   messageIds
 }: UseChatReadTrackingProps) => {
   const { supabase } = useSupabaseStore()
+  const { refreshChatList } = useChatSyncStore()
   const hasMarkedChatAsRead = useRef(false)
   const visibleMessagesRef = useRef<Set<string>>(new Set())
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -160,6 +167,10 @@ export const useChatReadTracking = ({
         } else {
           console.log('✅ Chat marked as read, updated messages:', updatedCount)
           hasMarkedChatAsRead.current = true
+
+          // 🔥 ОБНОВЛЕНИЕ: Отправляем сигнал обновления для ChatList после прочтения чата
+          console.log('📖 Отправляем сигнал обновления ChatList после прочтения чата')
+          refreshChatList()
         }
       } catch (error) {
         console.warn('Ошибка при пометке чата как прочитанного:', error)

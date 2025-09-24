@@ -4,7 +4,12 @@ import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
 import useScreenShare from '@/hooks/useScreenShare'
 
-const CallControls = () => {
+interface CallControlsProps {
+  isStreamHidden: boolean
+  onToggleStreamVisibility: () => void
+}
+
+const CallControls = ({ isStreamHidden, onToggleStreamVisibility }: CallControlsProps) => {
   const {
     isMicMuted,
     isInCall,
@@ -12,7 +17,8 @@ const CallControls = () => {
     userId,
     toggleMic,
     endCall,
-    remoteScreenStream
+    remoteScreenStream,
+    screenStream
   } = useCallStore()
 
   const { isScreenSharing, toggleScreenShare } = useScreenShare()
@@ -44,6 +50,16 @@ const CallControls = () => {
   }
 
   if (!isInCall) return null
+
+  const hasActiveScreenStream = screenStream?.getVideoTracks()?.some(track =>
+    track.readyState === 'live' && track.enabled
+  ) || false
+
+  const hasActiveRemoteScreenStream = remoteScreenStream?.getVideoTracks()?.some(track =>
+    track.readyState === 'live' && track.enabled
+  ) || false
+
+  const hasAnyScreenStream = hasActiveScreenStream || hasActiveRemoteScreenStream
 
   return (
     <div className="flex justify-center items-center space-x-6">
@@ -102,6 +118,25 @@ const CallControls = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
       </button>
+
+      {/* Toggle Stream Visibility Button */}
+      {hasAnyScreenStream && (
+        <button
+          onClick={onToggleStreamVisibility}
+          className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors duration-200 cursor-pointer ${
+            isStreamHidden
+              ? 'bg-blue-500 hover:bg-blue-600 hover:ring-2 hover:ring-blue-400/50'
+              : 'bg-gray-600 hover:bg-gray-700 hover:ring-2 hover:ring-gray-400/50 dark:bg-gray-700 dark:hover:bg-gray-500 dark:hover:ring-gray-300'
+          }`}
+          title={isStreamHidden ? "Показать стрим" : "Скрыть стрим"}
+        >
+          {isStreamHidden ? (
+            <i className="fas fa-eye text-white text-lg"></i>
+          ) : (
+            <i className="fas fa-eye-slash text-white text-lg"></i>
+          )}
+        </button>
+      )}
     </div>
   )
 }

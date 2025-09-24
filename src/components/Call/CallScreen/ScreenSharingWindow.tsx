@@ -4,13 +4,16 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import useCallStore from '@/store/useCallStore'
 import useThemeStore from '@/store/useThemeStore'
 import CallControls from '../CallControls'
+import { Eye, RotateCcw, Maximize } from 'lucide-react'
 
 interface ScreenSharingWindowProps {
   isScreenFullscreen: boolean
   screenWindowPosition: { x: number; y: number }
   screenWindowSize: { width: number; height: number }
-  onMouseDown: (e: React.MouseEvent, type: 'drag' | 'resize') => void
+  isStreamHidden: boolean
+  onMouseDown: (e: React.MouseEvent | React.TouchEvent, type: 'drag' | 'resize') => void
   onToggleFullscreen: () => void
+  onToggleStreamVisibility: () => void
   onStopVideo: () => void
   onResetPosition: () => void
 }
@@ -19,8 +22,10 @@ const ScreenSharingWindow = ({
   isScreenFullscreen,
   screenWindowPosition,
   screenWindowSize,
+  isStreamHidden,
   onMouseDown,
   onToggleFullscreen,
+  onToggleStreamVisibility,
   onStopVideo,
   onResetPosition
 }: ScreenSharingWindowProps) => {
@@ -60,7 +65,9 @@ const ScreenSharingWindow = ({
 
     // Выбираем stream: remote имеет приоритет
     const streamToShow = remoteScreenStream || screenStream
-    
+
+    // Всегда устанавливаем stream, даже если он уже установлен
+    // Это нужно для случаев, когда пользователь скрывал/показывал стрим
     if (streamToShow) {
       console.log('📺 Setting stream to video element:', streamToShow.id)
       videoElement.srcObject = streamToShow
@@ -69,7 +76,7 @@ const ScreenSharingWindow = ({
       console.log('📺 No stream - clearing video')
       videoElement.srcObject = null
     }
-  }, [screenStream, remoteScreenStream])
+  }, [screenStream, remoteScreenStream, isStreamHidden])
 
 
 
@@ -94,10 +101,19 @@ const ScreenSharingWindow = ({
     remoteScreenStreamTracks: remoteScreenStream?.getVideoTracks()?.length || 0,
     isCallActive,
     isReceivingCall,
-    isInCall
+    isInCall,
+    isStreamHidden
   })
 
-  if (!shouldShow) return null
+  // Если нет стрима вообще, ничего не показываем
+  if (!shouldShow) {
+    return null
+  }
+
+  // Если стрим скрыт, вообще не показываем окно
+  if (isStreamHidden) {
+    return null
+  }
 
   return (
     <div
@@ -112,18 +128,18 @@ const ScreenSharingWindow = ({
       {/* Control buttons */}
       {!isScreenFullscreen && (
         <div className="absolute top-2 right-2 flex space-x-1 z-50">
-          {(screenStream || remoteScreenStream) && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onStopVideo()
-              }}
-              className={`w-6 h-6 ${buttonStyles.background} ${buttonStyles.text} rounded flex items-center justify-center text-xs transition-colors`}
-              title="Остановить просмотр"
-            >
-              ⏸️
-            </button>
-          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleStreamVisibility()
+            }}
+            className={`w-6 h-6 ${buttonStyles.background} ${buttonStyles.text} rounded flex items-center justify-center text-xs transition-colors ${
+              isStreamHidden ? 'bg-red-500 hover:bg-red-600' : ''
+            }`}
+            title={isStreamHidden ? "Показать стрим" : "Скрыть стрим"}
+          >
+            <Eye className="w-4 h-4" />
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -132,7 +148,7 @@ const ScreenSharingWindow = ({
             className={`w-6 h-6 ${buttonStyles.background} ${buttonStyles.text} rounded flex items-center justify-center text-xs transition-colors`}
             title="На весь экран"
           >
-            ⛶
+            <Maximize className="w-4 h-4" />
           </button>
           <button
             onClick={(e) => {
@@ -140,9 +156,9 @@ const ScreenSharingWindow = ({
               onResetPosition()
             }}
             className={`w-6 h-6 ${buttonStyles.background} ${buttonStyles.text} rounded flex items-center justify-center text-xs transition-colors`}
-            title="Сбросить позицию"
+            title="Переподключить стрим"
           >
-            ↻
+            <RotateCcw className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -150,7 +166,10 @@ const ScreenSharingWindow = ({
       {isScreenFullscreen && (
         <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center space-x-6 z-50">
           {/* Оригинальные кнопки управления звонком */}
-          <CallControls />
+          <CallControls
+            isStreamHidden={isStreamHidden}
+            onToggleStreamVisibility={onToggleStreamVisibility}
+          />
 
           {/* Выйти из полноэкранного режима */}
           <button
@@ -168,23 +187,6 @@ const ScreenSharingWindow = ({
             🪟 Окно
           </button>
 
-          {/* Остановить демонстрацию экрана */}
-          {(screenStream || remoteScreenStream) && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onStopVideo()
-              }}
-              className={`px-6 py-3 rounded-lg flex items-center justify-center text-sm font-medium transition-colors shadow-lg ${
-                theme === 'dark'
-                  ? 'bg-slate-600 hover:bg-slate-700 text-slate-200'
-                  : 'bg-gray-500 bg-opacity-90 hover:bg-gray-600 text-white'
-              }`}
-              title="Остановить демонстрацию экрана"
-            >
-              ⏸️ Стоп
-            </button>
-          )}
         </div>
       )}
 
@@ -197,6 +199,7 @@ const ScreenSharingWindow = ({
               : 'bg-black/30 hover:bg-black/50'
           }`}
           onMouseDown={(e) => onMouseDown(e, 'drag')}
+          onTouchStart={(e) => onMouseDown(e, 'drag')}
           title="Переместить окно (зажмите и тяните)"
         />
       )}

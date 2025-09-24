@@ -21,10 +21,13 @@ const cleanupChannels = () => {
     // Не удаляем критически важные каналы:
     // - глобальные каналы сообщений и статусов пользователей
     // - каналы входящих звонков (calls:)
+    // - устойчивые каналы ResilientChannelManager (chat_messages_, webrtc:)
     // Они должны жить на протяжении сессии
     if (!channel.topic.includes('global_messages_') &&
         !channel.topic.includes('user_profiles_changes') &&
         !channel.topic.includes('chat_user_status_') &&
+        !channel.topic.includes('chat_messages_') &&
+        !channel.topic.includes('webrtc:') &&
         !channel.topic.includes('calls:')) {
       console.log('🗑️ Очищаем канал:', channel.topic)
       supabaseInstance.removeChannel(channel)
