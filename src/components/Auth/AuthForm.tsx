@@ -9,6 +9,7 @@ import RegisterForm from './RegisterForm'
 import { ThemeToggler } from '@/components/ui/theme-toggler'
 import { getAssetPath } from '@/lib/utils'
 import OptimizedImage from '@/components/ui/OptimizedImage'
+import { translateAuthError, getDisplayErrorMessage } from '@/utils/authErrorTranslations'
 
 const AuthForm = () => {
   const [isLogin, setIsLogin] = useState(true)
@@ -27,7 +28,8 @@ const AuthForm = () => {
       })
 
       if (error) {
-        setError('Ошибка входа: ' + error.message)
+        const translatedError = getDisplayErrorMessage(error)
+        setError('Ошибка входа: ' + translatedError)
         return
       }
 
@@ -37,7 +39,8 @@ const AuthForm = () => {
         setAuthenticated(true)
       }
     } catch (err) {
-      setError('Произошла ошибка при входе')
+      const translatedError = getDisplayErrorMessage(err as any)
+      setError('Произошла ошибка при входе: ' + translatedError)
     } finally {
       setIsLoading(false)
     }
@@ -59,7 +62,8 @@ const AuthForm = () => {
       })
 
       if (error) {
-        setError('Ошибка регистрации: ' + error.message)
+        const translatedError = getDisplayErrorMessage(error)
+        setError('Ошибка регистрации: ' + translatedError)
         return
       }
 
@@ -70,7 +74,8 @@ const AuthForm = () => {
         setError('Регистрация успешна! Проверьте email для подтверждения.')
       }
     } catch (err) {
-      setError('Произошла ошибка при регистрации')
+      const translatedError = getDisplayErrorMessage(err as any)
+      setError('Произошла ошибка при регистрации: ' + translatedError)
     } finally {
       setIsLoading(false)
     }

@@ -30,6 +30,7 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
   })
 
   const callMessageIdRef = useRef<string | null>(null)
+  const callInProgressRef = useRef<boolean>(false)
 
   // Определяем ID чата для звонка
   const getCallChatId = () => {
@@ -71,7 +72,19 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
   // Обновление статуса сообщения о звонке
   const updateCallMessage = async (callChatId: string, callerId: string, newStatus: string, duration: number = 0) => {
     try {
-      console.log('📞 Обновление сообщения о звонке:', { callChatId, callerId, newStatus, duration, messageId: callMessageIdRef.current })
+      console.log('📞 Обновление сообщения о звонке:', {
+        callChatId,
+        callerId,
+        newStatus,
+        duration,
+        messageId: callMessageIdRef.current,
+        callInProgress: callInProgressRef.current
+      })
+
+      if (!callMessageIdRef.current) {
+        console.error('❌ Нет ID сообщения для обновления!')
+        return
+      }
 
       const { data, error } = await supabase.rpc('update_call_message', {
         chat_uuid: callChatId,
@@ -82,12 +95,18 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
       })
 
       if (error) {
-        console.error('Ошибка при обновлении сообщения о звонке:', error)
+        console.error('❌ Ошибка при обновлении сообщения о звонке:', error)
+        console.error('❌ Детали ошибки:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
       } else {
         console.log('✅ Обновлено сообщение о звонке:', data)
       }
     } catch (error) {
-      console.error('Ошибка при обновлении сообщения о звонке:', error)
+      console.error('❌ Исключение при обновлении сообщения о звонке:', error)
     }
   }
 
@@ -107,44 +126,74 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
 
     if (!callChatId || !userId) return
 
-    // Определяем ID звонящего
-    const currentCallerId = callerId || targetUserId || userId
+    // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Определяем кто должен создавать/обновлять сообщения
+    // Сообщения создает только тот, кто начал звонок (имеет targetUserId)
+    // Получатель звонка (имеет callerId) НЕ создает сообщения, только инициатор
+    const isCallInitiator = isCalling && targetUserId && !callerId
+    const isCallReceiver = isReceivingCall && callerId && !targetUserId
 
-      // Логика создания/обновления сообщений о звонке
-    // Проверяем только изменения состояния, игнорируя начальную инициализацию
+    console.log('🔍 Call state debug:', {
+      userId,
+      callerId,
+      targetUserId,
+      isCalling,
+      isReceivingCall,
+      isCallActive,
+      isInCall,
+      callInProgress: callInProgressRef.current,
+      hasMessageId: !!callMessageIdRef.current,
+      isCallInitiator,
+      isCallReceiver,
+      logic: isCallInitiator ? 'Я ИНИЦИАТОР - буду создавать сообщения' : 
+             isCallReceiver ? 'Я ПОЛУЧАТЕЛЬ - НЕ буду создавать сообщения' : 
+             'НЕТ АКТИВНОЙ РОЛИ'
+    })
 
-    // 1. Начало звонка (кто-то начал звонить) - только если это новое событие
-    if ((isCalling || isReceivingCall) && !prevState.isCalling && !prevState.isReceivingCall) {
-      console.log('📞 Начало звонка - создаем сообщение')
-      createCallStartedMessage(callChatId, currentCallerId)
+    // ТОЛЬКО ИНИЦИАТОР создает и управляет сообщениями о звонке
+    if (!isCallInitiator) {
+      console.log('📞 Я НЕ инициатор звонка - не создаю сообщения')
+      lastCallStateRef.current = currentState
+      return
     }
 
-    // 2. Звонок принят и идет - только если был started и стал active
-    else if (isCallActive && !prevState.isCallActive && (prevState.isCalling || prevState.isReceivingCall)) {
+    // Логика создания/обновления сообщений о звонке - ТОЛЬКО ДЛЯ ИНИЦИАТОРА
+
+    // 1. Начало звонка - только ИНИЦИАТОР создает сообщение
+    if (isCalling && !prevState.isCalling && !callInProgressRef.current) {
+      console.log('📞 Я ИНИЦИАТОР - создаю сообщение о начале звонка')
+      callInProgressRef.current = true
+      createCallStartedMessage(callChatId, userId) // Передаем userId как caller_id
+    }
+
+    // 2. Звонок принят и идет - обновляем только если у нас есть созданное сообщение
+    else if (isCallActive && !prevState.isCallActive && callMessageIdRef.current && callInProgressRef.current) {
       console.log('📞 Звонок принят - обновляем статус на active')
-      updateCallMessage(callChatId, currentCallerId, 'active')
+      updateCallMessage(callChatId, userId, 'active')
     }
 
-    // 3. Звонок завершен - только если был активным и завершился
-    else if (!isInCall && prevState.isInCall && prevState.isCallActive) {
+    // 3. Звонок завершен - обновляем только если у нас есть созданное сообщение
+    else if (!isInCall && prevState.isInCall && callMessageIdRef.current && callInProgressRef.current) {
       console.log('📞 Звонок завершен - обновляем статус на ended')
       const duration = Math.floor(callDurationSeconds)
-      updateCallMessage(callChatId, currentCallerId, 'ended', duration)
+      updateCallMessage(callChatId, userId, 'ended', duration)
       callMessageIdRef.current = null // Сбрасываем ID сообщения
+      callInProgressRef.current = false // Сбрасываем флаг звонка
     }
 
-    // 4. Звонок отклонен - только если был входящий звонок и не стал активным
-    else if (!isReceivingCall && prevState.isReceivingCall && !prevState.isCallActive && !isCallActive) {
+    // 4. Звонок отклонен получателем - обновляем только если у нас есть созданное сообщение (только инициатор)
+    else if (!isCalling && prevState.isCalling && !prevState.isCallActive && !isCallActive && callMessageIdRef.current && callInProgressRef.current) {
       console.log('📞 Звонок отклонен - обновляем статус на rejected')
-      updateCallMessage(callChatId, currentCallerId, 'rejected')
+      updateCallMessage(callChatId, userId, 'rejected')
       callMessageIdRef.current = null
+      callInProgressRef.current = false
     }
 
-    // 5. Отмена исходящего звонка - только если был исходящий звонок и не стал активным
-    else if (!isCalling && prevState.isCalling && !prevState.isCallActive && !isCallActive && !isReceivingCall) {
+    // 5. Отмена исходящего звонка - обновляем только если у нас есть созданное сообщение (только инициатор)
+    else if (!isCalling && prevState.isCalling && !prevState.isCallActive && !isCallActive && callMessageIdRef.current && callInProgressRef.current) {
       console.log('📞 Отмена исходящего звонка - обновляем статус на missed')
-      updateCallMessage(callChatId, currentCallerId, 'missed')
+      updateCallMessage(callChatId, userId, 'missed')
       callMessageIdRef.current = null
+      callInProgressRef.current = false
     }
 
     // Сохраняем текущее состояние
@@ -161,6 +210,15 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
     targetUserId,
     callerId
   ])
+
+  // Сброс состояния при размонтировании
+  useEffect(() => {
+    return () => {
+      callMessageIdRef.current = null
+      callInProgressRef.current = false
+      console.log('🧹 useCallMessages cleanup: сброс состояния')
+    }
+  }, [])
 
   return {
     callMessageId: callMessageIdRef.current

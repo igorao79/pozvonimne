@@ -31,8 +31,10 @@ const nextConfig: NextConfig = {
     // Performance optimizations
     webVitalsAttribution: ['CLS', 'LCP'],
     // Enable modern features
-    serverComponentsExternalPackages: ['simple-peer'],
   },
+
+  // Moved from experimental
+  serverExternalPackages: ['simple-peer'],
 
   // Webpack optimizations
   webpack: (config, { dev, isServer }) => {

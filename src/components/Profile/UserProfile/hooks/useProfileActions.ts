@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/client'
 import useCallStore from '@/store/useCallStore'
+import { getDisplayErrorMessage } from '@/utils/authErrorTranslations'
 
 export const useProfileActions = (
   newDisplayName: string,
@@ -52,7 +53,8 @@ export const useProfileActions = (
       if (err.message && err.message.includes('already exists')) {
         setError('Это имя уже занято. Выберите другое.')
       } else {
-        setError(err.message || 'Не удалось обновить имя')
+        const translatedError = getDisplayErrorMessage(err)
+        setError(translatedError || 'Не удалось обновить имя')
       }
     } finally {
       setLoading(false)
@@ -74,7 +76,8 @@ export const useProfileActions = (
 
       setSuccess('Письмо для сброса пароля отправлено на вашу почту!')
     } catch (err: any) {
-      setError(err.message)
+      const translatedError = getDisplayErrorMessage(err)
+      setError(translatedError || 'Не удалось отправить письмо для сброса пароля')
     } finally {
       setLoading(false)
     }

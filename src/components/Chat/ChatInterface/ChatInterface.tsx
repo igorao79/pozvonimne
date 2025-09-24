@@ -14,6 +14,7 @@ import { Chat, ChatInterfaceProps } from './types'
 import { useTypingUsers } from '@/hooks/useTypingSelectors'
 import { useChatMessages } from '@/hooks/useChatMessages'
 import { useChatRealtime } from '@/hooks/useChatRealtime'
+import { useSimpleChatRealtime } from '@/hooks/useSimpleChatRealtime'
 import { useChatScroll } from '@/hooks/useChatScroll'
 import { useChatFocus } from '@/hooks/useChatFocus'
 import { useChatActions } from './ChatActions'
@@ -105,13 +106,22 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
   // Хук для создания сообщений о звонках
   useCallMessages({ chatId: chat.id, userId })
 
-  // Настраиваем realtime подписки
+  // Настраиваем realtime подписки (используем простую версию для отладки)
+  useSimpleChatRealtime({
+    chatId: chat.id,
+    userId,
+    onNewMessage: handleNewMessage
+  })
+
+  // Сложная версия с ResilientChannelManager (временно отключена для отладки)
+  /*
   useChatRealtime({
     chatId: chat.id,
     userId,
     otherParticipantId: chat.other_participant_id,
     onNewMessage: handleNewMessage
   })
+  */
 
   // ОТКЛЮЧЕНО: Автоматическая пометка чата как прочитанного при открытии
   // Это мешает показу плашки "Непрочитанные сообщения"
