@@ -132,18 +132,7 @@ const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
     }
   }, [loadingMore, messages.length, hasInitialScrolled])
 
-  if (loading) {
-    return (
-      <div className="flex-1 overflow-y-auto p-4 chat-pattern-bg">
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto mb-2"></div>
-            <p className="text-sm text-muted-foreground">Загрузка сообщений...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
+
 
   if (error) {
     return (

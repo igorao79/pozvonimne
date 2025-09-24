@@ -48,6 +48,21 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
   // Initialize WebRTC
   useWebRTC()
 
+  // Определение мобильного устройства
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Определяем мобильное устройство при монтировании
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768) // md breakpoint
+    }
+
+    checkIsMobile()
+    window.addEventListener('resize', checkIsMobile)
+
+    return () => window.removeEventListener('resize', checkIsMobile)
+  }, [])
+
   const supabase = createClient()
 
   // Состояние переподключения теперь обрабатывается глобально
@@ -255,7 +270,7 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
         />
 
         {/* Модальные окна звонков на мобильных */}
-        {isReceivingCall && (
+        {isReceivingCall && isMobile && (
           <div className="absolute inset-0 z-50 bg-background">
             <IncomingCall />
           </div>
@@ -315,9 +330,9 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
         </div>
       </div>
 
-      {/* Полноэкранное модальное окно входящего звонка (только для десктопа) */}
-      {isReceivingCall && (
-        <div className="hidden md:block fixed inset-0 z-50 bg-background">
+        {/* Полноэкранное модальное окно входящего звонка (только для десктопа) */}
+      {isReceivingCall && !isMobile && (
+        <div className="fixed inset-0 z-50 bg-background">
           <IncomingCall />
         </div>
       )}

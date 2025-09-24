@@ -15,7 +15,6 @@ import { useGlobalCallManager } from '@/hooks/useGlobalCallManager'
 import useCallStateSynchronizer from '@/hooks/useCallStateSynchronizer'
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
 import { User } from 'lucide-react'
-import { useNotificationDebugger } from '@/hooks/useNotificationDebugger' // 🔥 ДОБАВЛЯЕМ DEBUG
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
@@ -262,25 +261,6 @@ export default function Home() {
         <UserProfile onClose={() => setShowProfile(false)} />
       )}
 
-      {/* 🔥 КРИТИЧЕСКИЙ DEBUG PANEL для мониторинга производительности */}
-      {process.env.NODE_ENV === 'development' && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: '10px',
-            right: '10px',
-            background: 'rgba(0,0,0,0.8)',
-            color: 'white',
-            padding: '8px',
-            borderRadius: '4px',
-            fontSize: '10px',
-            fontFamily: 'monospace',
-            zIndex: 9999
-          }}
-        >
-          🔥 NOTIFICATION DEBUG: {Math.round((Date.now() - debugStartTime) / 1000)}s
-        </div>
-      )}
       
     </div>
   )

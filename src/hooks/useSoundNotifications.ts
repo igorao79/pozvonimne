@@ -266,6 +266,9 @@ export const useSoundNotifications = () => {
 
   // Функция для воспроизведения звука
   const playNotificationSound = useCallback(async () => {
+    const callStack = new Error().stack?.split('\n').slice(1, 4).map(line => line.trim()).join(' -> ')
+    console.log('🔊🔥 ЗВУК: playNotificationSound вызван! Стек вызовов:', callStack)
+    
     const { audioElement } = state
     
     if (!audioElement) {
@@ -332,6 +335,13 @@ export const useSoundNotifications = () => {
     senderId: string
     content: string
   }) => {
+    const callStack = new Error().stack?.split('\n').slice(1, 4).map(line => line.trim()).join(' -> ')
+    console.log('🔊🔥 УВЕДОМЛЕНИЕ: maybePlayNotification вызван!', {
+      chatId: messageData.chatId?.slice(0, 8),
+      senderId: messageData.senderId?.slice(0, 8),
+      content: messageData.content?.slice(0, 20),
+      stack: callStack
+    })
     const now = Date.now()
     const { isTabVisible, lastNotificationTime, currentChatId, userHasInteracted } = state
     

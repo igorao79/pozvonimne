@@ -9,7 +9,25 @@ interface RingtoneState {
   userHasInteracted: boolean
 }
 
+// Глобальный счетчик экземпляров для диагностики
+let ringtoneInstanceCounter = 0
+
+// Глобальный флаг активного рингтона - предотвращает одновременное воспроизведение
+let globalRingtoneActive = false
+
+// Время последнего принудительного останова рингтона
+let lastForcedStopTime = 0
+
 export const useRingtone = () => {
+  const instanceId = useRef(++ringtoneInstanceCounter)
+
+  // Диагностика создания экземпляра
+  useEffect(() => {
+    console.log(`🔔 СОЗДАН ЭКЗЕМПЛЯР РИНГТОНА [${instanceId.current}]`)
+    return () => {
+      console.log(`🗑️ УДАЛЕН ЭКЗЕМПЛЯР РИНГТОНА [${instanceId.current}]`)
+    }
+  }, [])
   const { supabase } = useSupabaseStore()
   const { isReceivingCall } = useCallStore()
 
@@ -226,6 +244,12 @@ export const useRingtone = () => {
     }
   }, [])
 
+  // Защита от двойного воспроизведения
+  const playInProgressRef = useRef(false)
+
+  // Ref для отслеживания последнего состояния звонка
+  const lastReceivingCallRef = useRef(isReceivingCall)
+
   // Основная логика управления рингтоном
   useEffect(() => {
     const { audioElement } = state
@@ -234,8 +258,34 @@ export const useRingtone = () => {
       return
     }
 
-    if (isReceivingCall && !state.isPlaying) {
-      console.log('🔔 Начинаем воспроизведение рингтона - входящий звонок')
+    // Отмечаем изменение состояния звонка для следующего вызова
+    lastReceivingCallRef.current = isReceivingCall
+
+    // Проверяем, не был ли рингтон остановлен принудительно недавно (за последние 2 секунды)
+    const timeSinceLastStop = Date.now() - lastForcedStopTime
+    const recentlyStopped = timeSinceLastStop < 2000
+
+    if (isReceivingCall && !state.isPlaying && !globalRingtoneActive && !recentlyStopped) {
+      const callStack = new Error().stack?.split('\n').slice(1, 5).map(line => line.trim()).join(' -> ')
+      console.log(`🔔🔥 ЭКЗЕМПЛЯР [${instanceId.current}]: Начинаем воспроизведение рингтона - входящий звонок`, {
+        timestamp: new Date().toLocaleTimeString(),
+        instanceId: instanceId.current,
+        isReceivingCall,
+        isPlaying: state.isPlaying,
+        playInProgress: playInProgressRef.current,
+        globalRingtoneActive,
+        recentlyStopped,
+        timeSinceLastStop,
+        soundUrl: state.soundUrl,
+        callStack
+      })
+
+      // Сбрасываем флаги перед новым запуском
+      playInProgressRef.current = false
+      globalRingtoneActive = true
+
+      // Устанавливаем флаг что воспроизведение в процессе
+      playInProgressRef.current = true
 
       // Очищаем предыдущий таймаут, если он существует
       if (ringtoneTimeoutRef.current) {
@@ -245,9 +295,10 @@ export const useRingtone = () => {
 
       // Всегда пытаемся воспроизвести рингтон, независимо от "взаимодействия"
       // Если браузер заблокирует, используем fallback через Web Audio API
+      console.log(`🔔 ЭКЗЕМПЛЯР [${instanceId.current}]: Запуск HTML5 Audio воспроизведения`)
       audioElement.play().then(() => {
         setState(prev => ({ ...prev, isPlaying: true }))
-        console.log('🔔 Рингтон воспроизводится успешно')
+        console.log(`🔔 ЭКЗЕМПЛЯР [${instanceId.current}]: HTML5 Audio воспроизводится успешно`)
       }).catch((error) => {
         console.warn('🔔 HTML5 Audio заблокирован браузером, используем Web Audio API fallback:', error)
 
@@ -263,6 +314,7 @@ export const useRingtone = () => {
           }
 
           const playRingtoneBeep = () => {
+            console.log(`🔔 ЭКЗЕМПЛЯР [${instanceId.current}]: Web Audio API сигнал в ${new Date().toLocaleTimeString()}`)
             // Проверяем актуальное состояние через ref, чтобы избежать stale closures
             if (!isReceivingCallRef.current) return // Прекращаем если звонок уже завершен
 
@@ -290,7 +342,7 @@ export const useRingtone = () => {
 
           setState(prev => ({ ...prev, isPlaying: true }))
           playRingtoneBeep()
-          console.log('🔔 Fallback рингтон через Web Audio API запущен')
+          console.log(`🔔 ЭКЗЕМПЛЯР [${instanceId.current}]: Web Audio API fallback запущен`)
 
         } catch (fallbackError) {
           console.error('❌ Fallback рингтон тоже не работает:', fallbackError)
@@ -309,16 +361,20 @@ export const useRingtone = () => {
       audioElement.pause()
       audioElement.currentTime = 0
       setState(prev => ({ ...prev, isPlaying: false }))
-      console.log('🔔 Рингтон остановлен')
+      playInProgressRef.current = false // Сбрасываем флаг
+      globalRingtoneActive = false // Сбрасываем глобальный флаг
+      console.log(`🔔 ЭКЗЕМПЛЯР [${instanceId.current}]: Рингтон остановлен`)
     }
-  }, [isReceivingCall, state.audioElement, state.isPlaying])
+  }, [isReceivingCall, state.audioElement, state.isPlaying, state.soundUrl])
 
 
   // Функция для принудительной остановки рингтона
   const stopRingtone = useCallback(() => {
     const { audioElement } = state
     if (audioElement && state.isPlaying) {
-      console.log('🔔 Принудительная остановка рингтона')
+      console.log(`🔔 ЭКЗЕМПЛЯР [${instanceId.current}]: Принудительная остановка рингтона`)
+      // Запоминаем время принудительной остановки
+      lastForcedStopTime = Date.now()
 
       // Очищаем таймаут повторения сигнала
       if (ringtoneTimeoutRef.current) {
@@ -329,6 +385,8 @@ export const useRingtone = () => {
       audioElement.pause()
       audioElement.currentTime = 0
       setState(prev => ({ ...prev, isPlaying: false }))
+      playInProgressRef.current = false // Сбрасываем флаг
+      globalRingtoneActive = false // Сбрасываем глобальный флаг
     }
   }, [state.audioElement, state.isPlaying])
 
@@ -348,6 +406,10 @@ export const useRingtone = () => {
         audioElement.pause()
         audioElement.src = ''
       }
+
+      // Сбрасываем флаг воспроизведения
+      playInProgressRef.current = false
+      globalRingtoneActive = false // Сбрасываем глобальный флаг
     }
   }, [state.audioElement])
 

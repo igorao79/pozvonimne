@@ -97,10 +97,16 @@ const useChatSyncStore = create<ChatSyncState>()(
     },
 
     registerSoundNotificationCallback: (callback: (messageData: any) => void) => {
+      const callStack = new Error().stack?.split('\n').slice(1, 4).map(line => line.trim()).join(' -> ')
       const { soundNotificationCallbacks } = get()
       const newCallbacks = new Set(soundNotificationCallbacks)
       newCallbacks.add(callback)
       set({ soundNotificationCallbacks: newCallbacks })
+      
+      console.log('🔊🔥 РЕГИСТРАЦИЯ: Зарегистрирован callback для звуковых уведомлений.', {
+        totalCallbacks: newCallbacks.size,
+        stack: callStack
+      })
       
       // Возвращаем функцию для отписки
       return () => {
@@ -108,6 +114,7 @@ const useChatSyncStore = create<ChatSyncState>()(
         const updatedCallbacks = new Set(currentCallbacks)
         updatedCallbacks.delete(callback)
         set({ soundNotificationCallbacks: updatedCallbacks })
+        console.log('🔇 Отписан callback звуковых уведомлений. Осталось:', updatedCallbacks.size)
       }
     },
 
