@@ -8,6 +8,7 @@ import LoginForm from './LoginForm'
 import RegisterForm from './RegisterForm'
 import { ThemeToggler } from '@/components/ui/theme-toggler'
 import { getAssetPath } from '@/lib/utils'
+import OptimizedImage from '@/components/ui/OptimizedImage'
 
 const AuthForm = () => {
   const [isLogin, setIsLogin] = useState(true)
@@ -82,12 +83,14 @@ const AuthForm = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-2">
             <div className="flex items-center">
-              <img
-                src={getAssetPath("/logo.webp")}
+              <OptimizedImage
+                src="/logo.webp"
                 alt="Позвони.мне логотип"
                 width={32}
                 height={32}
                 className="mr-2 select-none"
+                priority
+                quality={95}
                 onContextMenu={(e) => e.preventDefault()}
                 onDragStart={(e) => e.preventDefault()}
               />

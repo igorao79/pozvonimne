@@ -6,6 +6,6 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getAssetPath(path: string): string {
-  const basePath = process.env.NODE_ENV === 'production' ? '/pozvonimne' : ''
-  return `${basePath}${path}`
+  // Vercel doesn't need base path, return path as is
+  return path
 }

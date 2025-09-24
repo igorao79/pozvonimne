@@ -9,6 +9,7 @@ import AuthForm from '@/components/Auth/AuthForm'
 import CallInterface from '@/components/Call/CallInterface'
 import { UserProfile } from '@/components/Profile'
 import { getAssetPath } from '@/lib/utils'
+import OptimizedImage from '@/components/ui/OptimizedImage'
 import { ThemeToggler } from '@/components/ui/theme-toggler'
 import { useGlobalTypingManager } from '@/hooks/useGlobalTypingManager'
 import { useGlobalCallManager } from '@/hooks/useGlobalCallManager'
@@ -201,12 +202,14 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-2">
             <div className="flex items-center">
-              <img
-                src={getAssetPath("/logo.webp")}
+              <OptimizedImage
+                src="/logo.webp"
                 alt="Позвони.мне логотип"
                 width={32}
                 height={32}
                 className="mr-2 select-none"
+                priority
+                quality={95}
                 onContextMenu={(e) => e.preventDefault()}
                 onDragStart={(e) => e.preventDefault()}
               />

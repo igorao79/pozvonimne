@@ -1,50 +1,128 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // GitHub Pages deployment configuration
-  output: 'export',
-  trailingSlash: true,
-  basePath: process.env.NODE_ENV === 'production' ? '/pozvonimne' : '',
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/pozvonimne' : '',
-
   // Production optimizations
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? {
-      exclude: ['error']
+      exclude: ['error', 'warn']
     } : false,
   },
 
-  // Image optimization
+  // Vercel Image optimization (enabled for better performance)
   images: {
-    unoptimized: true, // Required for static export
-  },
-
-  // Experimental features for better performance (disabled tracing for OneDrive compatibility)
-  experimental: {
-    optimizePackageImports: ['lucide-react'],
-    // Disable tracing to avoid OneDrive permission issues
-    disableOptimizedLoading: true,
-    // Turbopack configuration for Supabase compatibility
-    turbo: {
-      resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.json'],
-      rules: {
-        '*.{js,ts,tsx,jsx}': {
-          loaders: ['js'],
-        },
+    formats: ['image/webp', 'image/avif'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    minimumCacheTTL: 60,
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    localPatterns: [
+      {
+        pathname: '/public/**',
+        search: '',
       },
-    },
+    ],
   },
 
-  // Server external packages
-  serverExternalPackages: [],
+  // Experimental features for better performance
+  experimental: {
+    optimizePackageImports: [
+      'lucide-react', 
+      '@supabase/supabase-js',
+      'react-virtuoso',
+      'gsap'
+    ],
+    // Enable modern features for better performance
+    // Performance optimizations
+    webVitalsAttribution: ['CLS', 'LCP'],
+    // Enable modern features
+    serverComponentsExternalPackages: ['simple-peer'],
+  },
+
+  // Webpack optimizations
+  webpack: (config, { dev, isServer }) => {
+    // Optimize bundle size
+    if (!dev && !isServer) {
+      config.optimization.splitChunks = {
+        chunks: 'all',
+        cacheGroups: {
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendors',
+            chunks: 'all',
+          },
+          supabase: {
+            test: /[\\/]node_modules[\\/]@supabase[\\/]/,
+            name: 'supabase',
+            chunks: 'all',
+            priority: 10,
+          },
+          gsap: {
+            test: /[\\/]node_modules[\\/]gsap[\\/]/,
+            name: 'gsap',
+            chunks: 'all',
+            priority: 10,
+          },
+        },
+      };
+    }
+    
+    return config;
+  },
+
+  // Headers for better caching and security
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+      {
+        source: '/static/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
+  },
 
   // Build optimizations
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false, // Enable linting for better code quality
   },
 
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false, // Enable TypeScript checks for better reliability
+  },
+
+  // PWA and performance optimizations
+  poweredByHeader: false,
+  compress: true,
+  
+  // Environment variables validation
+  env: {
+    CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
 };
 
