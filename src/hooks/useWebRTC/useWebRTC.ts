@@ -90,16 +90,18 @@ const useWebRTC = (): WebRTCHooks => {
     processSignals
   )
 
-  // Логируем состояние при каждом рендере
-  console.log(`🎯 [User ${userId?.slice(0, 8)}] useWebRTC render with state:`, {
-    isInCall,
-    isCalling,
-    isCallActive,
-    isReceivingCall,
-    hasPeer: !!peerRef.current,
-    targetUserId: targetUserId?.slice(0, 8),
-    callerId: callerId?.slice(0, 8)
-  })
+  // Логируем состояние только при изменениях ключевых параметров
+  useEffect(() => {
+    console.log(`🎯 [User ${userId?.slice(0, 8)}] useWebRTC state changed:`, {
+      isInCall,
+      isCalling,
+      isCallActive,
+      isReceivingCall,
+      hasPeer: !!peerRef.current,
+      targetUserId: targetUserId?.slice(0, 8),
+      callerId: callerId?.slice(0, 8)
+    })
+  }, [isInCall, isCalling, isCallActive, isReceivingCall, targetUserId, callerId, userId])
 
   // Listen for WebRTC signals
   useEffect(() => {

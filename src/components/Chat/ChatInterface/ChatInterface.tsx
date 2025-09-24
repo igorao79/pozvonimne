@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import useUsers from '@/hooks/useUsers'
 import useCallStore from '@/store/useCallStore'
+import useSupabaseStore from '@/store/useSupabaseStore'
 
 import { ChatHeader } from './ChatHeader'
 import { MessagesArea } from './MessagesArea'
@@ -35,9 +36,13 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
 
   const { userId: rawUserId, isInCall: storeIsInCall } = useCallStore()
   const { users } = useUsers()
+  const { supabase } = useSupabaseStore()
 
   // Преобразуем null в undefined для совместимости с хуками
   const userId = rawUserId || undefined
+
+  // Ref для отслеживания, был ли чат уже помечен как прочитанный в этой сессии
+  const hasMarkedAsReadRef = useRef(false)
 
   // Используем проп isInCall если он передан, иначе из store
   const effectiveIsInCall = isInCall !== undefined ? isInCall : storeIsInCall
@@ -82,8 +87,45 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
     onNewMessage: handleNewMessage
   })
 
+  // Автоматическая пометка чата как прочитанного при открытии
+  useEffect(() => {
+    if (!userId || !chat.id || hasMarkedAsReadRef.current) return
+
+    const markChatAsRead = async () => {
+      try {
+        console.log('📖 Автоматическая пометка чата как прочитанного при открытии:', chat.id.slice(0, 8))
+
+        const { data: updatedCount, error } = await supabase.rpc('mark_chat_as_read', {
+          chat_uuid: chat.id,
+          user_uuid: userId
+        })
+
+        if (error) {
+          console.warn('Ошибка при автоматической пометке чата как прочитанного:', error)
+        } else {
+          console.log('✅ Чат автоматически помечен как прочитанный при открытии, обновлено сообщений:', updatedCount)
+          hasMarkedAsReadRef.current = true
+        }
+      } catch (error) {
+        console.warn('Ошибка при автоматической пометке чата как прочитанного:', error)
+      }
+    }
+
+    // Небольшая задержка, чтобы дать время на загрузку сообщений
+    const timer = setTimeout(() => {
+      markChatAsRead()
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [chat.id, userId, supabase])
+
+  // Сброс флага при смене чата
+  useEffect(() => {
+    hasMarkedAsReadRef.current = false
+  }, [chat.id])
+
   // Синхронизация статуса прочитанности - теперь обрабатывается через visibility-based систему в MessageItem
-  // useSimpleChatRead убран, так как он помечал ВСЕ сообщения как прочитанные при входе в чат
+  // useSimpleChatRead убран, но заменен на автоматическую пометку при открытии чата
 
   // Получение статуса пользователя
   const getUserStatus = useCallback((userId?: string) => {

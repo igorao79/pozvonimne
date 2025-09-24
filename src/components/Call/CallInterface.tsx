@@ -228,15 +228,19 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
 
   // ПРАВИЛЬНО: ChatApp всегда остается смонтированным
   // Компоненты звонка показываются поверх как модальные окна
-  
-  console.log('📱 CALL INTERFACE - Рендер чата:', {
-    savedChatId,
-    hasAutoOpenChat: !!savedChatId,
-    isInCall,
-    isCallActive,
-    isReceivingCall,
-    timestamp: new Date().toISOString()
-  })
+
+  // Логируем изменения состояния только при реальных изменениях
+  useEffect(() => {
+    console.log('📱 CALL INTERFACE - Состояние изменилось:', {
+      savedChatId,
+      hasAutoOpenChat: !!savedChatId,
+      isInCall,
+      isCallActive,
+      isReceivingCall,
+      userId: userId?.slice(0, 8),
+      timestamp: new Date().toISOString()
+    })
+  }, [savedChatId, isInCall, isCallActive, isReceivingCall, userId])
 
   return (
     <div className="h-full w-full">

@@ -10,10 +10,10 @@ export function createClient() {
         params: {
           eventsPerSecond: 2, // Снижаем до 2 событий в секунду для стабильности
         },
-        heartbeatIntervalMs: 30000, // 30 секунд
+        heartbeatIntervalMs: 15000, // 🔥 ИСПРАВЛЕНИЕ: 15 секунд - компромисс между 5 и 30
         reconnectAfterMs: function (tries: number) {
-          // Более агрессивный backoff для стабильности
-          return Math.min(tries * 2000, 30000) // До 30 секунд
+          // 🔥 ИСПРАВЛЕНИЕ: Умеренное переподключение
+          return Math.min(tries * 1000, 10000) // До 10 секунд - компромисс
         },
         logger: (level: string, message: string, details?: any) => {
           // Тихий лог, только ошибки и важные события

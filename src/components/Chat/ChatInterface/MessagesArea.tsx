@@ -39,7 +39,7 @@ const getClientLocalDateString = (dateString: string) => {
 }
 
 
-export const MessagesArea: React.FC<MessagesAreaProps> = ({
+const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
   messages,
   loading,
   loadingMore = false,
@@ -207,7 +207,8 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
             arr.findIndex(m => m.id === message.id) === index
           )
 
-          console.log('📅 MessagesArea rendering:', uniqueMessages.length, 'messages')
+          // Логирование отключено для предотвращения лишних рендеров
+          // console.log('📅 MessagesArea rendering:', uniqueMessages.length, 'messages')
 
           return uniqueMessages.map((message, index) => {
             const currentMessageDate = getClientLocalDateString(message.created_at)
@@ -279,3 +280,5 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
     </div>
   )
 }
+
+export const MessagesArea = React.memo(MessagesAreaComponent)

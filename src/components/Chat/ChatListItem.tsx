@@ -37,11 +37,23 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
 }) => {
   // Получаем текущего пользователя для исключения
   const { userId } = useCallStore()
-  
+
   // Получаем typing users из оптимизированного хука для приватных чатов (исключаем себя)
   const typingUsers = usePrivateChatTyping(chat.id, chat.type === 'private', userId || undefined)
-  
+
   const isTyping = typingUsers.length > 0
+
+  // 🔥 ИСПРАВЛЕНИЕ: Throttled debug логи (только 5% обновлений для уменьшения спама)
+  React.useEffect(() => {
+    if (Math.random() < 0.05) { // Логируем только 5% обновлений
+      console.log(`📱 ChatListItem [${chat.id.slice(0, 8)}] получил обновление:`, {
+        unread_count: chat.unread_count,
+        last_message: chat.last_message?.slice(0, 20),
+        last_message_at: chat.last_message_at,
+        isSelected
+      })
+    }
+  }, [chat.unread_count, chat.last_message, chat.last_message_at, isSelected])
 
   return (
     <div
@@ -49,6 +61,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
       className={`px-2 py-1.5 chat-list-item-hover hover:bg-muted cursor-pointer transition-colors chat-list-item ${
         isSelected ? 'bg-primary/10 border-r-2 border-primary' : ''
       }`}
+      key={chat.id} // Добавляем key для стабильности
     >
       <div className="flex items-center space-x-1.5">
           {/* Ультракомпактный аватар */}
@@ -84,7 +97,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                 </span>
               )}
               {chat.unread_count > 0 && (
-                <div className="bg-primary text-primary-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                <div className="bg-primary text-primary-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
                   {chat.unread_count > 99 ? '99+' : chat.unread_count}
                 </div>
               )}
@@ -114,3 +127,5 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
     </div>
   )
 }
+
+export default React.memo(ChatListItem)

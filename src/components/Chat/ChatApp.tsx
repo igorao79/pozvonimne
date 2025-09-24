@@ -43,15 +43,28 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
   // Подписываемся на глобальные обновления чатов через Zustand
   const { registerRefreshCallback } = useChatSyncStore()
 
-  // Подписываемся на глобальные обновления чатов
+  // 🔥 ИСПРАВЛЕНИЕ: Throttled подписка на глобальные обновления чатов
   useEffect(() => {
     console.log('🌐 ChatApp: Подписываемся на глобальные обновления чатов')
+    
+    let updateTimeout: NodeJS.Timeout | null = null
+    
     const unsubscribe = registerRefreshCallback(() => {
+      // Throttling - максимум одно обновление в 250мс
+      if (updateTimeout) return
+      
       console.log('🔄 ChatApp: Получено уведомление об обновлении чатов, триггерим перезагрузку')
       setChatsUpdateTrigger(prev => prev + 1)
+      
+      updateTimeout = setTimeout(() => {
+        updateTimeout = null
+      }, 250) // 250мс throttle
     })
 
-    return unsubscribe
+    return () => {
+      unsubscribe()
+      if (updateTimeout) clearTimeout(updateTimeout)
+    }
   }, [registerRefreshCallback])
 
   // Уведомляем систему звуков об изменении активного чата

@@ -9,6 +9,28 @@ interface SoundNotificationState {
   audioElement: HTMLAudioElement | null
   soundUrl: string | null
   userHasInteracted: boolean
+  soundLoaded: boolean // Флаг, что настоящий звук загружен
+}
+
+// Глобальный кэш для звукового файла - загружается только один раз за сессию
+interface SoundCache {
+  audioElement: HTMLAudioElement | null
+  soundUrl: string | null
+  isLoading: boolean
+  isLoaded: boolean
+  promise: Promise<void> | null
+  fallbackAudio: HTMLAudioElement | null // Fallback звук для немедленного использования
+  isInitialized: boolean // Флаг, что инициализация уже прошла
+}
+
+const globalSoundCache: SoundCache = {
+  audioElement: null,
+  soundUrl: null,
+  isLoading: false,
+  isLoaded: false,
+  promise: null,
+  fallbackAudio: null,
+  isInitialized: false
 }
 
 export const useSoundNotifications = () => {
@@ -21,130 +43,177 @@ export const useSoundNotifications = () => {
     currentChatId: null,
     audioElement: null,
     soundUrl: null,
-    userHasInteracted: false
+    userHasInteracted: false,
+    soundLoaded: false
   })
 
-  // Загружаем звуковой файл из Supabase storage
+  // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: ФОРСИРОВАННАЯ инициализация звуков с детальной отладкой
   useEffect(() => {
-    console.log('🔊 Начинаем загрузку звукового файла...')
+    const initStartTime = performance.now()
+    console.log('🔊🔥 НАЧАЛО ИНИЦИАЛИЗАЦИИ звуковых уведомлений:', new Date().toLocaleTimeString())
     
-    const loadSoundFile = async () => {
-      try {
-        console.log('🔊 Пробуем загрузить звук из Supabase storage...')
-        
-        // Пробуем получить публичный URL
-        const { data: publicUrlData } = supabase.storage
-          .from('sounds')
-          .getPublicUrl('message.wav')
+    // Если уже инициализировано глобально - просто используем кэш
+    if (globalSoundCache.isInitialized) {
+      console.log('🔊 Звуковая система уже инициализирована, используем кэш')
+      setState(prev => ({
+        ...prev,
+        audioElement: globalSoundCache.fallbackAudio,
+        soundUrl: 'fallback-web-audio',
+        userHasInteracted: true // 🔥 ПРИНУДИТЕЛЬНО активируем звук!
+      }))
+      console.log('🔊✅ Звуковые уведомления ГОТОВЫ из кэша за:', Math.round(performance.now() - initStartTime), 'мс')
+      return
+    }
 
-        console.log('🔊 Public URL result:', publicUrlData)
-        let audioUrl = publicUrlData?.publicUrl
+    // Первая инициализация за сессию
+    console.log('🔊🔥 ПЕРВИЧНАЯ инициализация звуковых уведомлений...')
+    globalSoundCache.isInitialized = true
 
-        // Если публичный URL не работает, пробуем signed URL
-        if (!audioUrl) {
-          console.log('🔊 Пробуем получить signed URL...')
-          const { data: signedData, error: signedError } = await supabase.storage
+    // Создаем fallback звук (Web Audio API) для немедленного использования
+    createFallbackSound(true) // true = сохранить в кэш
+    
+    // 🔥 ПРИНУДИТЕЛЬНО активируем звуки сразу!
+    setState(prev => ({
+      ...prev,
+      userHasInteracted: true
+    }))
+    
+    console.log('🔊✅ Звуковые уведомления ПРИНУДИТЕЛЬНО АКТИВИРОВАНЫ за:', Math.round(performance.now() - initStartTime), 'мс')
+  }, [])
+
+  // Ленивая загрузка настоящего звука только после первого взаимодействия пользователя
+  useEffect(() => {
+    if (state.userHasInteracted && !globalSoundCache.isLoaded && !globalSoundCache.isLoading) {
+      console.log('🔊 Пользователь взаимодействовал - начинаем загрузку настоящего звука...')
+
+      const loadRealSound = async () => {
+        globalSoundCache.isLoading = true
+
+        try {
+          console.log('🔊 Пробуем загрузить настоящий звук из Supabase storage...')
+
+          // Пробуем получить публичный URL
+          const { data: publicUrlData } = supabase.storage
             .from('sounds')
-            .createSignedUrl('message.wav', 3600)
+            .getPublicUrl('message.wav')
 
-          console.log('🔊 Signed URL result:', { signedData, signedError })
+          console.log('🔊 Public URL result:', publicUrlData)
+          let audioUrl = publicUrlData?.publicUrl
 
-          if (signedError) {
-            console.warn('⚠️ Ошибка получения signed URL:', signedError)
-            // Fallback - создаем простой звук через Web Audio API
-            createFallbackSound()
-            return
-          }
+          // Если публичный URL не работает, пробуем signed URL
+          if (!audioUrl) {
+            console.log('🔊 Пробуем получить signed URL...')
+            const { data: signedData, error: signedError } = await supabase.storage
+              .from('sounds')
+              .createSignedUrl('message.wav', 3600)
 
-          audioUrl = signedData?.signedUrl
-        }
+            console.log('🔊 Signed URL result:', { signedData, signedError })
 
-        if (audioUrl) {
-          console.log('🔊 Создаем Audio элемент с URL:', audioUrl)
-          const audio = new Audio(audioUrl)
-          audio.preload = 'auto'
-          audio.volume = 0.7
-          
-          // Проверяем, что файл действительно загрузился
-          audio.addEventListener('canplaythrough', () => {
-            console.log('🔊 Звуковой файл уведомлений загружен из Supabase')
-          })
-
-          audio.addEventListener('error', (e) => {
-            console.warn('⚠️ Ошибка загрузки аудио файла:', e)
-            createFallbackSound()
-          })
-          
-          setState(prev => ({
-            ...prev,
-            audioElement: audio,
-            soundUrl: audioUrl
-          }))
-          
-          console.log('🔊 Звуковой файл готов для использования')
-        } else {
-          console.warn('⚠️ Не удалось получить URL звукового файла, используем fallback')
-          createFallbackSound()
-        }
-      } catch (error) {
-        console.error('❌ Ошибка загрузки звукового файла:', error)
-        createFallbackSound()
-      }
-    }
-
-    // Создаем простой звук через Web Audio API как fallback
-    const createFallbackSound = () => {
-      try {
-        // Создаем простой синтезированный звук уведомления
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-        
-        const createBeep = () => {
-          const oscillator = audioContext.createOscillator()
-          const gainNode = audioContext.createGain()
-          
-          oscillator.connect(gainNode)
-          gainNode.connect(audioContext.destination)
-          
-          oscillator.frequency.value = 800 // Частота звука
-          gainNode.gain.setValueAtTime(0, audioContext.currentTime)
-          gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1)
-          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
-          
-          oscillator.start(audioContext.currentTime)
-          oscillator.stop(audioContext.currentTime + 0.5)
-        }
-        
-        // Создаем mock audio element с функцией воспроизведения
-        const mockAudio = {
-          currentTime: 0,
-          play: async () => {
-            if (audioContext.state === 'suspended') {
-              await audioContext.resume()
+            if (signedError) {
+              console.warn('⚠️ Ошибка получения signed URL, продолжаем использовать fallback')
+              globalSoundCache.isLoading = false
+              return
             }
-            createBeep()
-            return Promise.resolve()
-          }
-        }
-        
-        setState(prev => ({
-          ...prev,
-          audioElement: mockAudio as HTMLAudioElement,
-          soundUrl: 'fallback-web-audio'
-        }))
-        
-        console.log('🔊 Использован fallback звук через Web Audio API')
-        console.log('🔊 Fallback звук готов для использования')
-      } catch (fallbackError) {
-        console.error('❌ Не удалось создать fallback звук:', fallbackError)
-      }
-    }
 
-    // Сначала создаем fallback звук, потом пробуем загрузить из Supabase
-    createFallbackSound()
-    
-    // Пробуем загрузить настоящий звук (асинхронно)
-    loadSoundFile()
-  }, [supabase])
+            audioUrl = signedData?.signedUrl
+          }
+
+          if (audioUrl) {
+            console.log('🔊 Создаем настоящий Audio элемент с URL:', audioUrl)
+            const audio = new Audio(audioUrl)
+            audio.preload = 'auto'
+            audio.volume = 0.7
+
+            // Проверяем, что файл действительно загрузился
+            audio.addEventListener('canplaythrough', () => {
+              console.log('🔊 Настоящий звуковой файл уведомлений загружен из Supabase')
+            })
+
+            audio.addEventListener('error', (e) => {
+              console.warn('⚠️ Ошибка загрузки настоящего аудио файла:', e)
+              globalSoundCache.isLoading = false
+            })
+
+            // Успешная загрузка - заменяем fallback на настоящий звук
+            globalSoundCache.audioElement = audio
+            globalSoundCache.soundUrl = audioUrl
+            globalSoundCache.isLoaded = true
+            globalSoundCache.isLoading = false
+
+            // Обновляем состояние компонента
+            setState(prev => ({
+              ...prev,
+              audioElement: audio,
+              soundUrl: audioUrl,
+              soundLoaded: true
+            }))
+
+            console.log('🔊 Настоящий звуковой файл готов для использования и закэширован')
+          } else {
+            console.warn('⚠️ Не удалось получить URL настоящего звукового файла')
+            globalSoundCache.isLoading = false
+          }
+        } catch (error) {
+          console.error('❌ Ошибка загрузки настоящего звукового файла:', error)
+          globalSoundCache.isLoading = false
+        }
+      }
+
+      loadRealSound()
+    }
+  }, [state.userHasInteracted, supabase])
+
+  // Создаем fallback звук через Web Audio API
+  const createFallbackSound = useCallback((saveToCache = false) => {
+    try {
+      // Создаем простой синтезированный звук уведомления
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+
+      const createBeep = () => {
+        const oscillator = audioContext.createOscillator()
+        const gainNode = audioContext.createGain()
+
+        oscillator.connect(gainNode)
+        gainNode.connect(audioContext.destination)
+
+        oscillator.frequency.value = 800 // Частота звука
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime)
+        gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1)
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
+
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.5)
+      }
+
+      // Создаем mock audio element с функцией воспроизведения
+      const mockAudio = {
+        currentTime: 0,
+        play: async () => {
+          if (audioContext.state === 'suspended') {
+            await audioContext.resume()
+          }
+          createBeep()
+          return Promise.resolve()
+        }
+      }
+
+      if (saveToCache) {
+        // Сохраняем в глобальный кэш как fallback
+        globalSoundCache.fallbackAudio = mockAudio as HTMLAudioElement
+      }
+
+      setState(prev => ({
+        ...prev,
+        audioElement: mockAudio as HTMLAudioElement,
+        soundUrl: 'fallback-web-audio'
+      }))
+
+      console.log('🔊 Использован fallback звук через Web Audio API')
+      console.log('🔊 Fallback звук готов для использования')
+    } catch (fallbackError) {
+      console.error('❌ Не удалось создать fallback звук:', fallbackError)
+    }
+  }, [])
 
   // Отслеживание видимости вкладки
   useEffect(() => {
@@ -272,11 +341,9 @@ export const useSoundNotifications = () => {
       return false
     }
 
-    // Убираем проверку userHasInteracted - звуки должны работать сразу
-    // if (!userHasInteracted) {
-    //   console.log('🔇 Звуковое уведомление пропущено - пользователь еще не взаимодействовал со страницей')
-    //   return false
-    // }
+    // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Звуки должны работать сразу!
+    // ПОЛНОСТЬЮ убираем проверку userHasInteracted для немедленных уведомлений
+    console.log('🔊 НЕМЕДЛЕННЫЕ уведомления активны - звук будет работать сразу при загрузке!')
 
     // Проверяем интервал между уведомлениями (10 секунд)
     if (now - lastNotificationTime < 10000) {
@@ -308,6 +375,12 @@ export const useSoundNotifications = () => {
     return true
   }, [state, userId, playNotificationSound])
 
+  // Функция для установки взаимодействия пользователя (нужно вызывать при первом клике/тапе)
+  const setUserInteraction = useCallback(() => {
+    console.log('👆 Пользователь взаимодействовал - разблокируем звук')
+    setState(prev => ({ ...prev, userHasInteracted: true }))
+  }, [])
+
   // Функция для тестирования звука
   const testSound = useCallback(async () => {
     console.log('🧪 Тестирование звука уведомлений')
@@ -318,11 +391,12 @@ export const useSoundNotifications = () => {
 
   return {
     setCurrentChat,
+    setUserInteraction,
     maybePlayNotification,
     testSound,
     isTabVisible: state.isTabVisible,
     currentChatId: state.currentChatId,
-    soundLoaded: !!state.audioElement,
+    soundLoaded: state.soundLoaded,
     userHasInteracted: state.userHasInteracted
   }
 }

@@ -3,7 +3,7 @@ import { Message, RealtimeMessagePayload } from '@/components/Chat/ChatInterface
 import useSupabaseStore from '@/store/useSupabaseStore'
 import useChatSyncStore from '@/store/useChatSyncStore'
 import useChatConnectionMonitor from '@/hooks/useChatConnectionMonitor'
-import useChatPollingFallback from '@/hooks/useChatPollingFallback'
+// import useChatPollingFallback from '@/hooks/useChatPollingFallback' // ОТКЛЮЧЕНО - только realtime
 
 interface UseChatMessagesProps {
   chatId: string
@@ -38,20 +38,26 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
     }
   })
   
-  const {
-    isPollingActive,
-    forcePoll,
-    getPollingStats
-  } = useChatPollingFallback({
-    chatId,
-    userId: userId || null,
-    isActive,
-    onNewMessage: (message) => {
-      console.log('📊 ChatMessages: Message received via polling fallback')
-      handleNewMessage(message)
-    },
-    isRealtimeHealthy: isConnectionHealthy()
-  })
+  // ОТКЛЮЧЕНО: Polling fallback - только realtime
+  // const {
+  //   isPollingActive,
+  //   forcePoll,
+  //   getPollingStats
+  // } = useChatPollingFallback({
+  //   chatId,
+  //   userId: userId || null,
+  //   isActive,
+  //   onNewMessage: (message) => {
+  //     console.log('📊 ChatMessages: Message received via polling fallback')
+  //     handleNewMessage(message)
+  //   },
+  //   isRealtimeHealthy: isConnectionHealthy()
+  // })
+
+  // Заглушки для отключенных функций
+  const isPollingActive = false
+  const forcePoll = () => {}
+  const getPollingStats = () => ({})
 
   // Загрузка сообщений
   const loadMessages = useCallback(async () => {
@@ -366,9 +372,9 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
     // Теперь это обрабатывается через отслеживание видимости в MessageItem компоненте
     // Это предотвращает автоматическую пометку сообщений как прочитанных без их просмотра
 
-    // Уведомляем о новом сообщении через Zustand для обновления списка чатов
-    refreshChatList()
-  }, [chatId, userId, supabase, refreshChatList, updateMessageReceived, error])
+    // УБРАНО: Вызов refreshChatList() в handleNewMessage вызывает бесконечный цикл
+    // Обновление списка чатов теперь происходит через глобальную синхронизацию realtime
+  }, [chatId, userId, supabase, updateMessageReceived, error])
 
   return {
     messages,

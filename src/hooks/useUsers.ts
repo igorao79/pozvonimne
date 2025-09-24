@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { User } from '@supabase/supabase-js'
+import useChatSyncStore from '@/store/useChatSyncStore'
 
 interface UserProfile {
   id: string
@@ -277,40 +278,26 @@ export const useUsers = () => {
     }
   }
 
-  // Оптимизированная подписка на изменения статусов пользователей
+  // Realtime подписка на изменения статусов пользователей через глобальный store
   useEffect(() => {
-    let updateTimeout: NodeJS.Timeout
+    console.log('👥 Подключаемся к глобальной системе обновлений пользователей...')
 
-    const channel = supabase
-      .channel('user_profiles_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE', // Только обновления статуса
-          schema: 'public',
-          table: 'user_profiles'
-        },
-        (payload) => {
-          // Дебаунсинг обновлений - избегаем частых запросов к БД
-          clearTimeout(updateTimeout)
-          updateTimeout = setTimeout(() => {
-            fetchUsers()
-          }, 1000) // Обновляем через 1 секунду после последнего изменения
-        }
-      )
-      .subscribe((status, err) => {
-        if (status === 'CHANNEL_ERROR') {
-          const errorMessage = err || 'Unknown subscription error'
-          console.warn('Ошибка realtime подписки пользователей, продолжаем с polling:', errorMessage)
-          // При ошибке realtime продолжаем работать с обычным polling
-        }
-      })
+    // Используем глобальную систему обновлений через useChatSyncStore
+    // которая теперь также отслеживает изменения пользователей
+    const { registerUserRefreshCallback } = useChatSyncStore.getState()
 
-    return () => {
-      clearTimeout(updateTimeout)
-      supabase.removeChannel(channel)
+    const refreshUsersCallback = () => {
+      console.log('🔄 Глобальный refresh: обновляем статусы пользователей')
+      fetchUsers(false)
     }
-  }, []) // Убрали fetchUsers из зависимостей
+
+    // Регистрируем callback для получения обновлений пользователей
+    const unsubscribe = registerUserRefreshCallback(refreshUsersCallback)
+
+    return unsubscribe
+  }, [fetchUsers])
+
+  // БЕЗ POLLING - только realtime обновления через глобальный store
 
   return { users, loading, error, refreshUsers, forceUpdateInactiveUsers }
 }

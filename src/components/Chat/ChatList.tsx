@@ -4,7 +4,7 @@ import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
 import useSupabaseStore from '@/store/useSupabaseStore'
 import useChatSyncStore from '@/store/useChatSyncStore'
 import useCallStore from '@/store/useCallStore'
-import { ChatListItem } from './ChatListItem'
+import ChatListItem from './ChatListItem'
 import { RandomFact } from '@/components/ui/random-fact'
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
 
@@ -37,7 +37,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
   const [currentTime, setCurrentTime] = useState<number>(Date.now())
   const { userId } = useCallStore()
   const { supabase } = useSupabaseStore()
-  const { refreshChatList, registerRefreshCallback, lastMessageUpdate, isGlobalSyncActive, reconnectAttempts } = useChatSyncStore()
+  const { refreshChatList, registerRefreshCallback, lastMessageUpdate, isGlobalSyncActive, reconnectAttempts, isNetworkError, retryConnection } = useChatSyncStore()
   
   // Импортируем хук звуковых уведомлений для тестирования
   const { testSound } = useSoundNotifications()
@@ -71,7 +71,25 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
 
       // Сортируем чаты по времени последнего сообщения
       const sortedChats = sortChatsByLastMessage(data || [])
-      setChats(sortedChats)
+
+      // Важно: Создаем новые объекты для чатов, чтобы React увидел изменения
+      const newChats = sortedChats.map(chat => ({
+        ...chat,
+        // Добавляем timestamp для принудительного обновления
+        _updateTimestamp: Date.now()
+      }))
+
+      console.log('🔄 ChatList: Обновление списка чатов:', {
+        oldCount: chats.length,
+        newCount: newChats.length,
+        changedChats: newChats.filter((newChat, index) => {
+          const oldChat = chats[index]
+          return !oldChat || oldChat.unread_count !== newChat.unread_count ||
+                 oldChat.last_message !== newChat.last_message
+        }).length
+      })
+
+      setChats(newChats)
     } catch (err) {
       console.error('Ошибка:', err)
       setError('Ошибка подключения')
@@ -104,12 +122,14 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
     }
   }, [externalUpdateTrigger])
 
-  // Периодическое обновление времени для корректного отображения "сейчас", "1 мин" и т.д.
+  // 🔥 ИСПРАВЛЕНИЕ: Менее частое обновление времени и уменьшение логов
   useEffect(() => {
     const timeUpdateInterval = setInterval(() => {
-      console.log('⏰ Обновление времени в ChatList для live статусов')
+      if (Math.random() < 0.2) { // Логируем только 20% обновлений времени
+        console.log('⏰ Обновление времени в ChatList для live статусов')
+      }
       setCurrentTime(Date.now())
-    }, 15000) // Обновляем каждые 15 секунд для более отзывчивого интерфейса
+    }, 30000) // 🔥 УВЕЛИЧИВАЕМ интервал до 30 секунд вместо 15
 
     return () => clearInterval(timeUpdateInterval)
   }, [])
@@ -127,14 +147,16 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
     }
   }, [currentTime])
 
-  // Мониторинг состояния real-time соединения
+  // 🔥 ИСПРАВЛЕНИЕ: Throttled мониторинг real-time соединения
   useEffect(() => {
-    console.log('📊 ChatList: Real-time состояние изменилось:', {
-      isGlobalSyncActive,
-      reconnectAttempts,
-      userId: userId?.slice(0, 8),
-      timestamp: new Date().toISOString()
-    })
+    if (Math.random() < 0.1) { // Логируем только 10% изменений состояния
+      console.log('📊 ChatList: Real-time состояние изменилось:', {
+        isGlobalSyncActive,
+        reconnectAttempts,
+        userId: userId?.slice(0, 8),
+        timestamp: new Date().toISOString()
+      })
+    }
   }, [isGlobalSyncActive, reconnectAttempts, userId])
 
   // Экспортируем методы для внешнего использования
@@ -347,19 +369,38 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
             <div className="flex items-center space-x-2">
             <h1 className="text-sm font-semibold text-foreground">Чаты</h1>
             {/* Индикатор real-time статуса */}
-            <div 
-              className={`w-2 h-2 rounded-full transition-colors ${
-                isGlobalSyncActive ? 'bg-green-500 animate-pulse' : 
-                reconnectAttempts > 0 ? 'bg-yellow-500' : 'bg-gray-400'
-              }`}
-              title={
-                isGlobalSyncActive 
-                  ? 'Real-time синхронизация активна • Обновления приходят мгновенно' 
-                  : reconnectAttempts > 0 
-                    ? `Переподключение... (попытка ${reconnectAttempts})` 
-                    : 'Real-time синхронизация неактивна • Требуется обновление страницы'
-              }
-            />
+            <div className="flex items-center space-x-1">
+              <div
+                className={`w-2 h-2 rounded-full transition-colors ${
+                  isNetworkError ? 'bg-red-500' :
+                  isGlobalSyncActive ? 'bg-green-500 animate-pulse' :
+                  reconnectAttempts > 0 ? 'bg-yellow-500' : 'bg-gray-400'
+                }`}
+                title={
+                  isNetworkError
+                    ? 'Критическая ошибка сети • Real-time отключен • Нажмите для переподключения'
+                    : isGlobalSyncActive
+                      ? 'Real-time синхронизация активна • Обновления приходят мгновенно'
+                      : reconnectAttempts > 0
+                        ? `Переподключение... (попытка ${reconnectAttempts})`
+                        : 'Real-time синхронизация неактивна • Требуется обновление страницы'
+                }
+              />
+
+              {/* Кнопка переподключения при сетевых ошибках */}
+              {isNetworkError && (
+                <button
+                  onClick={() => {
+                    console.log('🔄 Пользователь нажал переподключение')
+                    retryConnection()
+                  }}
+                  className="text-xs px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
+                  title="Переподключиться к real-time синхронизации"
+                >
+                  🔄
+                </button>
+              )}
+            </div>
             {/* Кнопка тестирования звука */}
             <button
               onClick={() => {

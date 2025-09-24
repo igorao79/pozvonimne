@@ -9,16 +9,20 @@ interface ChatSyncState {
   refreshCallbacks: Set<() => void>
   soundNotificationCallbacks: Set<(messageData: any) => void>
   messageCallbacks: Set<(messageData: any) => void>
+  userRefreshCallbacks: Set<() => void>
   reconnectAttempts: number
   keepAliveInterval: NodeJS.Timeout | null
-  
+  isNetworkError: boolean // Флаг критической ошибки сети
+
   // Actions
   refreshChatList: () => void
   registerRefreshCallback: (callback: () => void) => () => void
   registerSoundNotificationCallback: (callback: (messageData: any) => void) => () => void
   registerMessageCallback: (callback: (messageData: any) => void) => () => void
+  registerUserRefreshCallback: (callback: () => void) => () => void
   startGlobalSync: () => void
   stopGlobalSync: () => void
+  retryConnection: () => void // Ручной перезапуск соединения
 }
 
 const useChatSyncStore = create<ChatSyncState>()(
@@ -28,8 +32,10 @@ const useChatSyncStore = create<ChatSyncState>()(
     refreshCallbacks: new Set(),
     soundNotificationCallbacks: new Set(),
     messageCallbacks: new Set(),
+    userRefreshCallbacks: new Set(),
     reconnectAttempts: 0,
     keepAliveInterval: null,
+    isNetworkError: false,
 
     refreshChatList: () => {
       console.log('🔄 Глобальное обновление списка чатов через Zustand')
@@ -43,6 +49,21 @@ const useChatSyncStore = create<ChatSyncState>()(
           console.error('Ошибка при вызове callback обновления чата:', error)
         }
       })
+    },
+
+    registerUserRefreshCallback: (callback: () => void) => {
+      const { userRefreshCallbacks } = get()
+      const newCallbacks = new Set(userRefreshCallbacks)
+      newCallbacks.add(callback)
+      set({ userRefreshCallbacks: newCallbacks })
+
+      // Возвращаем функцию для отписки
+      return () => {
+        const { userRefreshCallbacks: currentCallbacks } = get()
+        const updatedCallbacks = new Set(currentCallbacks)
+        updatedCallbacks.delete(callback)
+        set({ userRefreshCallbacks: updatedCallbacks })
+      }
     },
 
     registerRefreshCallback: (callback: () => void) => {
@@ -96,7 +117,7 @@ const useChatSyncStore = create<ChatSyncState>()(
 
       const { supabase } = useSupabaseStore.getState()
       const { userId } = useCallStore.getState()
-      
+
       if (!userId) {
         console.warn('🌐 Нет userId для запуска глобальной синхронизации')
         return
@@ -111,13 +132,48 @@ const useChatSyncStore = create<ChatSyncState>()(
       const scheduleReconnect = () => {
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000) // Максимум 30 секунд
         console.log(`🔄 Переподключение через ${delay}мс (попытка ${reconnectAttempts + 1})`)
-        
+
         set({ isGlobalSyncActive: false, reconnectAttempts: reconnectAttempts + 1 })
-        
+
         reconnectTimeout = setTimeout(() => {
+          console.time('startGlobalSync_reconnect')
           get().startGlobalSync()
+          console.timeEnd('startGlobalSync_reconnect')
         }, delay)
       }
+
+      // 🆕 Функция для получения актуальных сообщений сразу при старте
+      const fetchLatestMessages = async () => {
+        try {
+          console.log('📨 Получаем последние сообщения перед подпиской на realtime...')
+
+          // Вызываем refreshChatList для получения актуальных данных
+          await get().refreshChatList()
+
+          console.log('✅ Получили актуальные сообщения перед realtime подпиской')
+        } catch (error) {
+          console.warn('⚠️ Не удалось получить актуальные сообщения перед realtime:', error)
+        }
+      }
+
+      // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: НЕ блокируем realtime подписку асинхронной загрузкой!
+      // Запускаем параллельно, НЕ ждем завершения
+      fetchLatestMessages().catch(error => {
+        console.warn('⚠️ Ошибка фоновой загрузки сообщений (не критично):', error)
+      })
+      
+      console.log('🚀 НЕМЕДЛЕННЫЙ запуск realtime подписки БЕЗ ожидания загрузки!')
+
+      // Принудительно очищаем возможные старые каналы глобальной синхронизации перед созданием нового
+      const existingGlobalChannels = supabase.getChannels().filter(ch => ch.topic.includes('global_chat_sync_'))
+      existingGlobalChannels.forEach(ch => {
+        try {
+          console.log('🧹 Удаление старого канала глобальной синхронизации:', ch.topic)
+          supabase.removeChannel(ch)
+        } catch (e) {
+          console.warn('⚠️ Не удалось удалить канал:', ch.topic, e)
+        }
+      })
 
       const globalChannel = supabase
         .channel(`global_chat_sync_${userId}_${Date.now()}`) // Уникальное имя канала
@@ -165,14 +221,11 @@ const useChatSyncStore = create<ChatSyncState>()(
             }
           })
           
-          // Немедленное обновление для новых сообщений
-          get().refreshChatList()
-          
-          // Дополнительное обновление через 50мс для подстраховки
+          // 🔥 ИСПРАВЛЕНИЕ: Debounced обновление вместо немедленного
           clearTimeout(debounceTimeout)
           debounceTimeout = setTimeout(() => {
             get().refreshChatList()
-          }, 50)
+          }, 150) // 150мс debounce для группировки обновлений
         })
         .on('postgres_changes', {
           event: 'UPDATE',
@@ -215,14 +268,11 @@ const useChatSyncStore = create<ChatSyncState>()(
             }
           })
           
-          // Немедленное обновление для изменений статуса прочтения
-          get().refreshChatList()
-          
-          // Дополнительное обновление через 50мс для подстраховки
+          // 🔥 ИСПРАВЛЕНИЕ: Debounced обновление для статуса прочтения
           clearTimeout(debounceTimeout)
           debounceTimeout = setTimeout(() => {
             get().refreshChatList()
-          }, 50)
+          }, 100) // 100мс debounce для статуса прочтения
         })
         .on('postgres_changes', {
           event: '*',
@@ -231,14 +281,11 @@ const useChatSyncStore = create<ChatSyncState>()(
         }, (payload) => {
           console.log('🌐 Глобальное обновление: изменение чата', payload)
           
-          // Немедленное обновление для изменений в чатах
-          get().refreshChatList()
-          
-          // Дополнительное обновление через 50мс для подстраховки
+          // 🔥 ИСПРАВЛЕНИЕ: Debounced обновление для изменений чатов
           clearTimeout(debounceTimeout)
           debounceTimeout = setTimeout(() => {
             get().refreshChatList()
-          }, 50)
+          }, 200) // 200мс debounce для изменений чатов
         })
         .on('postgres_changes', {
           event: 'UPDATE',
@@ -257,24 +304,52 @@ const useChatSyncStore = create<ChatSyncState>()(
           if (payload.old?.last_read_at !== payload.new?.last_read_at) {
             console.log('📖 Статус прочтения изменился - обновляем список чатов для badge')
             
-            // Немедленное обновление для изменений статуса прочтения
-            get().refreshChatList()
-            
-            // Дополнительное обновление через 100мс для подстраховки
+            // 🔥 ИСПРАВЛЕНИЕ: Debounced обновление для статуса прочтения участников
             clearTimeout(debounceTimeout)
             debounceTimeout = setTimeout(() => {
               get().refreshChatList()
-            }, 100)
+            }, 300) // 300мс debounce для участников чата
           }
+        })
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_profiles'
+        }, (payload) => {
+          console.log('👥 Глобальное обновление: изменение статуса пользователя', {
+            userId: payload.new?.id?.slice(0, 8),
+            oldStatus: payload.old?.status,
+            newStatus: payload.new?.status,
+            oldLastSeen: payload.old?.last_seen,
+            newLastSeen: payload.new?.last_seen
+          })
+
+          // Вызываем refresh для обновления списка пользователей
+          const { userRefreshCallbacks } = get()
+          if (userRefreshCallbacks && userRefreshCallbacks.size > 0) {
+            console.log('🔄 Уведомляем подписчиков об обновлении пользователей:', userRefreshCallbacks.size)
+            userRefreshCallbacks.forEach(callback => {
+              try {
+                callback()
+              } catch (error) {
+                console.error('Ошибка при вызове user refresh callback:', error)
+              }
+            })
+          } else {
+            console.log('⚠️ Нет подписчиков на обновление пользователей')
+          }
+
+          // 🔥 ИСПРАВЛЕНИЕ: НЕ обновляем чаты при каждом изменении статуса пользователя
+          // Это создавало каскадные обновления! Статусы пользователей обновляются отдельно.
         })
         .subscribe((status, err) => {
           console.log('🌐 Статус глобальной синхронизации чатов:', status, err ? `Ошибка: ${err}` : '')
-          
+
           if (status === 'SUBSCRIBED') {
             console.log('✅ Глобальная синхронизация чатов успешно подключена!')
-            set({ isGlobalSyncActive: true, reconnectAttempts: 0 })
-            
-            // Запускаем keep-alive механизм
+            set({ isGlobalSyncActive: true, reconnectAttempts: 0, isNetworkError: false })
+
+            // Keep-alive механизм для поддержания соединения
             const keepAliveInterval = setInterval(() => {
               if (get().isGlobalSyncActive) {
                 console.log('💓 Keep-alive ping для глобальной синхронизации')
@@ -286,16 +361,24 @@ const useChatSyncStore = create<ChatSyncState>()(
                 })
               }
             }, 30000) // Ping каждые 30 секунд
-            
+
             set({ keepAliveInterval })
-            
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.error(`❌ Проблема с каналом: ${status}`, err)
+
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Критическая ошибка WebSocket:', err)
+            // При критических ошибках WebSocket - временно отключаем realtime
+            console.log('🚫 Отключаем realtime из-за критических ошибок сети')
+            set({ isGlobalSyncActive: false, isNetworkError: true })
+            // Не пытаемся переподключаться автоматически при WebSocket ошибках
+            return
+
+          } else if (status === 'TIMED_OUT') {
+            console.error('⏰ Таймаут подключения к realtime')
             set({ isGlobalSyncActive: false })
-            
+
             // Очищаем текущий канал
             supabase.removeChannel(globalChannel)
-            
+
             // Планируем переподключение если попыток не слишком много
             if (reconnectAttempts < 10) {
               scheduleReconnect()
@@ -324,7 +407,11 @@ const useChatSyncStore = create<ChatSyncState>()(
           } else if (currentUserId !== userId) {
             // Перезапускаем синхронизацию с новым userId
             get().stopGlobalSync()
-            setTimeout(() => get().startGlobalSync(), 100)
+            setTimeout(() => {
+              console.time('startGlobalSync_userid_change')
+              get().startGlobalSync()
+              console.timeEnd('startGlobalSync_userid_change')
+            }, 100)
           }
         }
       )
@@ -374,11 +461,17 @@ const useChatSyncStore = create<ChatSyncState>()(
         }
       })
       
-      set({ 
-        isGlobalSyncActive: false, 
-        reconnectAttempts: 0, 
-        keepAliveInterval: null 
+      set({
+        isGlobalSyncActive: false,
+        reconnectAttempts: 0,
+        keepAliveInterval: null
       })
+    },
+
+    retryConnection: () => {
+      console.log('🔄 Ручная попытка переподключения к realtime...')
+      set({ isNetworkError: false, reconnectAttempts: 0 })
+      get().startGlobalSync()
     }
   }))
 )

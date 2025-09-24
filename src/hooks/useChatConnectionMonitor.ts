@@ -129,8 +129,8 @@ export const useChatConnectionMonitor = ({
     
     // Критическое время без активности - 3 минуты
     const CRITICAL_INACTIVE_TIME = 3 * 60 * 1000
-    // Предупреждающее время - 2 минуты
-    const WARNING_INACTIVE_TIME = 2 * 60 * 1000
+    // 🔥 ИСПРАВЛЕНИЕ: Предупреждающее время - 1 минута компромисс
+    const WARNING_INACTIVE_TIME = 60 * 1000
     
     console.log('🔍 ChatConnectionMonitor: Health check', {
       chatId: chatId.slice(0, 8),
@@ -197,13 +197,13 @@ export const useChatConnectionMonitor = ({
     // Регулярная проверка здоровья каждые 30 секунд
     monitorIntervalRef.current = setInterval(checkConnectionHealth, 30000)
     
-    // Ping каждые 2 минуты если нет активности
+    // 🔥 ИСПРАВЛЕНИЕ: Ping каждые 45 секунд - компромисс между активностью и спамом
     pingIntervalRef.current = setInterval(() => {
       const timeSinceLastMessage = Date.now() - healthRef.current.lastMessageReceived
-      if (timeSinceLastMessage > 2 * 60 * 1000) { // 2 минуты
+      if (timeSinceLastMessage > 45 * 1000) { // 45 секунд - компромисс
         sendPing()
       }
-    }, 2 * 60 * 1000)
+    }, 45 * 1000) // 45 секунд компромисс
 
     // Подписываемся на pong ответы
     const channelName = `global_messages_${userId.substring(0, 8)}`
@@ -237,7 +237,7 @@ export const useChatConnectionMonitor = ({
         }
       }
     }
-  }, [userId, chatId, isActive, checkConnectionHealth, sendPing, handlePong])
+  }, [userId, chatId, isActive])
 
   // Возвращаем функции для внешнего использования
   return {

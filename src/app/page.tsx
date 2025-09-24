@@ -15,11 +15,15 @@ import { useGlobalCallManager } from '@/hooks/useGlobalCallManager'
 import useCallStateSynchronizer from '@/hooks/useCallStateSynchronizer'
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
 import { User } from 'lucide-react'
+import { useNotificationDebugger } from '@/hooks/useNotificationDebugger' // 🔥 ДОБАВЛЯЕМ DEBUG
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [showProfile, setShowProfile] = useState(false)
   const [resetChatTrigger, setResetChatTrigger] = useState(0)
+  
+  // 🔥 КРИТИЧЕСКИЙ DEBUG HOOK для мониторинга производительности (упрощенная версия)
+  const debugStartTime = Date.now()
   const { supabase } = useSupabaseStore()
   const { startGlobalSync, stopGlobalSync, registerSoundNotificationCallback } = useChatSyncStore()
   
@@ -131,14 +135,27 @@ export default function Home() {
     return () => subscription.unsubscribe()
   }, [supabase, setUser, setUserId, setAuthenticated, resetAll])
 
-  // Запускаем глобальную синхронизацию чатов при аутентификации
+  // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: НЕМЕДЛЕННЫЙ запуск синхронизации с детальной отладкой
   useEffect(() => {
     if (isAuthenticated && user?.id) {
-      console.log('🌐 Запуск глобальной синхронизации чатов')
+      const syncStartTime = performance.now()
+      console.log('🌐🔥 НЕМЕДЛЕННЫЙ запуск глобальной синхронизации чатов в:', new Date().toLocaleTimeString())
+      console.time('startGlobalSync_page_auth')
+      
+      // DEBUG: Логируем начало запуска
+      console.log('🔥 DEBUG: Запуск глобальной синхронизации для пользователя:', user.id.slice(0, 8))
+      
+      // НЕМЕДЛЕННЫЙ запуск без задержек
       startGlobalSync()
+      
+      console.timeEnd('startGlobalSync_page_auth')
+      const initTime = Math.round(performance.now() - syncStartTime)
+      console.log('🌐✅ Глобальная синхронизация запущена за:', initTime, 'мс')
+      console.log('🔥 DEBUG: Глобальная синхронизация запущена за:', initTime, 'мс')
     } else {
       console.log('🌐 Остановка глобальной синхронизации чатов')
       stopGlobalSync()
+      console.log('🔥 DEBUG: Глобальная синхронизация остановлена')
     }
 
     return () => {
@@ -146,28 +163,7 @@ export default function Home() {
     }
   }, [isAuthenticated, user?.id, startGlobalSync, stopGlobalSync])
 
-  // Регистрируем звуковые уведомления
-  useEffect(() => {
-    console.log('🔊 Sound notification state:', { 
-      isAuthenticated, 
-      soundLoaded, 
-      userHasInteracted 
-    })
-    
-    if (isAuthenticated && soundLoaded) {
-      console.log('🔊 Регистрация звуковых уведомлений')
-      const unsubscribe = registerSoundNotificationCallback(maybePlayNotification)
-      
-      return unsubscribe
-    } else {
-      console.log('🔇 Звуковые уведомления не активны:', { 
-        isAuthenticated, 
-        soundLoaded,
-        userHasInteracted,
-        reason: !isAuthenticated ? 'не авторизован' : 'звук не загружен'
-      })
-    }
-  }, [isAuthenticated, soundLoaded, userHasInteracted, registerSoundNotificationCallback, maybePlayNotification])
+  // Убрали дублирующую регистрацию звуковых уведомлений (регистрация выше при аутентификации)
 
   const handleSignOut = async () => {
     try {
@@ -266,6 +262,26 @@ export default function Home() {
         <UserProfile onClose={() => setShowProfile(false)} />
       )}
 
+      {/* 🔥 КРИТИЧЕСКИЙ DEBUG PANEL для мониторинга производительности */}
+      {process.env.NODE_ENV === 'development' && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: '10px',
+            right: '10px',
+            background: 'rgba(0,0,0,0.8)',
+            color: 'white',
+            padding: '8px',
+            borderRadius: '4px',
+            fontSize: '10px',
+            fontFamily: 'monospace',
+            zIndex: 9999
+          }}
+        >
+          🔥 NOTIFICATION DEBUG: {Math.round((Date.now() - debugStartTime) / 1000)}s
+        </div>
+      )}
+      
     </div>
   )
 }
