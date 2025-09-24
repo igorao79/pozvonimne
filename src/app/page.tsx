@@ -11,6 +11,7 @@ import { UserProfile } from '@/components/Profile'
 import { getAssetPath } from '@/lib/utils'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { ThemeToggler } from '@/components/ui/theme-toggler'
+import { logEnvironment, validateSupabaseConfig } from '@/utils/debug'
 import { useGlobalTypingManager } from '@/hooks/useGlobalTypingManager'
 import { useGlobalCallManager } from '@/hooks/useGlobalCallManager'
 import useCallStateSynchronizer from '@/hooks/useCallStateSynchronizer'
@@ -57,6 +58,10 @@ export default function Home() {
 
   // Интегрируем звуковые уведомления с глобальной системой
   useEffect(() => {
+    // Debug environment in production
+    logEnvironment()
+    validateSupabaseConfig()
+    
     if (!isAuthenticated || !user?.id) return
 
     console.log('🔊 Sound notification state:', {
