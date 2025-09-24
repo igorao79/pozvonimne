@@ -38,6 +38,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
   // Получаем текущего пользователя для исключения
   const { userId } = useCallStore()
 
+
   // Получаем typing users из оптимизированного хука для приватных чатов (исключаем себя)
   const typingUsers = usePrivateChatTyping(chat.id, chat.type === 'private', userId || undefined)
 

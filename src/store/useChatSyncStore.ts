@@ -38,12 +38,27 @@ const useChatSyncStore = create<ChatSyncState>()(
     isNetworkError: false,
 
     refreshChatList: () => {
-      console.log('🔄 Глобальное обновление списка чатов через Zustand')
+      const { refreshCallbacks, isGlobalSyncActive } = get()
+      
+      console.log('🔄 Глобальное обновление списка чатов через Zustand:', {
+        timestamp: new Date().toLocaleTimeString(),
+        callbackCount: refreshCallbacks.size,
+        isGlobalSyncActive,
+        stackTrace: new Error().stack?.split('\n')[2]?.trim() // Показываем откуда вызов
+      })
+      
+      // 🔥 КРИТИЧЕСКАЯ ДИАГНОСТИКА: Логируем КАЖДЫЙ callback
+      if (refreshCallbacks.size === 0) {
+        console.warn('⚠️ ГЛОБАЛЬНАЯ СИНХРОНИЗАЦИЯ: НЕТ зарегистрированных callbacks для ChatList!')
+      }
+      
       set({ lastMessageUpdate: Date.now() })
       
-      const { refreshCallbacks } = get()
-      refreshCallbacks.forEach(callback => {
+      let callbackIndex = 0
+      refreshCallbacks.forEach((callback) => {
         try {
+          callbackIndex++
+          console.log(`🔥 ГЛОБАЛЬНАЯ ПОДПИСКА: Уведомляем ChatList об обновлении (callback ${callbackIndex}/${refreshCallbacks.size})`)
           callback()
         } catch (error) {
           console.error('Ошибка при вызове callback обновления чата:', error)
@@ -165,7 +180,9 @@ const useChatSyncStore = create<ChatSyncState>()(
       console.log('🚀 НЕМЕДЛЕННЫЙ запуск realtime подписки БЕЗ ожидания загрузки!')
 
       // Принудительно очищаем возможные старые каналы глобальной синхронизации перед созданием нового
-      const existingGlobalChannels = supabase.getChannels().filter(ch => ch.topic.includes('global_chat_sync_'))
+      const existingGlobalChannels = supabase.getChannels().filter(ch => 
+        ch.topic.includes('global_chat_sync_') || ch.topic.includes('global_chat_notifications')
+      )
       existingGlobalChannels.forEach(ch => {
         try {
           console.log('🧹 Удаление старого канала глобальной синхронизации:', ch.topic)
@@ -176,29 +193,34 @@ const useChatSyncStore = create<ChatSyncState>()(
       })
 
       const globalChannel = supabase
-        .channel(`global_chat_sync_${userId}_${Date.now()}`) // Уникальное имя канала
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
+        .channel('global_chat_notifications') // Единый канал для всех пользователей
+        .on('broadcast', {
+          event: 'new_message'
         }, (payload) => {
-          console.log('🌐 Глобальное обновление: новое сообщение', payload)
+          console.log('🌐 Глобальное broadcast уведомление: новое сообщение', {
+            messageId: payload.payload?.messageId?.slice(0, 8),
+            chatId: payload.payload?.chatId?.slice(0, 8),
+            content: payload.payload?.content?.slice(0, 30),
+            timestamp: new Date().toLocaleTimeString(),
+            registeredCallbacks: get().refreshCallbacks.size,
+            messageCallbacks: get().messageCallbacks.size
+          })
           
           const messageData = {
-            chatId: payload.new.chat_id,
-            senderId: payload.new.sender_id,
-            content: payload.new.content,
-            messageId: payload.new.id,
-            timestamp: payload.new.created_at,
+            chatId: payload.payload.chatId,
+            senderId: payload.payload.senderId,
+            content: payload.payload.content,
+            messageId: payload.payload.messageId,
+            timestamp: payload.payload.timestamp,
             event: 'INSERT',
-            fullPayload: payload.new
+            fullPayload: payload.payload
           }
           
           // Уведомляем компоненты о новом сообщении
           const { soundNotificationCallbacks, messageCallbacks } = get()
-          console.log('📨 Обнаружено новое сообщение - уведомляем callbacks:', {
-            chatId: payload.new.chat_id?.slice(0, 8),
-            senderId: payload.new.sender_id?.slice(0, 8),
+          console.log('📨 Обнаружено новое сообщение через broadcast - уведомляем callbacks:', {
+            chatId: payload.payload.chatId?.slice(0, 8),
+            senderId: payload.payload.senderId?.slice(0, 8),
             soundCallbacks: soundNotificationCallbacks.size,
             messageCallbacks: messageCallbacks.size
           })
@@ -224,6 +246,7 @@ const useChatSyncStore = create<ChatSyncState>()(
           // 🔥 ИСПРАВЛЕНИЕ: Debounced обновление вместо немедленного
           clearTimeout(debounceTimeout)
           debounceTimeout = setTimeout(() => {
+            console.log('🔥 ГЛОБАЛЬНАЯ BROADCAST ПОДПИСКА: Уведомляем ChatList об обновлении')
             get().refreshChatList()
           }, 150) // 150мс debounce для группировки обновлений
         })
@@ -237,7 +260,9 @@ const useChatSyncStore = create<ChatSyncState>()(
             chatId: payload.new?.chat_id?.slice(0, 8),
             oldReadAt: payload.old?.read_at,
             newReadAt: payload.new?.read_at,
-            hasReadAtChange: !payload.old?.read_at && payload.new?.read_at
+            hasReadAtChange: !payload.old?.read_at && payload.new?.read_at,
+            registeredCallbacks: get().refreshCallbacks.size,
+            messageCallbacks: get().messageCallbacks.size
           })
           
           const messageData = {
@@ -271,6 +296,7 @@ const useChatSyncStore = create<ChatSyncState>()(
           // 🔥 ИСПРАВЛЕНИЕ: Debounced обновление для статуса прочтения
           clearTimeout(debounceTimeout)
           debounceTimeout = setTimeout(() => {
+            console.log('🔥 ГЛОБАЛЬНАЯ ПОДПИСКА (UPDATE): Уведомляем ChatList об обновлении')
             get().refreshChatList()
           }, 100) // 100мс debounce для статуса прочтения
         })
@@ -284,6 +310,7 @@ const useChatSyncStore = create<ChatSyncState>()(
           // 🔥 ИСПРАВЛЕНИЕ: Debounced обновление для изменений чатов
           clearTimeout(debounceTimeout)
           debounceTimeout = setTimeout(() => {
+            console.log('🔥 ГЛОБАЛЬНАЯ ПОДПИСКА (CHATS): Уведомляем ChatList об обновлении')
             get().refreshChatList()
           }, 200) // 200мс debounce для изменений чатов
         })
@@ -307,6 +334,7 @@ const useChatSyncStore = create<ChatSyncState>()(
             // 🔥 ИСПРАВЛЕНИЕ: Debounced обновление для статуса прочтения участников
             clearTimeout(debounceTimeout)
             debounceTimeout = setTimeout(() => {
+              console.log('🔥 ГЛОБАЛЬНАЯ ПОДПИСКА (PARTICIPANTS): Уведомляем ChatList об обновлении')
               get().refreshChatList()
             }, 300) // 300мс debounce для участников чата
           }
@@ -451,7 +479,7 @@ const useChatSyncStore = create<ChatSyncState>()(
       // Очищаем все каналы синхронизации
       const channels = supabase.getChannels()
       channels.forEach(channel => {
-        if (channel.topic.includes('global_chat_sync')) {
+        if (channel.topic.includes('global_chat_sync') || channel.topic.includes('global_chat_notifications')) {
           console.log('🗑️ Удаление канала:', channel.topic)
           if ((channel as any).cleanup) {
             ;(channel as any).cleanup()

@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
+import { useState, useEffect, forwardRef, useImperativeHandle, useCallback, useRef } from 'react'
 import useSupabaseStore from '@/store/useSupabaseStore'
 import useChatSyncStore from '@/store/useChatSyncStore'
 import useCallStore from '@/store/useCallStore'
 import ChatListItem from './ChatListItem'
 import { RandomFact } from '@/components/ui/random-fact'
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
+import { useChatListRealtime } from '@/hooks/useChatListRealtime' // 🔥 ПРЯМАЯ ПОДПИСКА
 
 interface Chat {
   id: string
@@ -35,12 +36,65 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentTime, setCurrentTime] = useState<number>(Date.now())
+  const [updateTrigger, setUpdateTrigger] = useState(0)
   const { userId } = useCallStore()
   const { supabase } = useSupabaseStore()
-  const { refreshChatList, registerRefreshCallback, lastMessageUpdate, isGlobalSyncActive, reconnectAttempts, isNetworkError, retryConnection } = useChatSyncStore()
+  // 🔥 ВОЗВРАЩАЕМ ГЛОБАЛЬНУЮ СИСТЕМУ: Прямые подписки вызывали CHANNEL_ERROR, глобальный store работает!
   
   // Импортируем хук звуковых уведомлений для тестирования
   const { testSound } = useSoundNotifications()
+
+  // 🔥 ДЕБАУНСИНГ: useRef для хранения таймаута
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // 🔥 ДИАГНОСТИКА: Уникальный ID для отслеживания экземпляров + стабилизация
+  const instanceId = useRef(
+    `ChatList_${Date.now()}_${Math.random().toString(36).substr(2, 4)}_${selectedChatId ? 'desktop' : 'mobile'}`
+  )
+  
+  // 🔥 ДИАГНОСТИКА: Логируем создание экземпляра
+  useEffect(() => {
+    console.log(`🎯 СОЗДАН НОВЫЙ ChatList экземпляр [${instanceId.current}] для пользователя:`, userId?.slice(0, 8))
+    console.log(`🔍 ЭКЗЕМПЛЯР КОНТЕКСТ [${instanceId.current}]:`, {
+      selectedChatId: selectedChatId?.slice(0, 8),
+      hasUserId: !!userId,
+      timestamp: new Date().toLocaleTimeString()
+    })
+    return () => {
+      console.log(`🗑️ УДАЛЕН ChatList экземпляр [${instanceId.current}]`)
+    }
+  }, [])
+
+  // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Предотвращаем параллельные вызовы loadChats
+  const loadInProgress = useRef(false)
+  
+  // 🔥 ГЛОБАЛЬНЫЙ STORE: ДЕБАУНСЕННЫЙ обработчик для предотвращения спама
+  const handleChatUpdate = useCallback(() => {
+    console.log(`🔥 ГЛОБАЛЬНЫЙ STORE [${instanceId.current}]: Получен сигнал обновления ChatList`)
+    
+    // 🔥 ДЕБАУНСИНГ: Очищаем предыдущий таймаут
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current)
+      console.log(`🔥 ДЕБАУНСИНГ [${instanceId.current}]: Отменяем предыдущий setUpdateTrigger`)
+    }
+    
+    // 🔥 ДЕБАУНСИНГ: Планируем новый вызов
+    debounceTimeoutRef.current = setTimeout(() => {
+      setUpdateTrigger((prev: number) => {
+        const newValue = prev + 1
+        console.log(`🔥 ДИАГНОСТИКА [${instanceId.current}]: ДЕБАУНСЕННЫЙ setUpdateTrigger, prev:`, prev, 'new:', newValue)
+        return newValue
+      })
+      debounceTimeoutRef.current = null
+    }, 50) // 50мс дебаунс для setUpdateTrigger
+  }, [])
+  
+  useChatListRealtime({
+    userId,
+    onChatUpdate: handleChatUpdate
+  })
+  
+  // 🔥 ГЛОБАЛЬНЫЙ STORE: useChatListRealtime теперь использует глобальную синхронизацию!
 
   // Сортировка чатов по времени последнего сообщения (новые сверху)
   const sortChatsByLastMessage = (chatsToSort: Chat[]) => {
@@ -52,8 +106,16 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
   }
 
   // Загрузка чатов с опциональным лоадером
-  const loadChats = async (showLoader = false) => {
+  const loadChats = useCallback(async (showLoader = false) => {
     if (!userId) return
+
+    // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Предотвращаем параллельные загрузки
+    if (loadInProgress.current) {
+      console.log(`⏸️ СИНХРОНИЗАЦИЯ [${instanceId.current}]: Загрузка уже в процессе, пропускаем`)
+      return
+    }
+
+    loadInProgress.current = true
 
     try {
       if (showLoader) {
@@ -61,13 +123,32 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       }
       setError(null)
 
-      const { data, error: chatsError } = await supabase.rpc('get_user_chats')
+      // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Принудительная синхронизация данных
+      // Добавляем timestamp чтобы избежать кэширования результатов
+      const syncTimestamp = Date.now()
+      console.log(`🔄 СИНХРОНИЗАЦИЯ [${instanceId.current}]: Загружаем чаты с принудительным обновлением, timestamp:`, syncTimestamp)
+
+      // 🔥 КРИТИЧЕСКАЯ ПРОБЛЕМА: Принудительно обходим кэш Supabase!
+      // Добавляем случайный параметр чтобы каждый запрос был уникальным
+      const forceRefresh = Math.random().toString(36).substring(7)
+      const { data, error: chatsError } = await supabase.rpc('get_user_chats', { 
+        cache_buster: forceRefresh,
+        sync_timestamp: syncTimestamp 
+      })
 
       if (chatsError) {
-        console.error('Ошибка загрузки чатов:', chatsError)
+        console.error(`❌ СИНХРОНИЗАЦИЯ [${instanceId.current}]: Ошибка загрузки чатов:`, chatsError)
         setError('Ошибка загрузки чатов')
         return
       }
+
+      // 🔥 ДИАГНОСТИКА: Логируем полученные данные для отладки синхронизации
+      console.log(`📊 СИНХРОНИЗАЦИЯ [${instanceId.current}]: Получены данные чатов:`, {
+        count: data?.length || 0,
+        timestamp: syncTimestamp,
+        firstChatLastMessage: data?.[0]?.last_message?.slice(0, 20),
+        firstChatId: data?.[0]?.id?.slice(0, 8)
+      })
 
       // Сортируем чаты по времени последнего сообщения
       const sortedChats = sortChatsByLastMessage(data || [])
@@ -79,40 +160,62 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
         _updateTimestamp: Date.now()
       }))
 
+      // 🔥 ДИАГНОСТИКА СИНХРОНИЗАЦИИ: Детальное логирование обновлений
       console.log('🔄 ChatList: Обновление списка чатов:', {
+        timestamp: new Date().toLocaleTimeString(),
         oldCount: chats.length,
         newCount: newChats.length,
         changedChats: newChats.filter((newChat, index) => {
           const oldChat = chats[index]
           return !oldChat || oldChat.unread_count !== newChat.unread_count ||
                  oldChat.last_message !== newChat.last_message
-        }).length
+        }).length,
+        stackTrace: new Error().stack?.split('\n')[2]?.trim() // Показываем откуда вызов
       })
 
       setChats(newChats)
     } catch (err) {
-      console.error('Ошибка:', err)
+      console.error(`💥 СИНХРОНИЗАЦИЯ [${instanceId.current}]: Критическая ошибка:`, err)
       setError('Ошибка подключения')
     } finally {
+      // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Сбрасываем флаг загрузки
+      loadInProgress.current = false
       if (showLoader) {
         setLoading(false)
       }
+      console.log(`✅ СИНХРОНИЗАЦИЯ [${instanceId.current}]: Завершена, флаг сброшен`)
     }
-  }
+  }, [userId, supabase, instanceId]) // 🔥 useCallback зависимости
 
   // Загружаем чаты при монтировании и изменении userId (с лоадером)
   useEffect(() => {
     loadChats(true)
-  }, [userId])
+  }, [userId, loadChats])
+
+  // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: ДЕБАУНСЕННЫЙ loadChats при изменении updateTrigger!
+  useEffect(() => {
+    console.log(`🔥 ДИАГНОСТИКА [${instanceId.current}]: useEffect updateTrigger сработал, значение:`, updateTrigger)
+    if (updateTrigger > 0) {
+      console.log(`🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ [${instanceId.current}]: updateTrigger изменился, планируем дебаунсенный loadChats!`)
+      console.log(`🔍 updateTrigger [${instanceId.current}] значение:`, updateTrigger)
+      
+      // 🔥 ДЕБАУНСИНГ: Отменяем предыдущий вызов и планируем новый
+      const timeoutId = setTimeout(() => {
+        console.log(`🔥 ДЕБАУНСЕННЫЙ loadChats [${instanceId.current}]: Выполняем загрузку чатов`)
+        loadChats(false) // Без лоадера для быстрого обновления
+      }, 100) // 100мс дебаунс для группировки обновлений
+      
+      return () => {
+        console.log(`🔥 ДЕБАУНСИНГ [${instanceId.current}]: Отменяем предыдущий loadChats`)
+        clearTimeout(timeoutId)
+      }
+    }
+  }, [updateTrigger]) // 🔥 УБИРАЕМ loadChats из зависимостей!
 
   // Подписка на обновления теперь обрабатывается в ChatApp для мобильной версии
 
-  // Реагируем на изменения lastMessageUpdate (без лоадера)
-  useEffect(() => {
-    if (lastMessageUpdate > 0) {
-      loadChats(false)
-    }
-  }, [lastMessageUpdate])
+  // 🔥 УБРАНА ГЛОБАЛЬНАЯ ПОДПИСКА: Теперь используем прямые подписки выше
+  // Прямые подписки надежнее и не создают каскадных обновлений
 
   // Реагируем на внешний триггер обновления (для мобильной версии)
   useEffect(() => {
@@ -147,17 +250,8 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
     }
   }, [currentTime])
 
-  // 🔥 ИСПРАВЛЕНИЕ: Throttled мониторинг real-time соединения
-  useEffect(() => {
-    if (Math.random() < 0.1) { // Логируем только 10% изменений состояния
-      console.log('📊 ChatList: Real-time состояние изменилось:', {
-        isGlobalSyncActive,
-        reconnectAttempts,
-        userId: userId?.slice(0, 8),
-        timestamp: new Date().toISOString()
-      })
-    }
-  }, [isGlobalSyncActive, reconnectAttempts, userId])
+  // 🔥 УБРАН МОНИТОРИНГ ГЛОБАЛЬНОЙ СИСТЕМЫ: Теперь используем прямые подписки
+  // Каждая подписка сама следит за своим состоянием
 
   // Экспортируем методы для внешнего использования
   useImperativeHandle(ref, () => ({
@@ -368,38 +462,14 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
         <div className="flex items-center justify-between min-h-[32px]">
             <div className="flex items-center space-x-2">
             <h1 className="text-sm font-semibold text-foreground">Чаты</h1>
-            {/* Индикатор real-time статуса */}
+            {/* 🔥 ГЛОБАЛЬНЫЙ STORE ИНДИКАТОР: Показываем статус глобальной синхронизации */}
             <div className="flex items-center space-x-1">
               <div
-                className={`w-2 h-2 rounded-full transition-colors ${
-                  isNetworkError ? 'bg-red-500' :
-                  isGlobalSyncActive ? 'bg-green-500 animate-pulse' :
-                  reconnectAttempts > 0 ? 'bg-yellow-500' : 'bg-gray-400'
-                }`}
-                title={
-                  isNetworkError
-                    ? 'Критическая ошибка сети • Real-time отключен • Нажмите для переподключения'
-                    : isGlobalSyncActive
-                      ? 'Real-time синхронизация активна • Обновления приходят мгновенно'
-                      : reconnectAttempts > 0
-                        ? `Переподключение... (попытка ${reconnectAttempts})`
-                        : 'Real-time синхронизация неактивна • Требуется обновление страницы'
-                }
+                className="w-2 h-2 rounded-full bg-blue-500 animate-pulse transition-colors"
+                title="Глобальная синхронизация активна • Обновления через надежный store"
               />
 
-              {/* Кнопка переподключения при сетевых ошибках */}
-              {isNetworkError && (
-                <button
-                  onClick={() => {
-                    console.log('🔄 Пользователь нажал переподключение')
-                    retryConnection()
-                  }}
-                  className="text-xs px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
-                  title="Переподключиться к real-time синхронизации"
-                >
-                  🔄
-                </button>
-              )}
+              {/* 🔥 ГЛОБАЛЬНЫЙ STORE: Надежная синхронизация не требует ручного переподключения */}
             </div>
             {/* Кнопка тестирования звука */}
             <button

@@ -17,7 +17,7 @@ export const useChatRealtime = ({
   onNewMessage
 }: UseChatRealtimeProps) => {
   const { supabase, cleanupChannels } = useSupabaseStore()
-  const { registerMessageCallback } = useChatSyncStore()
+  const { registerMessageCallback, refreshChatList } = useChatSyncStore() // 🔥 ДОБАВЛЯЕМ refreshChatList
 
   // Оптимизированная подписка на изменения пользователей (ТОЛЬКО если есть собеседник)
   useEffect(() => {
@@ -95,6 +95,9 @@ export const useChatRealtime = ({
         // Вызываем onNewMessage с адаптированными данными
         if (messageData.event === 'INSERT') {
           onNewMessage(messageData.fullPayload)
+          // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Обновляем ChatList через глобальный store!
+          console.log('🔥 ГЛОБАЛЬНАЯ ПОДПИСКА: Уведомляем ChatList об обновлении')
+          refreshChatList()
         } else if (messageData.event === 'UPDATE') {
           console.log('🔄 Передаем UPDATE событие в useChatMessages:', {
             messageId: messageData.messageId?.slice(0, 8),
@@ -116,11 +119,11 @@ export const useChatRealtime = ({
     }
   }, [userId, chatId, registerMessageCallback, onNewMessage])
 
-  // ВРЕМЕННАЯ прямая подписка на сообщения (пока не исправим глобальную систему)
+  // 🔥 ВОЗВРАЩАЕМ ПРЯМУЮ ПОДПИСКУ: Она работает надежнее глобальной системы!
   useEffect(() => {
     if (!userId || !chatId) return
 
-    console.log('🔧 ВРЕМЕННО: создаем прямую подписку на сообщения для чата:', chatId?.slice(0, 8))
+    console.log('🔧 ПРЯМАЯ ПОДПИСКА: создаем надежную подписку на сообщения для чата:', chatId?.slice(0, 8))
 
     const directChannelName = `direct_messages_${chatId.substring(0, 8)}_${Date.now()}`
     
@@ -134,8 +137,11 @@ export const useChatRealtime = ({
           filter: `chat_id=eq.${chatId}` // Фильтруем только по текущему чату
         },
         (payload: any) => {
-          console.log('🔧 ВРЕМЕННО: Новое сообщение через прямую подписку:', payload.new.id?.slice(0, 8))
+          console.log('🔧 ПРЯМАЯ ПОДПИСКА: Новое сообщение:', payload.new.id?.slice(0, 8))
           onNewMessage(payload.new)
+          // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Обновляем ChatList через глобальный store!
+          console.log('🔥 ПРЯМАЯ ПОДПИСКА: Уведомляем ChatList об обновлении')
+          refreshChatList()
         }
       )
       .on('postgres_changes',
@@ -146,7 +152,7 @@ export const useChatRealtime = ({
           filter: `chat_id=eq.${chatId}` // Фильтруем только по текущему чату
         },
         (payload: any) => {
-          console.log('🔧 ВРЕМЕННО: Обновление сообщения через прямую подписку:', payload.new.id?.slice(0, 8))
+          console.log('🔧 ПРЯМАЯ ПОДПИСКА: Обновление сообщения:', payload.new.id?.slice(0, 8))
           onNewMessage({
             ...payload.new,
             _isUpdate: true,
@@ -155,11 +161,11 @@ export const useChatRealtime = ({
         }
       )
       .subscribe((status) => {
-        console.log('🔧 ВРЕМЕННО: Статус прямой подписки:', status)
+        console.log('🔧 ПРЯМАЯ ПОДПИСКА: Статус:', status)
       })
 
     return () => {
-      console.log('🔧 ВРЕМЕННО: Убираем прямую подписку')
+      console.log('🔧 ПРЯМАЯ ПОДПИСКА: Убираем подписку')
       supabase.removeChannel(directChannel)
     }
   }, [userId, chatId, supabase, onNewMessage])

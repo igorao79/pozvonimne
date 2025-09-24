@@ -236,12 +236,33 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
 
       console.log('✅ Сообщение отправлено:', messageId)
 
+      // 🔥 ГЛОБАЛЬНОЕ УВЕДОМЛЕНИЕ: Отправляем broadcast для всех пользователей
+      try {
+        await supabase.channel('global_chat_notifications').send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: {
+            messageId: messageId,
+            chatId: chatId,
+            senderId: userId,
+            content: text,
+            timestamp: new Date().toISOString()
+          }
+        })
+        console.log('📡 Глобальное broadcast уведомление отправлено для всех пользователей')
+      } catch (broadcastError) {
+        console.error('⚠️ Ошибка отправки broadcast уведомления:', broadcastError)
+      }
+
       // Обновляем временное сообщение реальным ID
       setMessages(prev => prev.map(msg =>
         msg.id === tempMessage.id
           ? { ...msg, id: messageId }
           : msg
       ))
+
+      // 🔥 УБРАНО: Принудительное обновление больше не нужно - прямые подписки сами обновляют
+      // ChatList теперь получает обновления через прямую подписку на изменения messages
 
       return { success: true }
 
@@ -258,6 +279,9 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
   const handleNewMessage = useCallback((messageData: RealtimeMessagePayload & { _isUpdate?: boolean, _oldRecord?: any }) => {
     // Уведомляем монитор соединения о получении сообщения
     updateMessageReceived()
+    
+    // 🔥 УБРАНО: Принудительное обновление больше не нужно - прямые подписки сами обновляют
+    // ChatList теперь получает обновления через прямую подписку на изменения messages
     
     // Очищаем ошибки при получении сообщений
     if (error) {
