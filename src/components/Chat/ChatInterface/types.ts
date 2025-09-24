@@ -5,7 +5,7 @@ export interface Message {
   sender_name: string
   sender_avatar?: string
   content: string
-  type: 'text' | 'call' | 'system' | string  // Добавляем тип 'call' для сообщений о звонках
+  type: 'text' | 'call' | string  // Добавляем тип 'call' для сообщений о звонках
   created_at: string
   updated_at: string
   edited_at?: string

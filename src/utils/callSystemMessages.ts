@@ -1,10 +1,6 @@
 import { createClient } from '@/utils/supabase/client'
 
-interface SendSystemMessageParams {
-  chatId: string
-  message: string
-  messageType?: 'call_missed' | 'call_ended' | 'system'
-}
+
 
 interface CallDurationFormat {
   totalSeconds: number

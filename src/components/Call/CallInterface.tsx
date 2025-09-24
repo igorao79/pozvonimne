@@ -10,7 +10,6 @@ import { ChatList } from '../Chat'
 import { ChatInterface } from '../Chat'
 import { CreateChatModal } from '../Chat'
 import { RandomFact } from '@/components/ui/random-fact'
-import { sendCallEndedMessage, sendMissedCallMessage } from '@/utils/callSystemMessages'
 
 interface Chat {
   id: string

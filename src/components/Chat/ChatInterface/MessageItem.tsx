@@ -24,7 +24,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onDelete
 }) => {
   const isOwn = message.sender_id === userId
-  const isSystemMessage = message.type === 'system'
 
   // Отслеживание видимости сообщения для пометки как прочитанное
   const { elementRef, isVisible, hasBeenVisible } = useMessageVisibility({
@@ -73,23 +72,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     return date.toLocaleDateString('ru-RU')
   }
 
-  // Системные сообщения отображаются по центру
-  if (isSystemMessage) {
-    return (
-      <div
-        key={`${message.id}-${message.updated_at}`}
-        className="flex justify-center my-4"
-        onClick={onClick}
-      >
-        <div className="max-w-md px-4 py-2 rounded-lg bg-muted/50 text-muted-foreground border border-muted text-center">
-          <p className="text-sm font-medium">{message.content}</p>
-          <p className="text-xs mt-1 opacity-70">
-            {formatMessageTime(message.created_at)}
-          </p>
-        </div>
-      </div>
-    )
-  }
+
 
   // Удаленные сообщения
   if (message.is_deleted) {
