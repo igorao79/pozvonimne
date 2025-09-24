@@ -219,18 +219,37 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
       // Добавляем сообщение локально для немедленного отображения
       setMessages(prev => [...prev, tempMessage])
 
-      // Отправляем сообщение на сервер
-      const { data: messageId, error: sendError } = await supabase.rpc('send_message', {
+      // Отправляем сообщение на сервер с таймаутом
+      console.log('📤 Отправляем сообщение на сервер...')
+      const sendPromise = supabase.rpc('send_message', {
         chat_uuid: chatId,
         message_content: text,
         message_type: 'text'
       })
 
+      // Создаем таймаут для отправки (10 секунд)
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Timeout: отправка сообщения заняла слишком много времени (>10s)'))
+        }, 10000)
+      })
+
+      const { data: messageId, error: sendError } = await Promise.race([
+        sendPromise,
+        timeoutPromise
+      ]) as any
+
       if (sendError) {
         console.error('Ошибка отправки сообщения:', sendError)
         // Удаляем временное сообщение и показываем ошибку
         setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id))
-        setError('Ошибка отправки сообщения')
+        
+        // Проверяем тип ошибки для более информативного сообщения
+        const errorMessage = sendError.message?.includes('Timeout') 
+          ? 'Таймаут отправки сообщения. Проверьте соединение и попробуйте снова.'
+          : 'Ошибка отправки сообщения'
+        
+        setError(errorMessage)
         return { success: false, text }
       }
 
@@ -267,8 +286,22 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
       return { success: true }
 
     } catch (err) {
-      console.error('Ошибка:', err)
-      setError('Ошибка подключения')
+      console.error('Ошибка отправки сообщения:', err)
+      
+      // Удаляем временное сообщение при любой ошибке (все временные сообщения начинаются с temp_)
+      setMessages(prev => prev.filter(msg => !msg.id.startsWith('temp_')))
+      
+      // Определяем тип ошибки для пользователя
+      let errorMessage = 'Ошибка подключения'
+      if (err instanceof Error) {
+        if (err.message.includes('Timeout')) {
+          errorMessage = 'Таймаут отправки. Сообщение не было отправлено. Попробуйте снова.'
+        } else if (err.message.includes('network') || err.message.includes('fetch')) {
+          errorMessage = 'Проблемы с сетью. Проверьте подключение к интернету.'
+        }
+      }
+      
+      setError(errorMessage)
       return { success: false, text }
     } finally {
       setSending(false)

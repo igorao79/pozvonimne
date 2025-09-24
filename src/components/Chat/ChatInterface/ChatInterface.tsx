@@ -22,6 +22,7 @@ import { useMessageActions } from '@/hooks/useMessageActions'
 const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
   const [newMessage, setNewMessage] = useState('')
   const [error, setError] = useState<string | undefined>(undefined)
+  const [isMobile, setIsMobile] = useState(false)
 
   // Состояние для редактирования сообщений
   const [editModal, setEditModal] = useState<{
@@ -43,6 +44,18 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
 
   // Ref для отслеживания, был ли чат уже помечен как прочитанный в этой сессии
   const hasMarkedAsReadRef = useRef(false)
+
+  // Определяем мобильное устройство при монтировании
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768) // md breakpoint
+    }
+
+    checkIsMobile()
+    window.addEventListener('resize', checkIsMobile)
+
+    return () => window.removeEventListener('resize', checkIsMobile)
+  }, [])
 
   // Используем проп isInCall если он передан, иначе из store
   const effectiveIsInCall = isInCall !== undefined ? isInCall : storeIsInCall
@@ -245,8 +258,9 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
 
   return (
     <div className="h-full flex flex-col hover:ring-2 hover:ring-border/60 dark:hover:ring-white/30 transition-all duration-300" onClick={focusInput}>
-      {/* Скрываем хэдер во время звонка - информация уже видна в интерфейсе звонка */}
-      {!effectiveIsInCall && (
+      {/* На мобильных устройствах всегда показываем хэдер, так как звонок показывается в отдельном модальном окне
+          На десктопе скрываем хэдер только если звонок активен, так как там звонок показывается в интерфейсе чата */}
+      {isMobile || !effectiveIsInCall ? (
         <ChatHeader
           chat={chat}
           onBack={onBack}
@@ -257,7 +271,7 @@ const ChatInterface = ({ chat, onBack, isInCall }: ChatInterfaceProps) => {
           typingUsers={typingUsers}
           currentUserId={userId || undefined}
         />
-      )}
+      ) : null}
 
       <MessagesArea
         messages={messages}

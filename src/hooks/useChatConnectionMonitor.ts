@@ -127,10 +127,10 @@ export const useChatConnectionMonitor = ({
     // Время с последнего сообщения
     const timeSinceLastMessage = now - health.lastMessageReceived
     
-    // Критическое время без активности - 3 минуты
-    const CRITICAL_INACTIVE_TIME = 3 * 60 * 1000
-    // 🔥 ИСПРАВЛЕНИЕ: Предупреждающее время - 1 минута компромисс
-    const WARNING_INACTIVE_TIME = 60 * 1000
+    // Критическое время без активности - 8 минут (увеличено для стабильности)
+    const CRITICAL_INACTIVE_TIME = 8 * 60 * 1000
+    // Предупреждающее время - 3 минуты
+    const WARNING_INACTIVE_TIME = 3 * 60 * 1000
     
     console.log('🔍 ChatConnectionMonitor: Health check', {
       chatId: chatId.slice(0, 8),
@@ -140,8 +140,8 @@ export const useChatConnectionMonitor = ({
       isHealthy: health.isHealthy
     })
     
-    // Если долго нет сообщений - отправляем ping
-    if (timeSinceLastMessage > WARNING_INACTIVE_TIME && health.lastPingSent < now - 30000) {
+    // Если долго нет сообщений - отправляем ping (более консервативно)
+    if (timeSinceLastMessage > WARNING_INACTIVE_TIME && health.lastPingSent < now - 120000) { // 2 минуты между пингами
       console.log('⚠️ ChatConnectionMonitor: Long time without messages, sending ping')
       sendPing()
     }
@@ -194,16 +194,16 @@ export const useChatConnectionMonitor = ({
       connectionScore: 100
     }
 
-    // Регулярная проверка здоровья каждые 30 секунд
-    monitorIntervalRef.current = setInterval(checkConnectionHealth, 30000)
+    // Регулярная проверка здоровья каждые 60 секунд (снижена нагрузка)
+    monitorIntervalRef.current = setInterval(checkConnectionHealth, 60000)
     
-    // 🔥 ИСПРАВЛЕНИЕ: Ping каждые 45 секунд - компромисс между активностью и спамом
+    // Ping только при реальной необходимости - каждые 5 минут если нет активности
     pingIntervalRef.current = setInterval(() => {
       const timeSinceLastMessage = Date.now() - healthRef.current.lastMessageReceived
-      if (timeSinceLastMessage > 45 * 1000) { // 45 секунд - компромисс
+      if (timeSinceLastMessage > 5 * 60 * 1000) { // 5 минут без активности
         sendPing()
       }
-    }, 45 * 1000) // 45 секунд компромисс
+    }, 5 * 60 * 1000) // Проверка каждые 5 минут
 
     // Подписываемся на pong ответы
     const channelName = `global_messages_${userId.substring(0, 8)}`
