@@ -12,6 +12,7 @@ interface UserProfile {
   avatar_url?: string
   last_seen: string | null
   status?: string
+  is_creator?: boolean
 }
 
 export const useUsers = () => {
@@ -66,7 +67,8 @@ export const useUsers = () => {
           display_name: user.display_name,
           avatar_url: user.avatar_url,
           last_seen: user.last_seen,
-          status: user.status
+          status: user.status,
+          is_creator: user.is_creator || false
         }))
 
         setUsers(usersData)

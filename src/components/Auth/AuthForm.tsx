@@ -73,15 +73,22 @@ const AuthForm = () => {
       }
 
       if (data.user) {
-        // Сохраняем email для показа в модальном окне
-        setRegisteredEmail(email)
-        setShowEmailVerification(true)
-        setError(null) // Очищаем ошибки
+        // Проверяем, подтвержден ли email
+        const isEmailConfirmed = data.user.email_confirmed_at !== null
         
-        // НЕ устанавливаем пользователя как аутентифицированного до подтверждения email
-        // setUser(data.user)
-        // setUserId(data.user.id)
-        // setAuthenticated(true)
+        if (isEmailConfirmed) {
+          // Email уже подтвержден (автоподтверждение в Supabase)
+          setUser(data.user)
+          setUserId(data.user.id)
+          setAuthenticated(true)
+          console.log('🎉 Email автоматически подтвержден, пользователь авторизован')
+        } else {
+          // Email требует подтверждения - показываем модальное окно
+          setRegisteredEmail(email)
+          setShowEmailVerification(true)
+          setError(null) // Очищаем ошибки
+          console.log('📧 Email требует подтверждения, показываем модальное окно')
+        }
       }
     } catch (err) {
       const translatedError = getDisplayErrorMessage(err as any)

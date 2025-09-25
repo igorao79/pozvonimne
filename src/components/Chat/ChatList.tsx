@@ -17,12 +17,17 @@ interface Chat {
   avatar_url?: string
   last_message?: string
   last_message_at?: string
+  last_message_sender_id?: string
   last_message_sender_name?: string
   unread_count: number
   other_participant_id?: string
   other_participant_name?: string
   other_participant_avatar?: string
+  other_participant_is_creator?: boolean
+  other_participant_status?: string
+  other_participant_last_seen?: string
   created_at: string
+  updated_at?: string
 }
 
 interface ChatListProps {

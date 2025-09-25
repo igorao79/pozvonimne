@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Chat } from './types'
 import { TypingIndicator } from '../TypingIndicator'
 import useCallStore from '@/store/useCallStore'
+import CreatorBadge from '../CreatorBadge'
 
 interface ChatHeaderProps {
   chat: Chat
@@ -213,7 +214,12 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 
           {/* Имя */}
           <div>
-            <h2 className="font-semibold text-foreground">{chat.name}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold text-foreground">{chat.name}</h2>
+              {chat.other_participant_is_creator && (
+                <CreatorBadge />
+              )}
+            </div>
             {chat.type === 'private' && (
               <div className="flex items-center space-x-2">
                 {isOtherParticipantTyping ? (

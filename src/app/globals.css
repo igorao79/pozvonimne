@@ -69,6 +69,10 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
+button, a {
+  @apply cursor-pointer;
+}
+
 /* Custom animations */
 @keyframes pulse {
   0%, 100% {
