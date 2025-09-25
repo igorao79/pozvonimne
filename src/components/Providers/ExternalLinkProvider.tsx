@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { useExternalLinks } from '@/hooks/useExternalLinks'
-import ExternalLinkModal from '@/components/UI/ExternalLinkModal'
+import ExternalLinkModal from '@/components/ui/ExternalLinkModal'
 
 interface ExternalLinkProviderProps {
   children: React.ReactNode
