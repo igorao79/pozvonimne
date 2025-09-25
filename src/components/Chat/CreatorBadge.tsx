@@ -35,3 +35,4 @@ const CreatorBadge = ({ className = '' }: CreatorBadgeProps) => {
 }
 
 export default CreatorBadge
+
