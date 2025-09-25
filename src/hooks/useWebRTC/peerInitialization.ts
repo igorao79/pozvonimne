@@ -7,6 +7,7 @@ import { startKeepAlive, stopKeepAlive, handleKeepAliveMessage } from './keepAli
 import { startConnectionMonitoring, stopConnectionMonitoring } from './connectionMonitor'
 import { resetReconnectionCounter, handlePeerError, handlePeerClose } from './reconnection'
 import { performanceMonitor } from './performanceMonitor'
+import { applyBitrateConstraints, detectOptimalQuality, VIDEO_QUALITY_PRESETS } from '@/utils/videoOptimization'
 
 // Функция для инициализации peer соединения
 export const initializePeer = async (
@@ -103,6 +104,23 @@ export const initializePeer = async (
 
       // Сбрасываем счетчик переподключений при успешном соединении
       resetReconnectionCounter(peerRefs)
+
+      // Применяем оптимальные настройки битрейта для видео
+      setTimeout(async () => {
+        try {
+          const optimalQuality = detectOptimalQuality()
+          const qualitySettings = VIDEO_QUALITY_PRESETS[optimalQuality]
+          const applied = await applyBitrateConstraints(peer, qualitySettings.bitrate)
+          
+          console.log('📺 Applied optimal video quality:', {
+            quality: optimalQuality,
+            settings: qualitySettings,
+            applied
+          })
+        } catch (err) {
+          console.warn('📺 Failed to apply initial bitrate constraints:', err)
+        }
+      }, 1000) // Применяем через секунду после соединения
 
       // Запускаем keep-alive и мониторинг
       startKeepAlive(peerRefs, userId, targetUserId, isCallActive)

@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { createClient } from '@/utils/supabase/client'
+import { createClient, getRedirectUrl } from '@/utils/supabase/client'
 import useCallStore from '@/store/useCallStore'
 import LoginForm from './LoginForm'
 import RegisterForm from './RegisterForm'
+import EmailVerificationModal from './EmailVerificationModal'
 import { ThemeToggler } from '@/components/ui/theme-toggler'
 import { getAssetPath } from '@/lib/utils'
 import OptimizedImage from '@/components/ui/OptimizedImage'
@@ -13,6 +14,9 @@ import { translateAuthError, getDisplayErrorMessage } from '@/utils/authErrorTra
 
 const AuthForm = () => {
   const [isLogin, setIsLogin] = useState(true)
+  const [showEmailVerification, setShowEmailVerification] = useState(false)
+  const [registeredEmail, setRegisteredEmail] = useState('')
+  const [isResendingEmail, setIsResendingEmail] = useState(false)
   const { setUser, setUserId, setAuthenticated, setError, setIsLoading, error, isLoading } = useCallStore()
   
   const supabase = createClient()
@@ -57,7 +61,8 @@ const AuthForm = () => {
         options: {
           data: {
             display_name: displayName
-          }
+          },
+          emailRedirectTo: getRedirectUrl('/auth/callback')
         }
       })
 
@@ -68,16 +73,47 @@ const AuthForm = () => {
       }
 
       if (data.user) {
-        setUser(data.user)
-        setUserId(data.user.id)
-        setAuthenticated(true)
-        setError('Регистрация успешна! Проверьте email для подтверждения.')
+        // Сохраняем email для показа в модальном окне
+        setRegisteredEmail(email)
+        setShowEmailVerification(true)
+        setError(null) // Очищаем ошибки
+        
+        // НЕ устанавливаем пользователя как аутентифицированного до подтверждения email
+        // setUser(data.user)
+        // setUserId(data.user.id)
+        // setAuthenticated(true)
       }
     } catch (err) {
       const translatedError = getDisplayErrorMessage(err as any)
       setError('Произошла ошибка при регистрации: ' + translatedError)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Функция для повторной отправки email подтверждения
+  const handleResendEmail = async () => {
+    if (!registeredEmail) return
+    
+    setIsResendingEmail(true)
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: registeredEmail,
+        options: {
+          emailRedirectTo: getRedirectUrl('/auth/callback')
+        }
+      })
+      
+      if (error) {
+        setError('Ошибка при отправке письма: ' + getDisplayErrorMessage(error))
+      } else {
+        setError('Письмо отправлено повторно! Проверьте почту.')
+      }
+    } catch (err) {
+      setError('Произошла ошибка при отправке письма')
+    } finally {
+      setIsResendingEmail(false)
     }
   }
 
@@ -159,6 +195,15 @@ const AuthForm = () => {
         </div>
         </div>
       </div>
+      
+      {/* Модальное окно подтверждения email */}
+      <EmailVerificationModal
+        isOpen={showEmailVerification}
+        onClose={() => setShowEmailVerification(false)}
+        email={registeredEmail}
+        onResendEmail={handleResendEmail}
+        isResending={isResendingEmail}
+      />
     </div>
   )
 }

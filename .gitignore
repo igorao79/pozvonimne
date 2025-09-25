@@ -25,6 +25,7 @@
 *.pem
 /sql/
 /md/
+/email-templates/
 
 
 # debug

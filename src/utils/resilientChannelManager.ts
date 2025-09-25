@@ -290,7 +290,10 @@ class ResilientChannelManager {
           })
           channelState.lastActivity = Date.now()
           
-          console.log(`💓 [ResilientChannel] Keep-alive sent for: ${channelState.config.channelName}`)
+          // Логируем keep-alive только в debug режиме
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`💓 [ResilientChannel] Keep-alive sent for: ${channelState.config.channelName}`)
+          }
         } catch (error) {
           console.warn(`💓 [ResilientChannel] Keep-alive failed for ${channelState.config.channelName}:`, error)
           channelState.isHealthy = false
@@ -310,12 +313,15 @@ class ResilientChannelManager {
       const timeSinceLastActivity = now - channelState.lastActivity
       const { channelName } = channelState.config
 
-      console.log(`🏥 [ResilientChannel] Health check for ${channelName}:`, {
-        isHealthy: channelState.isHealthy,
-        errorCount: channelState.errorCount,
-        timeSinceLastActivity: `${Math.round(timeSinceLastActivity / 1000)}s`,
-        channelState: channelState.channel?.state
-      })
+      // Логируем health check только в debug режиме или при проблемах
+      if (process.env.NODE_ENV === 'development' || !channelState.isHealthy) {
+        console.log(`🏥 [ResilientChannel] Health check for ${channelName}:`, {
+          isHealthy: channelState.isHealthy,
+          errorCount: channelState.errorCount,
+          timeSinceLastActivity: `${Math.round(timeSinceLastActivity / 1000)}s`,
+          channelState: channelState.channel?.state
+        })
+      }
 
       // Проверяем критические условия для чатов - увеличиваем таймаут
       const isMessageChannel = channelName.includes('chat_messages_')

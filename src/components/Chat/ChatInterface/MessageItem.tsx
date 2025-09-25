@@ -4,6 +4,7 @@ import { formatMessageTime } from './utils'
 import { MessageContextMenu } from './MessageContextMenu'
 import { SimpleMessageStatus } from './SimpleMessageStatus'
 import { useMessageVisibility, useMessageReadTracking } from '@/hooks/useMessageVisibility'
+import LinkRenderer from '../MessageContent/LinkRenderer'
 // CallMessage импортируется в MessagesArea, а не здесь
 
 interface MessageItemProps {
@@ -109,7 +110,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         <p className="text-xs text-muted-foreground mb-1">{message.sender_name}</p>
       )}
 
-      <p className="text-sm message-content">{message.content}</p>
+      <LinkRenderer 
+        content={message.content} 
+        isOwn={isOwn}
+      />
 
       <div className="flex items-center justify-between mt-1">
         <div className="flex items-center space-x-2">

@@ -3,6 +3,7 @@
 import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
 import useScreenShare from '@/hooks/useScreenShare'
+import VideoQualityControl from './VideoQualityControl'
 
 interface CallControlsProps {
   isStreamHidden: boolean
@@ -137,6 +138,12 @@ const CallControls = ({ isStreamHidden, onToggleStreamVisibility }: CallControls
           )}
         </button>
       )}
+
+      {/* Video Quality Control */}
+      <VideoQualityControl 
+        peer={useCallStore.getState().peer}
+        className="relative"
+      />
     </div>
   )
 }

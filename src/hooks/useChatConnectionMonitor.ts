@@ -127,28 +127,34 @@ export const useChatConnectionMonitor = ({
     // Время с последнего сообщения
     const timeSinceLastMessage = now - health.lastMessageReceived
     
-    // Критическое время без активности - 8 минут (увеличено для стабильности)
-    const CRITICAL_INACTIVE_TIME = 8 * 60 * 1000
-    // Предупреждающее время - 3 минуты
-    const WARNING_INACTIVE_TIME = 3 * 60 * 1000
+    // Критическое время без активности - 15 минут (увеличено для меньших ложных срабатываний)
+    const CRITICAL_INACTIVE_TIME = 15 * 60 * 1000
+    // Предупреждающее время - 10 минут
+    const WARNING_INACTIVE_TIME = 10 * 60 * 1000
     
-    console.log('🔍 ChatConnectionMonitor: Health check', {
-      chatId: chatId.slice(0, 8),
-      timeSinceLastMessage: Math.round(timeSinceLastMessage / 1000) + 's',
-      consecutiveFailures: health.consecutiveFailures,
-      connectionScore: health.connectionScore,
-      isHealthy: health.isHealthy
-    })
+    // Логируем только при проблемах или в debug режиме
+    const isDebugMode = process.env.NODE_ENV === 'development'
+    if (isDebugMode && timeSinceLastMessage > WARNING_INACTIVE_TIME) {
+      console.log('🔍 ChatConnectionMonitor: Health check', {
+        chatId: chatId.slice(0, 8),
+        timeSinceLastMessage: Math.round(timeSinceLastMessage / 1000) + 's',
+        consecutiveFailures: health.consecutiveFailures,
+        connectionScore: health.connectionScore,
+        isHealthy: health.isHealthy
+      })
+    }
     
     // Если долго нет сообщений - отправляем ping (более консервативно)
-    if (timeSinceLastMessage > WARNING_INACTIVE_TIME && health.lastPingSent < now - 120000) { // 2 минуты между пингами
-      console.log('⚠️ ChatConnectionMonitor: Long time without messages, sending ping')
+    if (timeSinceLastMessage > WARNING_INACTIVE_TIME && health.lastPingSent < now - 300000) { // 5 минут между пингами
+      if (isDebugMode) {
+        console.log('⚠️ ChatConnectionMonitor: Long time without messages, sending ping')
+      }
       sendPing()
     }
     
-    // Критическое состояние - соединение мертво
-    if (timeSinceLastMessage > CRITICAL_INACTIVE_TIME && health.consecutiveFailures >= 2) {
-      console.error('💀 ChatConnectionMonitor: Connection appears dead, triggering recovery')
+    // Критическое состояние - соединение мертво (только после 15 минут и 3+ ошибок)
+    if (timeSinceLastMessage > CRITICAL_INACTIVE_TIME && health.consecutiveFailures >= 3) {
+      console.warn('💀 ChatConnectionMonitor: Connection appears dead after 15 minutes, triggering recovery')
       health.isHealthy = false
       health.connectionScore = 0
       onConnectionIssue?.()

@@ -51,13 +51,18 @@ export const getPeerConfig = (): PeerConfig => ({
 // Получить конфигурацию для offer
 export const getOfferOptions = () => ({
   offerToReceiveAudio: true,
-  offerToReceiveVideo: true  // Всегда разрешаем получать video (для screen sharing)
+  offerToReceiveVideo: true,  // Всегда разрешаем получать video (для screen sharing)
+  // Оптимизация для высокого качества видео
+  voiceActivityDetection: false, // Отключаем VAD для стабильности
+  iceRestart: false
 })
 
 // Получить конфигурацию для answer
 export const getAnswerOptions = () => ({
   offerToReceiveAudio: true,
-  offerToReceiveVideo: true  // Всегда разрешаем получать video (для screen sharing)
+  offerToReceiveVideo: true,  // Всегда разрешаем получать video (для screen sharing)
+  // Оптимизация для высокого качества видео
+  voiceActivityDetection: false // Отключаем VAD для стабильности
 })
 
 // Получить конфигурацию data channel

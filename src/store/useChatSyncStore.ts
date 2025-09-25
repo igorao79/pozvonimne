@@ -351,13 +351,16 @@ const useChatSyncStore = create<ChatSyncState>()(
           schema: 'public',
           table: 'user_profiles'
         }, (payload) => {
-          console.log('👥 Глобальное обновление: изменение статуса пользователя', {
-            userId: payload.new?.id?.slice(0, 8),
-            oldStatus: payload.old?.status,
-            newStatus: payload.new?.status,
-            oldLastSeen: payload.old?.last_seen,
-            newLastSeen: payload.new?.last_seen
-          })
+          // Логируем изменения статуса только в debug режиме
+          if (process.env.NODE_ENV === 'development') {
+            console.log('👥 Глобальное обновление: изменение статуса пользователя', {
+              userId: payload.new?.id?.slice(0, 8),
+              oldStatus: payload.old?.status,
+              newStatus: payload.new?.status,
+              oldLastSeen: payload.old?.last_seen,
+              newLastSeen: payload.new?.last_seen
+            })
+          }
 
           // Вызываем refresh для обновления списка пользователей
           const { userRefreshCallbacks } = get()
@@ -387,7 +390,10 @@ const useChatSyncStore = create<ChatSyncState>()(
             // Keep-alive механизм для поддержания соединения
             const keepAliveInterval = setInterval(() => {
               if (get().isGlobalSyncActive) {
-                console.log('💓 Keep-alive ping для глобальной синхронизации')
+                // Логируем keep-alive только в debug режиме
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('💓 Keep-alive ping для глобальной синхронизации')
+                }
                 // Отправляем ping через канал
                 globalChannel.send({
                   type: 'broadcast',

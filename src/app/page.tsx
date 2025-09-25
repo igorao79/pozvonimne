@@ -16,6 +16,7 @@ import { useGlobalTypingManager } from '@/hooks/useGlobalTypingManager'
 import { useGlobalCallManager } from '@/hooks/useGlobalCallManager'
 import useCallStateSynchronizer from '@/hooks/useCallStateSynchronizer'
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
+import ExternalLinkProvider from '@/components/Providers/ExternalLinkProvider'
 import { User } from 'lucide-react'
 
 export default function Home() {
@@ -187,21 +188,28 @@ export default function Home() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg text-muted-foreground">Загрузка...</p>
+      <ExternalLinkProvider>
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-lg text-muted-foreground">Загрузка...</p>
+          </div>
         </div>
-      </div>
+      </ExternalLinkProvider>
     )
   }
 
   if (!isAuthenticated) {
-    return <AuthForm />
+    return (
+      <ExternalLinkProvider>
+        <AuthForm />
+      </ExternalLinkProvider>
+    )
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-background transition-colors">
+    <ExternalLinkProvider>
+      <div className="h-screen flex flex-col overflow-hidden bg-background transition-colors">
       {/* Header */}
       <header className="bg-card shadow-sm border-b border-border flex-shrink-0 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -270,6 +278,7 @@ export default function Home() {
       )}
 
       
-    </div>
+      </div>
+    </ExternalLinkProvider>
   )
 }

@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import useCallStore from '@/store/useCallStore'
+import { applyBitrateConstraints, VideoPerformanceMonitor, detectOptimalQuality, VIDEO_QUALITY_PRESETS } from '@/utils/videoOptimization'
 
 export const useScreenShare = () => {
   const {
@@ -15,6 +16,9 @@ export const useScreenShare = () => {
     userId,
     targetUserId
   } = useCallStore()
+
+  // Ref для мониторинга производительности видео
+  const performanceMonitorRef = useRef<VideoPerformanceMonitor | null>(null)
 
   // Функция для ожидания готовности peer connection
   const waitForPeerReady = useCallback(async (maxWaitTime = 5000): Promise<boolean> => {
@@ -88,9 +92,15 @@ export const useScreenShare = () => {
 
       const displayStream = await navigator.mediaDevices.getDisplayMedia({
         video: {
-          width: { ideal: 1920, max: 1920 },
-          height: { ideal: 1080, max: 1080 },
-          frameRate: { ideal: 30, max: 30 }
+          width: { ideal: 1920, max: 2560 },
+          height: { ideal: 1080, max: 1440 },
+          frameRate: { ideal: 60, max: 60 }, // 60 FPS для плавности
+          aspectRatio: { ideal: 16/9 },
+          // Отключаем автоматическое снижение разрешения (browser-specific)
+          ...(navigator.userAgent.includes('Chrome') && {
+            googCpuOveruseDetection: false,
+            googNoiseReduction: false
+          })
         },
         audio: false // Отключаем аудио для упрощения
       })
@@ -130,6 +140,41 @@ export const useScreenShare = () => {
         
         if (success) {
           console.log('📺 Screen sharing successfully started and transmitted')
+          
+          // Применяем оптимальные настройки битрейта для screen sharing
+          setTimeout(async () => {
+            try {
+              const optimalQuality = detectOptimalQuality()
+              const qualitySettings = VIDEO_QUALITY_PRESETS[optimalQuality]
+              
+              // Для screen sharing используем более высокий битрейт
+              const screenSharingBitrate = {
+                minBitrate: Math.max(qualitySettings.bitrate.minBitrate, 3000000), // минимум 3 Mbps
+                maxBitrate: Math.max(qualitySettings.bitrate.maxBitrate, 12000000), // максимум 12 Mbps
+                startBitrate: Math.max(qualitySettings.bitrate.startBitrate || 6000000, 6000000) // старт 6 Mbps
+              }
+              
+              const applied = await applyBitrateConstraints(peer, screenSharingBitrate)
+              console.log('📺 Applied screen sharing bitrate constraints:', {
+                applied,
+                bitrate: screenSharingBitrate
+              })
+              
+              // Запускаем мониторинг производительности
+              if (performanceMonitorRef.current) {
+                performanceMonitorRef.current.stop()
+              }
+              
+              performanceMonitorRef.current = new VideoPerformanceMonitor(peer, optimalQuality)
+              performanceMonitorRef.current.setQualityChangeCallback((newQuality) => {
+                console.log('📺 Video quality automatically adapted to:', newQuality)
+              })
+              performanceMonitorRef.current.start()
+              
+            } catch (err) {
+              console.warn('📺 Failed to apply screen sharing bitrate constraints:', err)
+            }
+          }, 500)
         } else {
           console.warn('📺 Failed to add video track to peer, but screen sharing is local only')
         }
@@ -272,6 +317,12 @@ export const useScreenShare = () => {
   // Остановить демонстрацию экрана
   const handleStopScreenShare = useCallback(async () => {
     console.log('📺 Stopping screen share...')
+
+    // Останавливаем мониторинг производительности
+    if (performanceMonitorRef.current) {
+      performanceMonitorRef.current.stop()
+      performanceMonitorRef.current = null
+    }
 
     // Сначала удаляем треки из peer connection
     let tracksRemoved = false

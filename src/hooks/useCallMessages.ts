@@ -31,6 +31,7 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
 
   const callMessageIdRef = useRef<string | null>(null)
   const callInProgressRef = useRef<boolean>(false)
+  const wasInitiatorRef = useRef<boolean>(false) // Запоминаем, были ли мы инициатором
 
   // Определяем ID чата для звонка
   const getCallChatId = () => {
@@ -149,12 +150,38 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
              'НЕТ АКТИВНОЙ РОЛИ'
     })
 
-    // ТОЛЬКО ИНИЦИАТОР создает и управляет сообщениями о звонке
-    if (!isCallInitiator) {
-      console.log('📞 Я НЕ инициатор звонка - не создаю сообщения')
+    // Сохраняем роль инициатора при начале звонка
+    if (isCallInitiator && !wasInitiatorRef.current) {
+      wasInitiatorRef.current = true
+      console.log('📞 Запоминаем роль инициатора')
+    }
+    
+    // Сбрасываем роль только при полном сбросе состояния И если нет активного сообщения
+    if (!isCalling && !isCallActive && !isInCall && !isReceivingCall && !callInProgressRef.current) {
+      if (wasInitiatorRef.current) {
+        console.log('📞 Сбрасываем роль инициатора после завершения звонка')
+        wasInitiatorRef.current = false
+      }
+    }
+    
+    // ИНИЦИАТОР создает сообщения И управляет их обновлением
+    // НО если у нас есть созданное сообщение, мы должны его обновить независимо от роли
+    const hasActiveMessage = callMessageIdRef.current && callInProgressRef.current
+    const shouldProcessMessages = isCallInitiator || wasInitiatorRef.current || hasActiveMessage
+    
+    if (!shouldProcessMessages) {
+      console.log('📞 Я НЕ инициатор звонка и нет активного сообщения - не создаю сообщения')
       lastCallStateRef.current = currentState
       return
     }
+    
+    console.log('📞 Обрабатываю сообщения о звонке:', {
+      isCallInitiator,
+      wasInitiator: wasInitiatorRef.current,
+      hasActiveMessage,
+      messageId: callMessageIdRef.current?.slice(0, 8),
+      callInProgress: callInProgressRef.current
+    })
 
     // Логика создания/обновления сообщений о звонке - ТОЛЬКО ДЛЯ ИНИЦИАТОРА
 
@@ -171,29 +198,51 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
       updateCallMessage(callChatId, userId, 'active')
     }
 
-    // 3. Звонок завершен - обновляем только если у нас есть созданное сообщение
-    else if (!isInCall && prevState.isInCall && callMessageIdRef.current && callInProgressRef.current) {
-      console.log('📞 Звонок завершен - обновляем статус на ended')
-      const duration = Math.floor(callDurationSeconds)
-      updateCallMessage(callChatId, userId, 'ended', duration)
+    // 3. Обработка завершения звонка - главная логика с приоритетами
+    else if (callMessageIdRef.current && callInProgressRef.current && 
+             ((!isInCall && prevState.isInCall) || 
+              (!isCalling && prevState.isCalling) || 
+              (!isCallActive && prevState.isCallActive))) {
+      
+      console.log('📞 Call end detected - determining end reason:', {
+        wasInCall: prevState.isInCall,
+        nowInCall: isInCall,
+        wasCallActive: prevState.isCallActive,
+        nowCallActive: isCallActive,
+        wasCalling: prevState.isCalling,
+        nowCalling: isCalling,
+        callDuration: callDurationSeconds
+      })
+
+      let endStatus = 'ended'
+      let duration = Math.floor(callDurationSeconds)
+
+      // Определяем причину завершения звонка
+      if (prevState.isCallActive && callDurationSeconds > 0) {
+        // Звонок был активным и продлился некоторое время - нормальное завершение
+        endStatus = 'ended'
+        console.log('📞 Normal call end - call was active with duration:', duration)
+      } else if (prevState.isCalling && !prevState.isCallActive) {
+        // Звонок не был принят - это пропущенный звонок или отмена
+        if (callDurationSeconds < 3) {
+          endStatus = 'missed' // Быстрая отмена - считаем пропущенным
+          console.log('📞 Call missed - cancelled quickly')
+        } else {
+          endStatus = 'rejected' // Звонок некоторое время ждал ответа - отклонен
+          console.log('📞 Call rejected - rang but not answered')
+        }
+        duration = 0 // Для непринятых звонков продолжительность = 0
+      } else {
+        // Fallback - обычное завершение
+        endStatus = 'ended'
+        console.log('📞 Fallback call end')
+      }
+
+      console.log(`📞 Updating call message status to: ${endStatus} with duration: ${duration}`)
+      updateCallMessage(callChatId, userId, endStatus, duration)
       callMessageIdRef.current = null // Сбрасываем ID сообщения
       callInProgressRef.current = false // Сбрасываем флаг звонка
-    }
-
-    // 4. Звонок отклонен получателем - обновляем только если у нас есть созданное сообщение (только инициатор)
-    else if (!isCalling && prevState.isCalling && !prevState.isCallActive && !isCallActive && callMessageIdRef.current && callInProgressRef.current) {
-      console.log('📞 Звонок отклонен - обновляем статус на rejected')
-      updateCallMessage(callChatId, userId, 'rejected')
-      callMessageIdRef.current = null
-      callInProgressRef.current = false
-    }
-
-    // 5. Отмена исходящего звонка - обновляем только если у нас есть созданное сообщение (только инициатор)
-    else if (!isCalling && prevState.isCalling && !prevState.isCallActive && !isCallActive && callMessageIdRef.current && callInProgressRef.current) {
-      console.log('📞 Отмена исходящего звонка - обновляем статус на missed')
-      updateCallMessage(callChatId, userId, 'missed')
-      callMessageIdRef.current = null
-      callInProgressRef.current = false
+      // НЕ сбрасываем wasInitiatorRef здесь - он будет сброшен позже при полном сбросе состояния
     }
 
     // Сохраняем текущее состояние

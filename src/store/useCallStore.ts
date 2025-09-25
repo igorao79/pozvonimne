@@ -23,6 +23,7 @@ interface CallState {
   // Call tracking
   callStartTime: number | null // Время начала звонка в миллисекундах
   callDurationSeconds: number  // Продолжительность звонка в секундах
+  durationInterval: NodeJS.Timeout | null // Интервал для обновления времени звонка
   
   // Media state
   isMicMuted: boolean
@@ -106,6 +107,7 @@ const useCallStore = create<CallStore>((set, get) => ({
   
   callStartTime: null,
   callDurationSeconds: 0,
+  durationInterval: null,
   
   isMicMuted: false,
   localStream: null,
@@ -137,6 +139,25 @@ const useCallStore = create<CallStore>((set, get) => ({
       newState.callStartTime = callStartTime
       newState.callDurationSeconds = 0
       console.log('📞 Call activated at:', new Date(callStartTime).toLocaleTimeString())
+      
+      // Запускаем таймер для обновления callDurationSeconds каждую секунду
+      const durationInterval = setInterval(() => {
+        const state = get()
+        if (state.isCallActive && state.callStartTime) {
+          const duration = Math.floor((Date.now() - state.callStartTime) / 1000)
+          set({ callDurationSeconds: duration })
+        } else {
+          clearInterval(durationInterval)
+        }
+      }, 1000)
+      
+      // Сохраняем интервал для очистки
+      newState.durationInterval = durationInterval
+    }
+    // Если звонок деактивируется, очищаем интервал
+    else if (!isCallActive && currentState.isCallActive && currentState.durationInterval) {
+      clearInterval(currentState.durationInterval)
+      newState.durationInterval = null
     }
     
     set(newState)
@@ -403,10 +424,16 @@ const useCallStore = create<CallStore>((set, get) => ({
   },
   
   endCall: () => {
-    const { peer, localStream, screenStream, callStartTime, isCallActive } = get()
-
+    const { peer, localStream, screenStream, callStartTime, isCallActive, durationInterval } = get()
+    
     console.log('🔚 EndCall: Starting cleanup process')
-
+    
+    // Очищаем интервал таймера
+    if (durationInterval) {
+      clearInterval(durationInterval)
+      console.log('🔚 EndCall: Cleared duration interval')
+    }
+    
     // Вычисляем продолжительность звонка
     let callDurationSeconds = 0
     if (callStartTime && isCallActive) {
@@ -467,6 +494,7 @@ const useCallStore = create<CallStore>((set, get) => ({
       error: null,
       callStartTime: null,
       callDurationSeconds, // Сохраняем продолжительность для использования в компонентах
+      durationInterval: null, // Очищаем ссылку на интервал
       isCallInitiating: false, // Сбрасываем блокировку звонков
       lastCallAttempt: null // Сбрасываем время последнего звонка
     })
@@ -476,7 +504,12 @@ const useCallStore = create<CallStore>((set, get) => ({
   
   // Reset functions
   resetCallState: () => {
-    const { peer, localStream, screenStream } = get()
+    const { peer, localStream, screenStream, durationInterval } = get()
+
+    // Очищаем интервал таймера
+    if (durationInterval) {
+      clearInterval(durationInterval)
+    }
 
     if (peer) {
       peer.destroy()
@@ -508,6 +541,7 @@ const useCallStore = create<CallStore>((set, get) => ({
       error: null,
       callStartTime: null,
       callDurationSeconds: 0,
+      durationInterval: null,
       isCallInitiating: false,
       lastCallAttempt: null
     })

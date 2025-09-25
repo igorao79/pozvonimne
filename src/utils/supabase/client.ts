@@ -1,10 +1,27 @@
 import { createBrowserClient } from '@supabase/ssr'
 
+// Функция для получения правильного redirect URL
+export function getRedirectUrl(path: string = '/auth/callback') {
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}${path}`
+  }
+  
+  // Fallback для server-side
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://pozvonimne.vercel.app'
+  return `${baseUrl}${path}`
+}
+
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        flowType: 'pkce'
+      },
       realtime: {
         // Оптимизированные настройки для стабильного WebSocket соединения
         params: {
