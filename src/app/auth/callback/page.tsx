@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 
-const AuthCallbackPage = () => {
+const AuthCallbackContent = () => {
   const searchParams = useSearchParams()
   const router = useRouter()
   const supabase = createClient()
@@ -63,6 +63,21 @@ const AuthCallbackPage = () => {
         <p className="text-muted-foreground">Обрабатываем аутентификацию...</p>
       </div>
     </div>
+  )
+}
+
+const AuthCallbackPage = () => {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
+          <p className="text-muted-foreground">Загрузка...</p>
+        </div>
+      </div>
+    }>
+      <AuthCallbackContent />
+    </Suspense>
   )
 }
 

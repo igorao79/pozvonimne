@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { CheckCircle, XCircle, Loader2, Home, LogIn } from 'lucide-react'
@@ -12,7 +12,7 @@ import ExternalLinkProvider from '@/components/Providers/ExternalLinkProvider'
 
 type ConfirmationState = 'loading' | 'success' | 'error' | 'expired'
 
-const EmailConfirmationPage = () => {
+const EmailConfirmationContent = () => {
   const [state, setState] = useState<ConfirmationState>('loading')
   const [message, setMessage] = useState('')
   const [countdown, setCountdown] = useState(5)
@@ -271,6 +271,21 @@ const EmailConfirmationPage = () => {
         </footer>
       </div>
     </ExternalLinkProvider>
+  )
+}
+
+const EmailConfirmationPage = () => {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
+          <p className="text-muted-foreground">Загрузка...</p>
+        </div>
+      </div>
+    }>
+      <EmailConfirmationContent />
+    </Suspense>
   )
 }
 
