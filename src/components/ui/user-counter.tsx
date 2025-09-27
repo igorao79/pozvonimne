@@ -250,8 +250,8 @@ export const UserCounter = () => {
   }, [])
 
   return (
-    <div className="mt-6 bg-card/80 backdrop-blur-sm rounded-lg border border-border/50 w-full min-h-[200px] max-w-md mx-auto
-                    p-4 sm:p-6 md:p-4 lg:p-4
+    <div className="mt-6 bg-card/80 backdrop-blur-sm rounded-lg border border-border/50 w-full min-h-[160px] sm:min-h-[200px] max-w-sm sm:max-w-md mx-auto
+                    p-2 sm:p-3 md:p-4 lg:p-4
                     transition-all duration-300 ease-in-out
                     cursor-default select-none
                     mobile-chatlist-random-fact
@@ -265,7 +265,7 @@ export const UserCounter = () => {
             Нашим сервисом пользуется:
           </h4>
 
-           <div className="flex items-center justify-center px-2 min-h-[100px] relative">
+           <div className="flex items-center justify-center px-2 min-h-[80px] sm:min-h-[100px] relative">
              <div className={`w-full transition-all duration-1000 ${
                isInitialLoad ? 'blur-md opacity-60' : 'blur-none opacity-100'
              }`}>
@@ -323,9 +323,9 @@ export const UserCounter = () => {
 
                    {/* Центрированное число - поверх звездочек */}
                    <div className="flex flex-col items-center justify-center relative z-10">
-                     <span 
+                     <span
                        ref={numberRef}
-                       className="text-3xl sm:text-4xl font-bold text-green-500 transition-colors duration-500 mb-2"
+                       className="text-2xl sm:text-3xl md:text-4xl font-bold text-green-500 transition-colors duration-500 mb-1 sm:mb-2"
                      >
                        {userCount}
                      </span>

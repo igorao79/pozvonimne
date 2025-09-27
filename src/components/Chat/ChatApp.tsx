@@ -289,7 +289,6 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
           />
         </div>
 
-
         {/* ChatInterface показывается когда выбран чат */}
         {selectedChat && (
           <ChatInterface
