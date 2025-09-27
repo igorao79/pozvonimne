@@ -68,7 +68,10 @@ export const UserCounter = () => {
   }
 
   const fetchUserCount = async () => {
+    console.log('🎯 UserCounter: fetchUserCount called, userId:', userId)
+
     if (!userId) {
+      console.log('❌ UserCounter: userId отсутствует, устанавливаем ошибку')
       setError('Пользователь не авторизован')
       setIsLoading(false)
       return
@@ -88,12 +91,13 @@ export const UserCounter = () => {
       }
 
       const finalCount = count || 0
+      console.log('✅ UserCounter: данные загружены, count:', finalCount)
       setUserCount(finalCount)
-      
+
       // Запускаем анимацию перебора чисел
       startNumberAnimation(finalCount)
     } catch (err) {
-      console.error('Ошибка загрузки количества пользователей:', err)
+      console.error('❌ UserCounter: Ошибка загрузки количества пользователей:', err)
       setError('Не удалось загрузить данные')
     } finally {
       setIsLoading(false)
@@ -101,7 +105,12 @@ export const UserCounter = () => {
   }
 
   const startNumberAnimation = (finalNumber: number) => {
-    if (!numberRef.current) return
+    console.log('🎬 UserCounter: startNumberAnimation called with finalNumber:', finalNumber)
+
+    if (!numberRef.current) {
+      console.log('❌ UserCounter: numberRef.current отсутствует')
+      return
+    }
 
     // Сразу делаем цифры зелеными
     numberRef.current.style.color = '#22c55e' // text-green-500
@@ -137,6 +146,7 @@ export const UserCounter = () => {
         }
       },
       onComplete: () => {
+        console.log('✨ UserCounter: number animation completed, launching stars animation')
         // Запускаем анимацию звездочек
         setAnimationComplete(true)
         animateStars()
@@ -145,7 +155,16 @@ export const UserCounter = () => {
   }
 
   const animateStars = () => {
-    if (!starsLeftRef.current || !starsRightRef.current || !starsCenterRef.current) return
+    console.log('🌟 UserCounter: animateStars called')
+
+    if (!starsLeftRef.current || !starsRightRef.current || !starsCenterRef.current) {
+      console.log('❌ UserCounter: refs отсутствуют:', {
+        starsLeftRef: !!starsLeftRef.current,
+        starsRightRef: !!starsRightRef.current,
+        starsCenterRef: !!starsCenterRef.current
+      })
+      return
+    }
 
     // Получаем все звездочки из трех групп
     const allStars = [
@@ -153,6 +172,8 @@ export const UserCounter = () => {
       ...Array.from(starsRightRef.current.children),
       ...Array.from(starsCenterRef.current.children)
     ]
+
+    console.log('🌟 UserCounter: found stars:', allStars.length)
 
     // Главный timeline для анимации
     const masterTl = gsap.timeline()
@@ -210,11 +231,12 @@ export const UserCounter = () => {
   }
 
   useEffect(() => {
+    console.log('🔄 UserCounter: useEffect triggered, userId:', userId)
     fetchUserCount()
-    
+
     // Обновляем каждые 5 минут
     const interval = setInterval(fetchUserCount, 5 * 60 * 1000)
-    
+
     return () => clearInterval(interval)
   }, [userId])
 

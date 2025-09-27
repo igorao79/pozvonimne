@@ -332,8 +332,8 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
                   <h3 className="text-lg font-medium text-foreground mb-2">Выберите чат</h3>
                   <p className="text-muted-foreground text-sm">Выберите чат из списка или создайте новый</p>
                 </div>
-                {/* RandomFact и UserCounter только на десктопе */}
-                <div className="hidden md:block">
+                {/* RandomFact и UserCounter */}
+                <div>
                   <RandomFact />
                   <UserCounter />
                 </div>
