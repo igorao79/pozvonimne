@@ -18,7 +18,7 @@ function OAuthCallbackContent() {
 
         if (error) {
           setStatus('error')
-          setMessage('Авторизация была отменена пользователем')
+          setMessage('Авторизация была отменена пользователем.')
           return
         }
 
