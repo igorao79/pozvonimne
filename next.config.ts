@@ -1,11 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Production optimizations
+  // Production optimizations - ВРЕМЕННО ОТКЛЮЧЕНО для диагностики
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production' ? {
-      exclude: ['error', 'warn']
-    } : false,
+    // removeConsole: process.env.NODE_ENV === 'production' ? {
+    //   exclude: ['error', 'warn']
+    // } : false,
+    removeConsole: false, // 🔥 ОТКЛЮЧЕНО для диагностики продакшена
   },
 
   // Vercel Image optimization (enabled for better performance)

@@ -5,6 +5,7 @@ import ChatList from './ChatList'
 import ChatInterface from './ChatInterface'
 import CreateChatModal from './CreateChatModal'
 import { RandomFact } from '@/components/ui/random-fact'
+import { UserCounter } from '@/components/ui/user-counter'
 import useChatSyncStore from '@/store/useChatSyncStore'
 
 interface Chat {
@@ -331,9 +332,10 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
                   <h3 className="text-lg font-medium text-foreground mb-2">Выберите чат</h3>
                   <p className="text-muted-foreground text-sm">Выберите чат из списка или создайте новый</p>
                 </div>
-                {/* RandomFact только на десктопе */}
+                {/* RandomFact и UserCounter только на десктопе */}
                 <div className="hidden md:block">
                   <RandomFact />
+                  <UserCounter />
                 </div>
               </div>
             </div>

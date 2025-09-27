@@ -6,7 +6,13 @@ export const logEnvironment = () => {
       supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing',
       nodeEnv: process.env.NODE_ENV,
       urlLength: process.env.NEXT_PUBLIC_SUPABASE_URL?.length || 0,
-      keyLength: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length || 0
+      keyLength: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length || 0,
+      // 🔥 ДОПОЛНИТЕЛЬНАЯ ДИАГНОСТИКА ДЛЯ ПРОДАКШЕНА
+      urlPrefix: process.env.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 30) + '...',
+      keyPrefix: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.slice(0, 30) + '...',
+      isProduction: process.env.NODE_ENV === 'production',
+      isVercel: !!process.env.VERCEL,
+      vercelEnv: process.env.VERCEL_ENV
     })
   }
 }

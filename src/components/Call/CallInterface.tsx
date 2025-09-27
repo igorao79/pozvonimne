@@ -10,6 +10,7 @@ import { ChatList } from '../Chat'
 import { ChatInterface } from '../Chat'
 import { CreateChatModal } from '../Chat'
 import { RandomFact } from '@/components/ui/random-fact'
+import { UserCounter } from '@/components/ui/user-counter'
 
 interface Chat {
   id: string
@@ -322,6 +323,7 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
                     <p className="text-muted-foreground text-sm">Выберите чат из списка или создайте новый</p>
                   </div>
                   <RandomFact />
+                  <UserCounter />
                 </div>
               </div>
             )}
