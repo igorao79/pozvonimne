@@ -258,6 +258,58 @@ const useChatSyncStore = create<ChatSyncState>()(
           }, 150) // 150мс debounce для группировки обновлений
         })
         .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        }, (payload) => {
+          console.log('🌐 Глобальное обновление: НОВОЕ сообщение', {
+            messageId: payload.new?.id?.slice(0, 8),
+            chatId: payload.new?.chat_id?.slice(0, 8),
+            senderId: payload.new?.sender_id?.slice(0, 8),
+            content: payload.new?.content?.slice(0, 30),
+            type: payload.new?.type,
+            timestamp: new Date().toLocaleTimeString(),
+            registeredCallbacks: get().refreshCallbacks.size
+          })
+
+          // Уведомляем о новом сообщении
+          const messageData = {
+            chatId: payload.new.chat_id,
+            senderId: payload.new.sender_id,
+            content: payload.new.content,
+            messageId: payload.new.id,
+            timestamp: payload.new.created_at,
+            event: 'INSERT',
+            fullPayload: payload.new
+          }
+
+          // Звуковые уведомления
+          const { soundNotificationCallbacks, messageCallbacks } = get()
+          soundNotificationCallbacks.forEach(callback => {
+            try {
+              callback(messageData)
+            } catch (error) {
+              console.error('Ошибка при вызове звукового уведомления для INSERT:', error)
+            }
+          })
+
+          // Уведомления для компонентов чата
+          messageCallbacks.forEach(callback => {
+            try {
+              callback(messageData)
+            } catch (error) {
+              console.error('Ошибка при вызове message callback для INSERT:', error)
+            }
+          })
+
+          // 🔥 ИСПРАВЛЕНИЕ: Debounced обновление списка чатов для новых сообщений
+          clearTimeout(debounceTimeout)
+          debounceTimeout = setTimeout(() => {
+            console.log('🔥 ГЛОБАЛЬНАЯ ПОДПИСКА (INSERT): Уведомляем ChatList о новом сообщении')
+            get().refreshChatList()
+          }, 150) // 150мс debounce для группировки обновлений
+        })
+        .on('postgres_changes', {
           event: 'UPDATE',
           schema: 'public',
           table: 'messages'

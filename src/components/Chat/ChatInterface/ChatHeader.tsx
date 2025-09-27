@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Chat } from './types'
 import { TypingIndicator } from '../TypingIndicator'
+import { useSinglePremiumData } from '@/hooks/usePremiumData'
+import { PremiumNickname } from '@/components/ui'
 import useCallStore from '@/store/useCallStore'
 import CreatorBadge from '../CreatorBadge'
 
@@ -28,6 +30,11 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   const { isCalling, targetUserId, endCall, error: callError, isInCall: isInCallStore } = useCallStore()
   const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'failed'>('idle')
   const [isCancelling, setIsCancelling] = useState(false)
+  
+  // Получаем премиум данные для приватного чата (для другого участника)
+  const { premiumData: otherParticipantPremiumData } = useSinglePremiumData(
+    chat.type === 'private' ? chat.other_participant_id || null : null
+  )
 
   // Определяем, звоним ли мы этому пользователю
   const isCallingThisUser = isCalling && targetUserId === chat.other_participant_id
@@ -215,7 +222,17 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           {/* Имя */}
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-foreground">{chat.name}</h2>
+              {chat.type === 'private' ? (
+                <PremiumNickname 
+                  displayName={chat.name}
+                  premiumData={otherParticipantPremiumData}
+                  showIcon={true}
+                  showGlow={false}
+                  className="font-semibold"
+                />
+              ) : (
+                <h2 className="font-semibold text-foreground">{chat.name}</h2>
+              )}
               {chat.other_participant_is_creator && (
                 <CreatorBadge />
               )}

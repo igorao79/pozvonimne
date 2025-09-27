@@ -297,14 +297,102 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
     if (result && !result.success) {
       // Если отправка не удалась, возвращаем текст
       setNewMessage(result.text || messageText)
-    } else {
-      // Автоматическая прокрутка вниз только при успешной отправке собственного сообщения (как в Telegram)
-      console.log('📜 Автоматическая прокрутка вниз после отправки сообщения')
-      scrollToBottom()
-      // Всегда восстанавливаем фокус после отправки сообщения
-      focusAfterSend()
-    }
+      } else {
+        // 🔥 ЯВНОЕ ОБНОВЛЕНИЕ СПИСКА ЧАТОВ после отправки текстового сообщения
+        console.log('💬 Текстовое сообщение отправлено - обновляем список чатов')
+        refreshChatList()
+
+        // 📡 Broadcast уведомления уже отправлены в useChatMessages.sendMessage
+
+        // Автоматическая прокрутка вниз только при успешной отправке собственного сообщения (как в Telegram)
+        console.log('📜 Автоматическая прокрутка вниз после отправки сообщения')
+        scrollToBottom()
+        // Всегда восстанавливаем фокус после отправки сообщения
+        focusAfterSend()
+      }
   }, [newMessage, sending, userId, sendMessage, focusAfterSend, scrollToBottom])
+
+  const handleVoiceSubmit = useCallback(async (audioBlob: Blob, duration: number) => {
+    if (sending || !userId) return
+
+    try {
+      // Создаем FormData для отправки файла
+      const formData = new FormData()
+      formData.append('file', audioBlob, `voice-${Date.now()}.webm`)
+      formData.append('duration', duration.toString())
+
+      // Загружаем файл в Supabase Storage
+      const fileName = `voice-messages/${userId}/${Date.now()}.webm`
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('chat-files')
+        .upload(fileName, audioBlob, {
+          contentType: 'audio/webm',
+          cacheControl: '3600',
+          upsert: false
+        })
+
+      if (uploadError) {
+        console.error('Ошибка загрузки голосового файла:', uploadError)
+        setError('Не удалось загрузить голосовое сообщение')
+        return
+      }
+
+      // Получаем публичный URL файла
+      const { data: urlData } = supabase.storage
+        .from('chat-files')
+        .getPublicUrl(fileName)
+
+      // Используем RPC функцию напрямую для голосовых сообщений
+      const { data: messageId, error: sendError } = await supabase.rpc('send_message', {
+        chat_uuid: chat.id,
+        message_content: '',
+        message_type: 'voice',
+        reply_to_uuid: null,
+        metadata: {
+          audio_url: urlData.publicUrl,
+          duration: duration,
+          file_name: fileName
+        }
+      })
+
+      if (sendError) {
+        console.error('Ошибка отправки голосового сообщения:', sendError)
+        // Если отправка не удалась, удаляем файл
+        await supabase.storage
+          .from('chat-files')
+          .remove([fileName])
+        setError('Не удалось отправить голосовое сообщение')
+      } else {
+        // 🔥 ЯВНОЕ ОБНОВЛЕНИЕ СПИСКА ЧАТОВ после отправки голосового сообщения
+        console.log('🎵 Голосовое сообщение отправлено - обновляем список чатов')
+        refreshChatList()
+
+        // 📡 ДОПОЛНИТЕЛЬНО: Отправляем broadcast уведомление для всех клиентов
+        console.log('📡 Отправляем broadcast уведомление о голосовом сообщении')
+        supabase.channel('global_chat_notifications').send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: {
+            messageId: messageId,
+            chatId: chat.id,
+            senderId: userId,
+            content: '🎵 Голосовое сообщение',
+            type: 'voice',
+            timestamp: new Date().toISOString()
+          }
+        }).catch(error => {
+          console.error('Ошибка отправки broadcast уведомления:', error)
+        })
+
+        // Автоматическая прокрутка вниз при успешной отправке
+        scrollToBottom()
+        focusAfterSend()
+      }
+    } catch (error) {
+      console.error('Ошибка отправки голосового сообщения:', error)
+      setError('Не удалось отправить голосовое сообщение')
+    }
+  }, [sending, userId, scrollToBottom, focusAfterSend, supabase, chat.id])
 
   // Обработчик начала редактирования сообщения
   const handleEditMessage = useCallback((messageId: string, currentContent: string) => {
@@ -402,6 +490,7 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
         value={newMessage}
         onChange={setNewMessage}
         onSubmit={handleSendMessage}
+        onVoiceSubmit={handleVoiceSubmit}
         sending={sending}
         chatId={chat.id}
       />

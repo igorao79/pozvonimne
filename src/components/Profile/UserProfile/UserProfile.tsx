@@ -5,12 +5,15 @@ import { useProfileData } from './hooks/useProfileData'
 import { useDisplayNameValidation } from './hooks/useDisplayNameValidation'
 import { useAvatarManager } from './hooks/useAvatarManager'
 import { useProfileActions } from './hooks/useProfileActions'
+import { usePremiumStatus } from './hooks/usePremiumStatus'
 import ProfileHeader from './ProfileHeader'
 import MessageDisplay from './MessageDisplay'
 import AvatarSection from './AvatarSection'
 import DisplayNameSection from './DisplayNameSection'
 import EmailSection from './EmailSection'
 import PasswordResetSection from './PasswordResetSection'
+import DonationSection from './DonationSection'
+import PremiumSettingsSection from './PremiumSettingsSection'
 import { UserProfileProps } from './types'
 
 const UserProfile = ({ onClose }: UserProfileProps) => {
@@ -54,6 +57,8 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
     setError,
     setSuccess
   )
+
+  const { isPremium } = usePremiumStatus(userId)
 
   const handleDisplayNameChange = (value: string) => {
     setNewDisplayName(value)
@@ -99,6 +104,14 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
           </div>
 
           <div className="animate-in slide-in-from-bottom-2 duration-300 delay-375">
+            <DonationSection userId={userId || ''} isPremium={isPremium} />
+          </div>
+
+          <div className="animate-in slide-in-from-bottom-2 duration-300 delay-450">
+            <PremiumSettingsSection userId={userId || ''} isPremium={isPremium} />
+          </div>
+
+          <div className="animate-in slide-in-from-bottom-2 duration-300 delay-525">
             <PasswordResetSection
               loading={loading}
               onPasswordReset={handlePasswordReset}

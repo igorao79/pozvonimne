@@ -23,7 +23,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
 
   // Проверяем, является ли сообщение собственным и не удаленным
   const isOwnMessage = message.sender_id === userId
-  const canEdit = isOwnMessage && !message.is_deleted && message.type === 'text'
+  const canEdit = isOwnMessage && !message.is_deleted && message.type === 'text' && message.type !== 'voice'
   const canDelete = isOwnMessage && !message.is_deleted
 
   // Если пользователь не может редактировать или удалять сообщение, просто возвращаем children

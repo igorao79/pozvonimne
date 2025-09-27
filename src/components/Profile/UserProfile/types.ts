@@ -38,6 +38,16 @@ export interface ProfileHeaderProps {
   onClose: () => void
 }
 
+export interface DonationSectionProps {
+  userId: string
+  isPremium: boolean
+}
+
+export interface PremiumSettingsSectionProps {
+  userId: string
+  isPremium: boolean
+}
+
 
 
 

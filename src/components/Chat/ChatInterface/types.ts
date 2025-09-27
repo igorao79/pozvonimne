@@ -5,7 +5,7 @@ export interface Message {
   sender_name: string
   sender_avatar?: string
   content: string
-  type: 'text' | 'call' | string  // Добавляем тип 'call' для сообщений о звонках
+  type: 'text' | 'call' | 'voice' | string  // Добавляем типы для сообщений
   created_at: string
   updated_at: string
   edited_at?: string
@@ -46,6 +46,7 @@ export interface Chat {
   name: string
   avatar_url?: string
   last_message?: string
+  last_message_type?: string
   last_message_at?: string
   last_message_sender_id?: string
   last_message_sender_name?: string

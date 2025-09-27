@@ -2,11 +2,13 @@ import React, { useState, useRef, useImperativeHandle, forwardRef, useCallback }
 import { EmojiPicker } from './EmojiPicker'
 import { EmojiAutocomplete } from './EmojiAutocomplete'
 import { useTyping } from '@/hooks/useTyping'
+import { VoiceMessageInput } from '@/components/Chat/ChatInterface/VoiceMessageInput'
 
 interface MessageInputProps {
   value: string
   onChange: (value: string) => void
   onSubmit: (e: React.FormEvent) => void
+  onVoiceSubmit?: (audioBlob: Blob, duration: number) => void
   sending: boolean
   disabled?: boolean
   chatId: string
@@ -20,11 +22,13 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
   value,
   onChange,
   onSubmit,
+  onVoiceSubmit,
   sending,
   disabled = false,
   chatId
 }, ref) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [isVoiceMode, setIsVoiceMode] = useState(false)
 
   // 🚀 МГНОВЕННЫЙ ОТКЛИК: Локальное состояние для UI
   const [localValue, setLocalValue] = useState(value)
@@ -171,9 +175,25 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
     setShowEmojiPicker(!showEmojiPicker)
   }, [showEmojiPicker])
 
+  const toggleVoiceMode = useCallback(() => {
+    setIsVoiceMode(!isVoiceMode)
+    setShowEmojiPicker(false) // Закрываем emoji picker при переключении
+  }, [isVoiceMode])
+
   return (
     <div className="p-4 bg-card border-t border-border relative">
-      <form onSubmit={handleSubmit} className="flex space-x-2">
+      {isVoiceMode && onVoiceSubmit ? (
+        <VoiceMessageInput
+          onVoiceSubmit={(audioBlob: Blob, duration: number) => {
+            if (onVoiceSubmit) {
+              onVoiceSubmit(audioBlob, duration)
+              setIsVoiceMode(false) // Возвращаемся в текстовый режим после отправки
+            }
+          }}
+          disabled={inputDisabled}
+        />
+      ) : (
+        <form onSubmit={handleSubmit} className="flex space-x-2">
         <div className="flex-1 relative">
           <input
             ref={inputRef}
@@ -198,6 +218,19 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
           </button>
         </div>
 
+        {/* Кнопка переключения режима */}
+        <button
+          type="button"
+          onClick={toggleVoiceMode}
+          disabled={inputDisabled}
+          className="px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all duration-200 rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          title={isVoiceMode ? "Переключить на текстовый режим" : "Переключить на голосовой режим"}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+          </svg>
+        </button>
+
         <button
           type="submit"
           disabled={!localValue.trim() || inputDisabled}
@@ -212,6 +245,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
           )}
         </button>
       </form>
+      )}
 
       {/* Emoji Autocomplete */}
       <EmojiAutocomplete

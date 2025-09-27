@@ -3,7 +3,10 @@ import { Message, Chat } from './types'
 import { formatMessageTime } from './utils'
 import { MessageContextMenu } from './MessageContextMenu'
 import { SimpleMessageStatus } from './SimpleMessageStatus'
+import { VoiceMessageItem } from './VoiceMessageItem'
 import { useMessageVisibility, useMessageReadTracking } from '@/hooks/useMessageVisibility'
+import { useSinglePremiumData } from '@/hooks/usePremiumData'
+import { PremiumNickname } from '@/components/ui'
 import LinkRenderer from '../MessageContent/LinkRenderer'
 // CallMessage импортируется в MessagesArea, а не здесь
 
@@ -25,6 +28,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onDelete
 }) => {
   const isOwn = message.sender_id === userId
+  
+  // Получаем премиум данные для отправителя сообщения
+  const { premiumData: senderPremiumData } = useSinglePremiumData(
+    !isOwn ? message.sender_id : null
+  )
 
   // Отслеживание видимости сообщения для пометки как прочитанное
   const { elementRef, isVisible, hasBeenVisible } = useMessageVisibility({
@@ -107,13 +115,30 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         : 'bg-card text-foreground border border-border'
     }`}>
       {!isOwn && chat.type === 'group' && (
-        <p className="text-xs text-muted-foreground mb-1">{message.sender_name}</p>
+        <div className="mb-1">
+          <PremiumNickname 
+            displayName={message.sender_name}
+            premiumData={senderPremiumData}
+            showIcon={true}
+            showGlow={false}
+            className="text-xs"
+          />
+        </div>
       )}
 
-      <LinkRenderer 
-        content={message.content} 
-        isOwn={isOwn}
-      />
+      {/* Рендеринг содержимого в зависимости от типа сообщения */}
+      {message.type === 'voice' ? (
+        <VoiceMessageItem
+          audioUrl={message.metadata?.audio_url || ''}
+          duration={message.metadata?.duration || 0}
+          isOwn={isOwn}
+        />
+      ) : (
+        <LinkRenderer
+          content={message.content}
+          isOwn={isOwn}
+        />
+      )}
 
       <div className="flex items-center justify-between mt-1">
         <div className="flex items-center space-x-2">

@@ -250,7 +250,7 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
   }, [chatId, loadMessages])
 
   // Отправка сообщения
-  const sendMessage = useCallback(async (messageText: string) => {
+  const sendMessage = useCallback(async (messageText: string, options?: { type?: string, metadata?: any }) => {
     if (!messageText.trim() || sending || !userId) return { success: false, text: messageText }
 
     const text = messageText.trim()

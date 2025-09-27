@@ -2,6 +2,8 @@
 
 import React from 'react'
 import { usePrivateChatTyping } from '@/hooks/useTypingSelectors'
+import { useSinglePremiumData } from '@/hooks/usePremiumData'
+import { PremiumNickname } from '@/components/ui'
 import useCallStore from '@/store/useCallStore'
 import { TypingDots } from './TypingIndicator'
 
@@ -11,13 +13,19 @@ interface Chat {
   name: string
   avatar_url?: string
   last_message?: string
+  last_message_type?: string
   last_message_at?: string
+  last_message_sender_id?: string
   last_message_sender_name?: string
-  unread_count: number
+  unread_count?: number
   other_participant_id?: string
   other_participant_name?: string
   other_participant_avatar?: string
-  created_at: string
+  other_participant_is_creator?: boolean
+  other_participant_status?: string
+  other_participant_last_seen?: string
+  created_at?: string
+  updated_at?: string
 }
 
 interface ChatListItemProps {
@@ -38,6 +46,10 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
   // Получаем текущего пользователя для исключения
   const { userId } = useCallStore()
 
+  // Получаем премиум данные для приватного чата (для другого участника)
+  const { premiumData: otherParticipantPremiumData } = useSinglePremiumData(
+    chat.type === 'private' ? chat.other_participant_id || null : null
+  )
 
   // Получаем typing users из оптимизированного хука для приватных чатов (исключаем себя)
   const typingUsers = usePrivateChatTyping(chat.id, chat.type === 'private', userId || undefined)
@@ -48,7 +60,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
   React.useEffect(() => {
     if (Math.random() < 0.05) { // Логируем только 5% обновлений
       console.log(`📱 ChatListItem [${chat.id.slice(0, 8)}] получил обновление:`, {
-        unread_count: chat.unread_count,
+        unread_count: chat.unread_count ?? 0,
         last_message: chat.last_message?.slice(0, 20),
         last_message_at: chat.last_message_at,
         isSelected
@@ -88,18 +100,28 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
         {/* Информация о чате */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium text-foreground text-sm truncate">
-              {chat.name}
-            </h3>
+            {chat.type === 'private' ? (
+              <PremiumNickname 
+                displayName={chat.name}
+                premiumData={otherParticipantPremiumData}
+                showIcon={true}
+                showGlow={false}
+                className="font-medium text-sm truncate"
+              />
+            ) : (
+              <h3 className="font-medium text-foreground text-sm truncate">
+                {chat.name}
+              </h3>
+            )}
             <div className="flex items-center space-x-1">
               {chat.last_message_at && (
                 <span className="text-xs text-muted-foreground">
                   {formatLastMessageTime(chat.last_message_at)}
                 </span>
               )}
-              {chat.unread_count > 0 && (
+              {(chat.unread_count ?? 0) > 0 && (
                 <div className="bg-primary text-primary-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                  {chat.unread_count > 99 ? '99+' : chat.unread_count}
+                  {(chat.unread_count ?? 0) > 99 ? '99+' : (chat.unread_count ?? 0)}
                 </div>
               )}
             </div>
@@ -119,7 +141,17 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                 {chat.last_message_sender_name && chat.type === 'group' && (
                   <span className="text-muted-foreground/70">{chat.last_message_sender_name}: </span>
                 )}
-                {truncateText(chat.last_message, 35)}
+                {chat.last_message_type === 'voice'
+                  ? 'Голосовое сообщение'
+                  : truncateText(chat.last_message, 35)
+                }
+              </p>
+            ) : chat.last_message_type === 'voice' ? (
+              <p className="text-xs text-muted-foreground truncate">
+                {chat.last_message_sender_name && chat.type === 'group' && (
+                  <span className="text-muted-foreground/70">{chat.last_message_sender_name}: </span>
+                )}
+                Голосовое сообщение
               </p>
             ) : null}
           </div>

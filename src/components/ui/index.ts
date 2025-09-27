@@ -1,3 +1,8 @@
 export { ThemeToggler } from './theme-toggler';
 export { RandomFact } from './random-fact';
 export { UserCounter } from './user-counter';
+export { default as PremiumModal } from './PremiumModal';
+export { default as ExternalLinkModal } from './ExternalLinkModal';
+export { default as CreatorModal } from './CreatorModal';
+export { default as PremiumNickname } from './PremiumNickname';
+export { default as PremiumSettingsModal } from './PremiumSettingsModal';

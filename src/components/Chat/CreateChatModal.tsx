@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { usePremiumData } from '@/hooks/usePremiumData'
+import { PremiumNickname } from '@/components/ui'
 import useCallStore from '@/store/useCallStore'
 import useUsers from '@/hooks/useUsers'
 
@@ -29,6 +31,10 @@ const CreateChatModal = ({ isOpen, onClose, onChatCreated }: CreateChatModalProp
   const { userId } = useCallStore()
   const { users, loading: usersLoading } = useUsers()
   const supabase = createClient()
+  
+  // Получаем премиум данные для всех пользователей
+  const userIds = users.map(user => user.id)
+  const { getPremiumDataForUser } = usePremiumData(userIds)
 
   // Сброс состояния при открытии/закрытии модала
   useEffect(() => {
@@ -228,9 +234,16 @@ const CreateChatModal = ({ isOpen, onClose, onChatCreated }: CreateChatModalProp
 
                     {/* Информация */}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">
-                        {user.display_name || user.username}
-                      </p>
+                      <div className="truncate">
+                        <PremiumNickname 
+                          displayName={user.display_name}
+                          username={user.username}
+                          premiumData={getPremiumDataForUser(user.id)}
+                          showIcon={true}
+                          showGlow={false}
+                          className="font-medium"
+                        />
+                      </div>
                       <p className={`text-xs truncate ${
                         getUserStatus(user) === 'онлайн' 
                           ? 'text-green-600 dark:text-green-400' 
