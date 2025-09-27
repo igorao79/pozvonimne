@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, CheckCircle, XCircle, Crown } from 'lucide-react'
 
-export default function OAuthCallbackPage() {
+function OAuthCallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
@@ -138,5 +138,28 @@ export default function OAuthCallbackPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-lg">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">
+            Загрузка...
+          </h2>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function OAuthCallbackPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <OAuthCallbackContent />
+    </Suspense>
   )
 }
