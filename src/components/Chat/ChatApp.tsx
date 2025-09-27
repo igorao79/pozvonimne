@@ -289,6 +289,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
           />
         </div>
 
+
         {/* ChatInterface показывается когда выбран чат */}
         {selectedChat && (
           <ChatInterface
@@ -299,6 +300,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
           />
         )}
       </div>
+
 
       {/* Десктопная версия - всегда показываем оба компонента */}
       <div className="hidden md:flex w-full overflow-hidden">

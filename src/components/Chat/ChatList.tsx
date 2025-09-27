@@ -6,6 +6,7 @@ import useChatSyncStore from '@/store/useChatSyncStore'
 import useCallStore from '@/store/useCallStore'
 import ChatListItem from './ChatListItem'
 import { RandomFact } from '@/components/ui/random-fact'
+import { UserCounter } from '@/components/ui/user-counter'
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
 import { useChatListRealtime } from '@/hooks/useChatListRealtime' // 🔥 ПРЯМАЯ ПОДПИСКА
 import { Volume2 } from 'lucide-react'
@@ -544,10 +545,13 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
                 />
               ))}
             </div>
-            {/* RandomFact только на мобильных устройствах */}
+            {/* RandomFact и UserCounter только на мобильных устройствах */}
             <div className="md:hidden">
               <div className="mobile-chatlist-random-fact">
                 <RandomFact />
+              </div>
+              <div className="mt-4">
+                <UserCounter />
               </div>
             </div>
           </>
