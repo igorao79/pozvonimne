@@ -68,10 +68,7 @@ export const UserCounter = () => {
   }
 
   const fetchUserCount = async () => {
-    console.log('🎯 UserCounter: fetchUserCount called, userId:', userId)
-
     if (!userId) {
-      console.log('❌ UserCounter: userId отсутствует, устанавливаем ошибку')
       setError('Пользователь не авторизован')
       setIsLoading(false)
       return
@@ -91,7 +88,6 @@ export const UserCounter = () => {
       }
 
       const finalCount = count || 0
-      console.log('✅ UserCounter: данные загружены, count:', finalCount)
       setUserCount(finalCount)
 
       // Запускаем анимацию перебора чисел
@@ -105,10 +101,20 @@ export const UserCounter = () => {
   }
 
   const startNumberAnimation = (finalNumber: number) => {
-    console.log('🎬 UserCounter: startNumberAnimation called with finalNumber:', finalNumber)
+    // Проверяем что мы на клиентской стороне и GSAP доступен
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    if (!gsap || typeof gsap.to !== 'function') {
+      if (numberRef.current) {
+        numberRef.current.textContent = finalNumber.toString()
+        numberRef.current.style.color = '#22c55e'
+      }
+      return
+    }
 
     if (!numberRef.current) {
-      console.log('❌ UserCounter: numberRef.current отсутствует')
       return
     }
 
@@ -146,7 +152,6 @@ export const UserCounter = () => {
         }
       },
       onComplete: () => {
-        console.log('✨ UserCounter: number animation completed, launching stars animation')
         // Запускаем анимацию звездочек
         setAnimationComplete(true)
         animateStars()
@@ -155,14 +160,16 @@ export const UserCounter = () => {
   }
 
   const animateStars = () => {
-    console.log('🌟 UserCounter: animateStars called')
+    // Проверяем что мы на клиентской стороне и GSAP доступен
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    if (!gsap || typeof gsap.timeline !== 'function') {
+      return
+    }
 
     if (!starsLeftRef.current || !starsRightRef.current || !starsCenterRef.current) {
-      console.log('❌ UserCounter: refs отсутствуют:', {
-        starsLeftRef: !!starsLeftRef.current,
-        starsRightRef: !!starsRightRef.current,
-        starsCenterRef: !!starsCenterRef.current
-      })
       return
     }
 
@@ -172,8 +179,6 @@ export const UserCounter = () => {
       ...Array.from(starsRightRef.current.children),
       ...Array.from(starsCenterRef.current.children)
     ]
-
-    console.log('🌟 UserCounter: found stars:', allStars.length)
 
     // Главный timeline для анимации
     const masterTl = gsap.timeline()
@@ -187,8 +192,9 @@ export const UserCounter = () => {
       let finalX: number, finalY: number
       let attempts = 0
       do {
-        finalX = gsap.utils.random(-120, 120)
-        finalY = gsap.utils.random(-90, 90)
+        // Уменьшенный радиус для мобильных устройств
+        finalX = gsap.utils.random(-80, 80)
+        finalY = gsap.utils.random(-60, 60)
         attempts++
         // Проверяем, не слишком ли близко к занятым позициям
         const tooClose = occupiedPositions.some(pos =>
@@ -231,7 +237,6 @@ export const UserCounter = () => {
   }
 
   useEffect(() => {
-    console.log('🔄 UserCounter: useEffect triggered, userId:', userId)
     fetchUserCount()
 
     // Обновляем каждые 5 минут
@@ -249,13 +254,28 @@ export const UserCounter = () => {
     return () => clearTimeout(timer)
   }, [])
 
+  // Дополнительный эффект для проверки hydration и GSAP
+  useEffect(() => {
+    // Проверяем что компонент полностью загружен на клиенте
+    if (typeof window !== 'undefined') {
+      // Небольшая задержка чтобы убедиться что все загружено
+      const checkGsap = setTimeout(() => {
+        if (!gsap) {
+          console.error('❌ UserCounter: GSAP не загружен после hydration')
+        }
+      }, 100)
+      
+      return () => clearTimeout(checkGsap)
+    }
+  }, [])
+
   return (
     <div className="mt-6 bg-card/80 backdrop-blur-sm rounded-lg border border-border/50 w-full min-h-[160px] sm:min-h-[200px] max-w-sm sm:max-w-md mx-auto
-                    p-2 sm:p-3 md:p-4 lg:p-4
-                    transition-all duration-300 ease-in-out
-                    cursor-default select-none
-                    mobile-chatlist-random-fact
-                    overflow-hidden">
+                      p-2 sm:p-3 md:p-4 lg:p-4
+                      transition-all duration-300 ease-in-out
+                      cursor-default select-none
+                      mobile-chatlist-random-fact
+                      overflow-hidden">
       
       <div className="flex flex-col h-full">
         <div className="flex-1 flex flex-col justify-center w-full">

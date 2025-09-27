@@ -1,12 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Production optimizations - ВРЕМЕННО ОТКЛЮЧЕНО для диагностики
+  // Production optimizations
   compiler: {
-    // removeConsole: process.env.NODE_ENV === 'production' ? {
-    //   exclude: ['error', 'warn']
-    // } : false,
-    removeConsole: false, // 🔥 ОТКЛЮЧЕНО для диагностики продакшена
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn']
+    } : false,
   },
 
   // Vercel Image optimization (enabled for better performance)
@@ -17,7 +16,7 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 60,
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; sandbox;",
   },
 
   // Experimental features for better performance
@@ -25,8 +24,8 @@ const nextConfig: NextConfig = {
     optimizePackageImports: [
       'lucide-react', 
       '@supabase/supabase-js',
-      'react-virtuoso',
-      'gsap'
+      'react-virtuoso'
+      // Убираем GSAP из optimizePackageImports для предотвращения проблем с tree-shaking
     ],
     // Enable modern features for better performance
     // Performance optimizations
