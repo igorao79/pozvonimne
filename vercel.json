@@ -4,6 +4,7 @@
   "installCommand": "npm install",
   "framework": null,
   "outputDirectory": ".next",
+  "ignoreCommand": "",
   "functions": {
     "src/app/api/**/*.ts": {
       "maxDuration": 30
