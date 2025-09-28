@@ -180,6 +180,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
     setShowEmojiPicker(false) // Закрываем emoji picker при переключении
   }, [isVoiceMode])
 
+
   return (
     <div className="p-4 bg-card border-t border-border relative">
       {isVoiceMode && onVoiceSubmit ? (
@@ -191,6 +192,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
             }
           }}
           disabled={inputDisabled}
+          chatId={chatId}
         />
       ) : (
         <form onSubmit={handleSubmit} className="flex space-x-2">

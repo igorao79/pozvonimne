@@ -7,13 +7,15 @@ interface TypingIndicatorProps {
   className?: string
   showText?: boolean
   text?: string
+  isRecordingVoice?: boolean
 }
 
 export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   size = 'md',
   className = '',
   showText = true,
-  text = 'печатает...'
+  text = 'печатает...',
+  isRecordingVoice = false
 }) => {
   const sizeClasses = {
     sm: {
@@ -34,6 +36,9 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   }
 
   const currentSize = sizeClasses[size]
+
+  // Определяем текст в зависимости от состояния
+  const displayText = isRecordingVoice ? 'записывает голосовое...' : text
 
   return (
     <div className={`flex items-center space-x-2 ${className}`}>
@@ -56,7 +61,7 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
       {/* Текст */}
       {showText && (
         <span className={`text-muted-foreground ${currentSize.text} italic`}>
-          {text}
+          {displayText}
         </span>
       )}
     </div>

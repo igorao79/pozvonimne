@@ -95,10 +95,11 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
 
   const { messageInputRef, focusInput, focusAfterSend, disableAutoFocus, enableAutoFocus } = useChatFocus()
 
-  const { handleCall, handleCancelCall } = useChatActions({ 
-    chat, 
+  const { handleCall, handleCancelCall } = useChatActions({
+    chat,
     onError: setError
   })
+
 
   // Хуки для работы с сообщениями
   const { editMessage, deleteMessage } = useMessageActions()

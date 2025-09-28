@@ -1,14 +1,19 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { Mic, StopCircle, Play, Pause } from 'lucide-react'
+import { useTyping } from '@/hooks/useTyping'
+import useCallStore from '@/store/useCallStore'
+import useSupabaseStore from '@/store/useSupabaseStore'
 
 interface VoiceMessageInputProps {
   onVoiceSubmit: (audioBlob: Blob, duration: number) => void
   disabled?: boolean
+  chatId: string
 }
 
 export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
   onVoiceSubmit,
-  disabled = false
+  disabled = false,
+  chatId
 }) => {
   const [isRecording, setIsRecording] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -16,6 +21,17 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
+  const [typingStarted, setTypingStarted] = useState(false)
+
+  // Получаем данные из stores
+  const { userId } = useCallStore()
+  const { supabase } = useSupabaseStore()
+
+  // Хук для typing indicator
+  const { startTyping, stopTyping } = useTyping({
+    chatId,
+    enabled: !disabled
+  })
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -24,6 +40,7 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const animationRef = useRef<number | null>(null)
+  const serverIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Проверяем разрешение на использование микрофона
   useEffect(() => {
@@ -32,9 +49,14 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
       .catch(() => setHasPermission(false))
   }, [])
 
+
   // Очистка при размонтировании
   useEffect(() => {
     return () => {
+      // Останавливаем typing indicator при размонтировании компонента
+      console.log('🧹 [VoiceMessageInput] Очистка при размонтировании')
+      stopTyping()
+      
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop())
       }
@@ -47,11 +69,29 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current)
       }
+      if (serverIntervalRef.current) {
+        clearInterval(serverIntervalRef.current)
+        serverIntervalRef.current = null
+      }
     }
-  }, [audioUrl])
+  }, [audioUrl, stopTyping])
 
   const startRecording = useCallback(async () => {
-    if (disabled || !hasPermission) return
+    if (disabled || !hasPermission || !userId || !chatId) return
+
+    // Очищаем предыдущий интервал если он есть
+    if (serverIntervalRef.current) {
+      clearInterval(serverIntervalRef.current)
+      serverIntervalRef.current = null
+    }
+
+    // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Устанавливаем индикатор голосовой записи СРАЗУ при начале записи
+    // Это гарантирует, что индикатор появится до того, как пользователь увидит UI
+    if (!typingStarted) {
+      console.log('🎤 [VoiceMessageInput] Устанавливаем индикатор голосовой записи')
+      startTyping('voice')
+      setTypingStarted(true)
+    }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -107,20 +147,71 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
     } catch (error) {
       console.error('Ошибка при запуске записи:', error)
       setHasPermission(false)
-    }
-  }, [disabled, hasPermission])
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
-
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
+      // Очищаем интервал при ошибке
+      if (serverIntervalRef.current) {
+        clearInterval(serverIntervalRef.current)
+        serverIntervalRef.current = null
       }
     }
-  }, [isRecording])
+  }, [disabled, hasPermission, userId, chatId, startTyping, typingStarted])
+
+  const stopRecording = useCallback(async () => {
+    console.log('🎤 [VoiceMessageInput] Остановка записи, isRecording:', isRecording)
+
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+    }
+
+    // Всегда устанавливаем isRecording = false
+    setIsRecording(false)
+
+    // Очищаем интервал сервера
+    if (serverIntervalRef.current) {
+      clearInterval(serverIntervalRef.current)
+      serverIntervalRef.current = null
+    }
+
+    // Очищаем индикатор через useTyping (локальный store + сервер)
+    if (typingStarted) {
+      console.log('🎤 [VoiceMessageInput] Очищаем индикатор голосовой записи')
+      stopTyping()
+      setTypingStarted(false)
+    }
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+  }, [isRecording, stopTyping, typingStarted])
+
+  // Глобальные обработчики событий для надежной остановки записи
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isRecording) {
+        console.log('🎤 [VoiceMessageInput] Глобальный mouseup - останавливаем запись')
+        stopRecording()
+      }
+    }
+
+    const handleGlobalTouchEnd = () => {
+      if (isRecording) {
+        console.log('🎤 [VoiceMessageInput] Глобальный touchend - останавливаем запись')
+        stopRecording()
+      }
+    }
+
+    if (isRecording) {
+      window.addEventListener('mouseup', handleGlobalMouseUp)
+      window.addEventListener('touchend', handleGlobalTouchEnd)
+      window.addEventListener('touchcancel', handleGlobalTouchEnd)
+    }
+
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp)
+      window.removeEventListener('touchend', handleGlobalTouchEnd)
+      window.removeEventListener('touchcancel', handleGlobalTouchEnd)
+    }
+  }, [isRecording]) // Убрали stopRecording из зависимостей, чтобы избежать бесконечного цикла
 
   const playAudio = useCallback(() => {
     if (audioRef.current) {
@@ -136,18 +227,42 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
     }
   }, [])
 
-  const sendVoiceMessage = useCallback(() => {
+  const sendVoiceMessage = useCallback(async () => {
     if (audioBlob && recordingTime > 0) {
+      console.log('🎤 [VoiceMessageInput] Отправка голосового сообщения')
+
       onVoiceSubmit(audioBlob, recordingTime)
+
+      // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Очищаем индикатор через RPC вызов через 1 секунду после отправки
+      setTimeout(async () => {
+        if (typingStarted) {
+          console.log('🎤 [VoiceMessageInput] Очищаем индикатор после отправки голосового сообщения через RPC', { chatId, userId })
+          try {
+            await supabase.rpc('clear_typing_indicator_fixed', {
+              chat_uuid: chatId,
+              user_uuid: userId
+            })
+            console.log('✅ [VoiceMessageInput] Индикатор очищен через RPC')
+          } catch (err) {
+            console.error('❌ [VoiceMessageInput] Ошибка очистки индикатора:', err)
+          }
+          setTypingStarted(false)
+        }
+      }, 1000)
+
       resetState()
     }
-  }, [audioBlob, recordingTime, onVoiceSubmit])
+  }, [audioBlob, recordingTime, onVoiceSubmit, supabase, chatId, userId, typingStarted])
 
   const resetState = useCallback(() => {
+    console.log('🎤 [VoiceMessageInput] Сброс состояния')
+
     setIsRecording(false)
     setIsPlaying(false)
     setRecordingTime(0)
     setAudioBlob(null)
+    setTypingStarted(false)
+
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl)
       setAudioUrl(null)
@@ -159,6 +274,10 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
+    }
+    if (serverIntervalRef.current) {
+      clearInterval(serverIntervalRef.current)
+      serverIntervalRef.current = null
     }
   }, [audioUrl])
 
@@ -214,8 +333,10 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
             <button
               onMouseDown={startRecording}
               onMouseUp={stopRecording}
+              onMouseLeave={stopRecording}
               onTouchStart={startRecording}
               onTouchEnd={stopRecording}
+              onTouchCancel={stopRecording}
               disabled={disabled || hasPermission === null}
               className={`flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 ${
                 isRecording

@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { usePrivateChatTyping } from '@/hooks/useTypingSelectors'
+import { usePrivateChatTyping, useTypingUsersWithTypes } from '@/hooks/useTypingSelectors'
 import { useSinglePremiumData } from '@/hooks/usePremiumData'
 import { PremiumNickname } from '@/components/ui'
 import useCallStore from '@/store/useCallStore'
@@ -43,18 +43,37 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
   formatLastMessageTime,
   truncateText
 }) => {
+  // 🔥 ДИАГНОСТИКА: Логируем каждый рендер
+  console.log(`🔄 ChatListItem [${chat.id.slice(0, 8)}] рендерится`)
   // Получаем текущего пользователя для исключения
   const { userId } = useCallStore()
+  console.log(`👤 ChatListItem: userId=`, userId, 'typeof userId:', typeof userId)
 
   // Получаем премиум данные для приватного чата (для другого участника)
   const { premiumData: otherParticipantPremiumData } = useSinglePremiumData(
     chat.type === 'private' ? chat.other_participant_id || null : null
   )
 
-  // Получаем typing users из оптимизированного хука для приватных чатов (исключаем себя)
-  const typingUsers = usePrivateChatTyping(chat.id, chat.type === 'private', userId || undefined)
+  const typingUsersWithTypes = useTypingUsersWithTypes(chat.id)
+  console.log(`🎯 ChatListItem: typingUsersWithTypes=`, typingUsersWithTypes)
 
-  const isTyping = typingUsers.length > 0
+  // Фильтруем текущего пользователя из списка
+  const otherTypingUsersWithTypes = React.useMemo(() => {
+    if (!userId) return typingUsersWithTypes
+    const filtered = typingUsersWithTypes.filter(user => user.userId !== userId)
+    console.log(`🔍 ChatListItem: filtering - userId=${userId}, typingUsersWithTypes=`, typingUsersWithTypes, 'filtered=', filtered)
+    return filtered
+  }, [typingUsersWithTypes, userId])
+
+  const isTyping = otherTypingUsersWithTypes.length > 0
+
+  // Определяем, есть ли пользователь, который записывает голосовое
+  const isSomeoneRecordingVoice = otherTypingUsersWithTypes.some(user => user.type === 'voice')
+  console.log(`🔍 ChatListItem: computed values - isTyping=${isTyping}, isSomeoneRecordingVoice=${isSomeoneRecordingVoice}`)
+
+  // Определяем, есть ли пользователь, который печатает текст
+  const isSomeoneTypingText = otherTypingUsersWithTypes.some(user => user.type === 'text')
+
 
   // 🔥 ИСПРАВЛЕНИЕ: Throttled debug логи (только 5% обновлений для уменьшения спама)
   React.useEffect(() => {
@@ -63,10 +82,18 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
         unread_count: chat.unread_count ?? 0,
         last_message: chat.last_message?.slice(0, 20),
         last_message_at: chat.last_message_at,
-        isSelected
+        isSelected,
+        isTyping,
+        isSomeoneRecordingVoice,
+        otherTypingUsersWithTypes,
+        typingUsersCount: otherTypingUsersWithTypes.length,
+        chatId: chat.id
       })
     }
-  }, [chat.unread_count, chat.last_message, chat.last_message_at, isSelected])
+  }, [chat.unread_count, chat.last_message, chat.last_message_at, isSelected, isTyping, isSomeoneRecordingVoice, otherTypingUsersWithTypes, chat.id])
+
+  // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Key должен изменяться при изменении typing state для форсированного перерендеринга
+  const componentKey = `${chat.id}-${isTyping}-${isSomeoneRecordingVoice}-${otherTypingUsersWithTypes.length}`
 
   return (
     <div
@@ -74,7 +101,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
       className={`px-2 py-1.5 chat-list-item-hover hover:bg-muted cursor-pointer transition-colors chat-list-item ${
         isSelected ? 'bg-primary/10 border-r-2 border-primary' : ''
       }`}
-      key={chat.id} // Добавляем key для стабильности
+      key={componentKey} // 🔥 ИСПРАВЛЕНИЕ: Key изменяется при изменении typing state
     >
       <div className="flex items-center space-x-1.5">
           {/* Ультракомпактный аватар */}
@@ -132,7 +159,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
             {isTyping ? (
               <div className="flex items-center space-x-1">
                 <span className="text-xs text-primary italic">
-                  печатает
+                  {isSomeoneRecordingVoice ? 'записывает голосовое...' : 'печатает'}
                 </span>
                 <TypingDots size="sm" />
               </div>
@@ -161,4 +188,5 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
   )
 }
 
-export default React.memo(ChatListItem)
+// 🔥 ВРЕМЕННО: Убрали React.memo для диагностики
+export default ChatListItem

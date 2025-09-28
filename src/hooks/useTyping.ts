@@ -5,13 +5,14 @@ import useTypingStore from '@/store/useTypingStore'
 import useCallStore from '@/store/useCallStore'
 import useSupabaseStore from '@/store/useSupabaseStore'
 
+
 interface UseTypingProps {
   chatId: string
   enabled?: boolean
 }
 
 interface UseTypingReturn {
-  startTyping: () => void
+  startTyping: (type?: 'text' | 'voice') => void
   stopTyping: () => void
   handleInputChange: (value: string) => void
   handleSubmit: () => void
@@ -24,6 +25,7 @@ export const useTyping = ({ chatId, enabled = true }: UseTypingProps): UseTyping
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastServerUpdateRef = useRef<number>(0)
   const isInitializedRef = useRef(false)
+  const isComponentMountedRef = useRef(true)
 
   // Логируем только при первой инициализации
   if (!isInitializedRef.current && enabled && chatId && userId) {
@@ -33,7 +35,7 @@ export const useTyping = ({ chatId, enabled = true }: UseTypingProps): UseTyping
 
   const stopTyping = useCallback(async () => {
     if (!enabled || !userId || !chatId) return
-    
+
     console.log(`🛑 [useTyping] Остановка typing для пользователя ${userId} в чате ${chatId}`)
 
     if (typingTimeoutRef.current) {
@@ -67,26 +69,28 @@ export const useTyping = ({ chatId, enabled = true }: UseTypingProps): UseTyping
       if (error) {
         console.error('❌ [useTyping] Ошибка очистки typing indicator:', error)
       } else {
-        console.log(`✅ [useTyping] Typing indicator успешно очищен`, data)
+        console.log(`✅ [useTyping] Typing indicator успешно очищен`, { chatId, userId, data })
       }
     } catch (error) {
       console.error('💥 [useTyping] Исключение при очистке typing indicator:', error)
     }
   }, [enabled, userId, chatId, stopTypingStore, supabase])
 
-  const startTyping = useCallback(async () => {
+  const startTyping = useCallback(async (type: 'text' | 'voice' = 'text') => {
     if (!enabled || !userId || !chatId) return
-    
+
     try {
       // 🚀 ОПТИМИЗАЦИЯ: Сначала быстро обновляем локальное состояние (UI)
-      startTypingStore(chatId, userId)
-      
+      startTypingStore(chatId, userId, type)
+
       // Затем асинхронно отправляем в базу данных (не блокирует UI)
-      const { data, error } = await supabase.rpc('set_typing_indicator_fixed', {
+      // Используем разные RPC функции для разных типов активности
+      const rpcFunction = type === 'voice' ? 'set_voice_typing_indicator' : 'set_typing_indicator_fixed'
+      const { data, error } = await supabase.rpc(rpcFunction as any, {
         chat_uuid: chatId,
         user_uuid: userId
       })
-      
+
       if (error) {
         console.error('❌ [useTyping] Ошибка установки typing indicator:', error)
         // Откатываем локальное состояние при ошибке
@@ -94,19 +98,27 @@ export const useTyping = ({ chatId, enabled = true }: UseTypingProps): UseTyping
         return
       }
       
-      // Автоматически останавливаем через 3 секунды
+      // Очищаем существующие таймауты
       if (typingTimeoutRef.current) {
+        console.log('🧹 [useTyping] Очищаем предыдущий timeout перед созданием нового')
         clearTimeout(typingTimeoutRef.current)
+        typingTimeoutRef.current = null
       }
-      
-      typingTimeoutRef.current = setTimeout(() => {
-        stopTyping()
-      }, 3000)
+
+      // Для текста - таймаут авто-остановки (3 секунды)
+      // Для голоса - индикатор управляется локально в VoiceMessageInput, но начальное состояние устанавливаем
+      if (type === 'text') {
+        typingTimeoutRef.current = setTimeout(() => {
+          stopTyping()
+        }, 3000)
+      }
+      // Для голоса не устанавливаем таймаут - управление индикатором происходит локально
     } catch (error) {
       console.error('💥 [useTyping] Исключение при установке typing indicator:', error)
       stopTypingStore(chatId, userId)
     }
   }, [enabled, userId, chatId, startTypingStore, stopTypingStore, supabase, stopTyping])
+
 
   const handleInputChange = useCallback((value: string) => {
     if (!enabled || !chatId || !userId) return
@@ -149,11 +161,21 @@ export const useTyping = ({ chatId, enabled = true }: UseTypingProps): UseTyping
 
   // Очистка при размонтировании
   useEffect(() => {
+    isComponentMountedRef.current = true
     return () => {
+      console.log('🧹 [useTyping] Очистка при размонтировании хука', { chatId, userId })
+
+      // КРИТИЧЕСКИ ВАЖНО: помечаем компонент как размонтированный
+      isComponentMountedRef.current = false
+
       if (typingTimeoutRef.current) {
+        console.log('🧹 [useTyping] Очищаем timeout при размонтировании')
         clearTimeout(typingTimeoutRef.current)
+        typingTimeoutRef.current = null
       }
+
       if (enabled && userId && chatId) {
+        console.log('🧹 [useTyping] Останавливаем typing при размонтировании')
         stopTypingStore(chatId, userId)
       }
     }

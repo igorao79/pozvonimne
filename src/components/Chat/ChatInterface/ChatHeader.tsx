@@ -4,6 +4,7 @@ import { TypingIndicator } from '../TypingIndicator'
 import { useSinglePremiumData } from '@/hooks/usePremiumData'
 import { PremiumNickname } from '@/components/ui'
 import useCallStore from '@/store/useCallStore'
+import useTypingStore from '@/store/useTypingStore'
 import CreatorBadge from '../CreatorBadge'
 
 interface ChatHeaderProps {
@@ -28,9 +29,10 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   currentUserId
 }) => {
   const { isCalling, targetUserId, endCall, error: callError, isInCall: isInCallStore } = useCallStore()
+  const { getTypingType } = useTypingStore()
   const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'failed'>('idle')
   const [isCancelling, setIsCancelling] = useState(false)
-  
+
   // Получаем премиум данные для приватного чата (для другого участника)
   const { premiumData: otherParticipantPremiumData } = useSinglePremiumData(
     chat.type === 'private' ? chat.other_participant_id || null : null
@@ -38,6 +40,29 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   // Определяем, звоним ли мы этому пользователю
   const isCallingThisUser = isCalling && targetUserId === chat.other_participant_id
+
+  // Фильтруем typing пользователей, исключая текущего пользователя
+  const otherTypingUsers = React.useMemo(() => {
+    if (!currentUserId) return typingUsers
+    return typingUsers.filter(userId => userId !== currentUserId)
+  }, [typingUsers, currentUserId])
+
+  // Определяем, есть ли пользователь, который записывает голосовое
+  const isSomeoneRecordingVoice = React.useMemo(() => {
+    if (chat.type !== 'private') return false
+    return otherTypingUsers.some(userId => getTypingType(chat.id, userId) === 'voice')
+  }, [chat.id, chat.type, otherTypingUsers, getTypingType])
+
+  // Определяем, есть ли пользователь, который печатает текст
+  const isSomeoneTypingText = React.useMemo(() => {
+    if (chat.type !== 'private') return false
+    return otherTypingUsers.some(userId => getTypingType(chat.id, userId) === 'text')
+  }, [chat.id, chat.type, otherTypingUsers, getTypingType])
+
+  // Проверяем, активен ли typing индикатор
+  const hasTypingActivity = React.useMemo(() => {
+    return otherTypingUsers.length > 0
+  }, [otherTypingUsers])
 
 
   // Эффект для отслеживания состояния звонка
@@ -239,16 +264,17 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             </div>
             {chat.type === 'private' && (
               <div className="flex items-center space-x-2">
-                {isOtherParticipantTyping ? (
-                  // Индикатор печатания вместо статуса - только когда печатает собеседник
+                {hasTypingActivity ? (
+                  // Индикатор печатания/записи вместо статуса
                   <div className="flex items-center space-x-1">
                     <span className="text-xs text-primary italic">
-                      печатает
+                      {isSomeoneRecordingVoice ? 'записывает голосовое...' : 'печатает'}
                     </span>
                     <TypingIndicator
                       size="sm"
                       showText={false}
                       className="scale-75"
+                      isRecordingVoice={isSomeoneRecordingVoice}
                     />
                   </div>
                 ) : userStatus ? (

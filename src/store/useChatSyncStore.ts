@@ -261,7 +261,7 @@ const useChatSyncStore = create<ChatSyncState>()(
           event: 'INSERT',
           schema: 'public',
           table: 'messages'
-        }, (payload) => {
+        }, async (payload) => {
           console.log('🌐 Глобальное обновление: НОВОЕ сообщение', {
             messageId: payload.new?.id?.slice(0, 8),
             chatId: payload.new?.chat_id?.slice(0, 8),
@@ -301,6 +301,16 @@ const useChatSyncStore = create<ChatSyncState>()(
               console.error('Ошибка при вызове message callback для INSERT:', error)
             }
           })
+
+          // 🔄 Принудительно очищаем все typing индикаторы когда приходят новые сообщения
+          try {
+            const { globalTypingManager } = await import('@/lib/GlobalTypingManager')
+            if (messageData.chatId) {
+              globalTypingManager.clearAllTypingInChat(messageData.chatId, 'новое_сообщение')
+            }
+          } catch (error) {
+            console.error('Ошибка при очистке typing индикаторов:', error)
+          }
 
           // 🔥 ИСПРАВЛЕНИЕ: Debounced обновление списка чатов для новых сообщений
           clearTimeout(debounceTimeout)
