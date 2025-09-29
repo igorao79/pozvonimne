@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Позвони.мне - Десктопное приложение</title>
+  <style>
+    /* Loading styles */
+    .electron-loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      flex-direction: column;
+    }
+
+    .electron-loading .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #e2e8f0;
+      border-top: 4px solid #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    .electron-loading .text {
+      color: #64748b;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Hide loading when app is ready */
+    body.app-ready .electron-loading {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="electron-loading">
+    <div class="spinner"></div>
+    <div class="text">Загрузка Позвони.мне...</div>
+  </div>
+
+  <div id="root"></div>
+
+  <script>
+    // Electron API is available globally via preload
+    window.addEventListener('DOMContentLoaded', () => {
+      // Signal that DOM is ready
+      document.body.classList.add('dom-ready');
+
+      // Wait for Next.js to load
+      const checkReady = () => {
+        if (window.next && window.next.router) {
+          document.body.classList.add('app-ready');
+        } else {
+          setTimeout(checkReady, 100);
+        }
+      };
+
+      checkReady();
+
+      // Add version info to title if available
+      if (window.electronAPI) {
+        window.electronAPI.getAppVersion().then(version => {
+          if (version) {
+            document.title = `Позвони.мне v${version}`;
+          }
+        }).catch(() => {
+          // Ignore errors
+        });
+      }
+    });
+  </script>
+</body>
+</html>

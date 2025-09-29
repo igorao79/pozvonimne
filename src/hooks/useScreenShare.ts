@@ -90,20 +90,75 @@ export const useScreenShare = () => {
     try {
       console.log('📺 Starting screen share...')
 
-      const displayStream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          width: { ideal: 1920, max: 2560 },
-          height: { ideal: 1080, max: 1440 },
-          frameRate: { ideal: 60, max: 60 }, // 60 FPS для плавности
-          aspectRatio: { ideal: 16/9 },
-          // Отключаем автоматическое снижение разрешения (browser-specific)
-          ...(navigator.userAgent.includes('Chrome') && {
-            googCpuOveruseDetection: false,
-            googNoiseReduction: false
+      let displayStream: MediaStream
+
+      // Проверяем, работает ли приложение в Electron
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        console.log('📺 Running in Electron, using desktopCapturer API...')
+
+        try {
+          // Получаем доступные источники экрана через Electron
+          const sources = await window.electronAPI.getScreenSources()
+          console.log('📺 Available screen sources:', sources)
+
+          if (!sources || sources.length === 0) {
+            throw new Error('No screen sources available')
+          }
+
+          // Выбираем первый экран (можно добавить UI для выбора в будущем)
+          const selectedSource = sources.find((s: any) => s.name.includes('Screen')) || sources[0]
+
+          console.log('📺 Selected source:', selectedSource)
+
+          // Используем getUserMedia с chromeMediaSource для Electron
+          displayStream = await (navigator.mediaDevices as any).getUserMedia({
+            audio: false,
+            video: {
+              mandatory: {
+                chromeMediaSource: 'desktop',
+                chromeMediaSourceId: selectedSource.id,
+                minWidth: 1280,
+                maxWidth: 1920,
+                minHeight: 720,
+                maxHeight: 1080,
+                maxFrameRate: 30
+              }
+            }
           })
-        },
-        audio: false // Отключаем аудио для упрощения
-      })
+
+          console.log('📺 Electron screen capture successful!')
+
+        } catch (electronError) {
+          console.warn('📺 Electron desktopCapturer failed, falling back to standard API:', electronError)
+          // Fallback to standard API
+          displayStream = await navigator.mediaDevices.getDisplayMedia({
+            video: {
+              width: { ideal: 1920, max: 2560 },
+              height: { ideal: 1080, max: 1440 },
+              frameRate: { ideal: 30, max: 30 },
+              aspectRatio: { ideal: 16/9 },
+            },
+            audio: false
+          })
+        }
+      } else {
+        // Стандартный браузерный API
+        console.log('📺 Using standard browser getDisplayMedia API...')
+        displayStream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            width: { ideal: 1920, max: 2560 },
+            height: { ideal: 1080, max: 1440 },
+            frameRate: { ideal: 60, max: 60 }, // 60 FPS для плавности
+            aspectRatio: { ideal: 16/9 },
+            // Отключаем автоматическое снижение разрешения (browser-specific)
+            ...(navigator.userAgent.includes('Chrome') && {
+              googCpuOveruseDetection: false,
+              googNoiseReduction: false
+            })
+          },
+          audio: false // Отключаем аудио для упрощения
+        })
+      }
 
       console.log('📺 Screen share stream obtained:', {
         id: displayStream.id,

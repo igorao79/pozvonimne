@@ -3,7 +3,7 @@
   import { useState, useRef, useEffect } from 'react'
 
 interface LoginFormProps {
-  onLogin: (email: string, password: string) => void
+  onLogin: (email: string, password: string, rememberMe: boolean) => void
   isLoading: boolean
 }
 
@@ -12,6 +12,27 @@ const LoginForm = ({ onLogin, isLoading }: LoginFormProps) => {
   const [password, setPassword] = useState('')
   const [emailTouched, setEmailTouched] = useState(false)
   const [passwordTouched, setPasswordTouched] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
+
+  // Автоматически восстанавливаем настройку rememberMe при загрузке формы
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedRememberMe = localStorage.getItem('rememberMe') === 'true'
+      const lastLoginTime = localStorage.getItem('lastLoginTime')
+
+      // Проверяем, не истек ли срок (90 дней)
+      if (savedRememberMe && lastLoginTime) {
+        const daysSinceLogin = (Date.now() - parseInt(lastLoginTime)) / (1000 * 60 * 60 * 24)
+        if (daysSinceLogin <= 90) {
+          setRememberMe(true)
+        } else {
+          // Очищаем устаревшие настройки
+          localStorage.removeItem('rememberMe')
+          localStorage.removeItem('lastLoginTime')
+        }
+      }
+    }
+  }, [])
 
   const emailRef = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
@@ -50,7 +71,7 @@ const LoginForm = ({ onLogin, isLoading }: LoginFormProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onLogin(email, password)
+    onLogin(email, password, rememberMe)
   }
 
   return (
@@ -104,6 +125,27 @@ const LoginForm = ({ onLogin, isLoading }: LoginFormProps) => {
             }`}
             placeholder="Введите пароль"
           />
+        </div>
+      </div>
+
+      <div className="flex items-start">
+        <div className="flex items-center h-5">
+          <input
+            id="remember-me"
+            name="remember-me"
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+          />
+        </div>
+        <div className="ml-3">
+          <label htmlFor="remember-me" className="text-sm text-foreground font-medium cursor-pointer">
+            Запомнить меня
+          </label>
+          <p className="text-xs text-muted-foreground mt-1">
+            Автоматический вход в приложение на 90 дней без запроса логина и пароля
+          </p>
         </div>
       </div>
 

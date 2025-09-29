@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Тест Electron</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-align: center;
+    }
+    .container {
+      max-width: 600px;
+      padding: 2rem;
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    p {
+      font-size: 1.2rem;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+    .status {
+      padding: 1rem;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .loading {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 Электрон работает!</h1>
+    <p>Если вы видите эту страницу, значит Electron успешно запустился и может загружать контент.</p>
+    <div class="status">
+      <h3>Статус:</h3>
+      <p class="loading">⏳ Подключение к Next.js серверу...</p>
+      <p id="server-status">Ожидание ответа от сервера</p>
+    </div>
+    <div style="margin-top: 2rem;">
+      <button onclick="testConnection()" style="padding: 12px 24px; font-size: 16px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; color: white; cursor: pointer;">
+        Проверить подключение
+      </button>
+    </div>
+  </div>
+
+  <script>
+    function testConnection() {
+      fetch('http://localhost:3000')
+        .then(response => {
+          if (response.ok) {
+            document.getElementById('server-status').innerHTML = '✅ Сервер Next.js доступен!';
+            document.querySelector('.loading').style.display = 'none';
+          } else {
+            throw new Error('Server not ready');
+          }
+        })
+        .catch(error => {
+          document.getElementById('server-status').innerHTML = '❌ Сервер недоступен. Убедитесь, что Next.js запущен.';
+          console.error('Connection test failed:', error);
+        });
+    }
+
+    // Auto-test connection
+    setTimeout(testConnection, 1000);
+    setInterval(testConnection, 5000);
+  </script>
+</body>
+</html>

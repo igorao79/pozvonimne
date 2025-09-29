@@ -21,14 +21,25 @@ const AuthForm = () => {
   
   const supabase = createClient()
 
-  const handleLogin = async (email: string, password: string) => {
+  const handleLogin = async (email: string, password: string, rememberMe: boolean = false) => {
     setIsLoading(true)
     setError(null)
     
     try {
+      // Если выбрано "Запомнить меня", устанавливаем сессию на 90 дней
+      // В противном случае используем настройки по умолчанию (обычно 7 дней)
+      const authOptions = rememberMe ? {
+        data: {
+          // Можно добавить дополнительные данные в сессию
+          remember_me: true,
+          expires_at: Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60), // 90 дней в секундах
+        }
+      } : undefined
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
+        options: authOptions
       })
 
       if (error) {
@@ -41,6 +52,13 @@ const AuthForm = () => {
         setUser(data.user)
         setUserId(data.user.id)
         setAuthenticated(true)
+
+        // Сохраняем информацию о rememberMe в localStorage для Electron
+        if (typeof window !== 'undefined' && rememberMe) {
+          localStorage.setItem('rememberMe', 'true')
+          localStorage.setItem('lastLoginTime', Date.now().toString())
+          console.log('💾 Сохранена настройка "Запомнить меня"')
+        }
       }
     } catch (err) {
       const translatedError = getDisplayErrorMessage(err as any)

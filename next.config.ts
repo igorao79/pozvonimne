@@ -1,15 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Production optimizations
-  compiler: {
-    removeConsole: process.env.NODE_ENV === 'production' ? {
-      exclude: ['error', 'warn']
-    } : false,
-  },
+  // Enable static export for Electron
+  output: process.env.ELECTRON_BUILD ? 'export' : undefined,
 
-  // Vercel Image optimization (enabled for better performance)
-  images: {
+  // For Electron, we need to disable image optimization
+  images: process.env.ELECTRON_BUILD ? {
+    unoptimized: true,
+  } : {
     formats: ['image/webp', 'image/avif'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
@@ -40,6 +38,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+
+  // Production optimizations
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn']
+    } : false,
+  },
+
 
   // Experimental features for better performance
   experimental: {

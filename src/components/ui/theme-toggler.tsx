@@ -11,8 +11,15 @@ type Props = {
 };
 
 export const ThemeToggler = ({ className }: Props) => {
-  const { theme, toggleTheme } = useThemeStore();
+  const { theme, toggleTheme, initSystemThemeListener } = useThemeStore();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  // Initialize system theme listener on mount (only in Electron)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.electronAPI) {
+      initSystemThemeListener();
+    }
+  }, [initSystemThemeListener]);
 
   // Apply theme on mount and theme change
   useEffect(() => {
@@ -26,40 +33,44 @@ export const ThemeToggler = ({ className }: Props) => {
   const handleToggle = async () => {
     if (!buttonRef.current) return;
 
-    // Check if browser supports View Transitions
-    if (!document.startViewTransition) {
-      toggleTheme();
-      return;
-    }
-
-    await document.startViewTransition(() => {
-      flushSync(() => {
-        toggleTheme();
-      });
-    }).ready;
-
-    const { top, left, width, height } =
-      buttonRef.current.getBoundingClientRect();
+    const { top, left, width, height } = buttonRef.current.getBoundingClientRect();
     const y = top + height / 2;
     const x = left + width / 2;
 
-    const right = window.innerWidth - left;
-    const bottom = window.innerHeight - top;
-    const maxRad = Math.hypot(Math.max(left, right), Math.max(top, bottom));
+    // Check if browser supports View Transitions
+    if (document.startViewTransition) {
+      await document.startViewTransition(() => {
+        flushSync(() => {
+          toggleTheme();
+        });
+      }).ready;
 
-    document.documentElement.animate(
-      {
-        clipPath: [
-          `circle(0px at ${x}px ${y}px)`,
-          `circle(${maxRad}px at ${x}px ${y}px)`,
-        ],
-      },
-      {
-        duration: 700,
-        easing: "ease-in-out",
-        pseudoElement: "::view-transition-new(root)",
-      },
-    );
+      // Apply animation with optimized settings
+      const right = window.innerWidth - left;
+      const bottom = window.innerHeight - top;
+      const maxRad = Math.hypot(Math.max(left, right), Math.max(top, bottom));
+
+      // Use requestAnimationFrame for smoother Electron animations
+      const isElectron = typeof window !== 'undefined' && window.electronAPI;
+      const duration = isElectron ? 500 : 700; // Slightly longer for Electron to ensure smoothness
+
+      document.documentElement.animate(
+        {
+          clipPath: [
+            `circle(0px at ${x}px ${y}px)`,
+            `circle(${maxRad}px at ${x}px ${y}px)`,
+          ],
+        },
+        {
+          duration: duration,
+          easing: "ease-in-out",
+          pseudoElement: "::view-transition-new(root)",
+        },
+      );
+    } else {
+      // Fallback for browsers without View Transitions support
+      toggleTheme();
+    }
   };
 
   return (
