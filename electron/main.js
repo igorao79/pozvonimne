@@ -190,29 +190,46 @@ async function createWindow() {
     try {
       updateSplashProgress(70, 'Подключение к серверу...');
       
-      // Always use localhost in development
-      let startUrl = 'http://localhost:3000';
+      // Use localhost in development, production URL in release
+      let startUrl = isDev ? 'http://localhost:3000' : 'https://pozvonimne.vercel.app/';
       
       console.log('Loading URL:', startUrl);
       console.log('Development mode:', isDev);
 
-      // Check if Next.js server is running
+      let retryCount = 0;
+      const maxRetries = isDev ? 15 : 5; // В dev больше попыток для localhost
+
+      // Check if server is running
       const checkServer = async () => {
         try {
-          updateSplashProgress(80, 'Проверка сервера...');
-          const response = await fetch(startUrl);
+          updateSplashProgress(80, isDev ? 'Ожидание dev сервера...' : 'Подключение к сайту...');
+          
+          const response = await fetch(startUrl, { 
+            timeout: isDev ? 5000 : 10000 // В dev меньше таймаут
+          });
+          
           if (response.ok) {
-            console.log('Next.js server is ready, loading app...');
+            console.log('Server is ready, loading app...');
             updateSplashProgress(90, 'Загрузка интерфейса...');
             await mainWindow.loadURL(startUrl);
           } else {
-            throw new Error('Server not ready');
+            throw new Error(`Server returned ${response.status}`);
           }
         } catch (error) {
-          console.error('Next.js server not ready:', error.message);
-          console.log('Retrying in 2 seconds...');
-          updateSplashProgress(75, 'Ожидание сервера...');
-          setTimeout(checkServer, 2000);
+          retryCount++;
+          console.error(`Server check failed (${retryCount}/${maxRetries}):`, error.message);
+          
+          if (retryCount >= maxRetries) {
+            if (isDev) {
+              showSplashError(`Dev сервер не запущен!\n\nЗапустите: npm run dev\nИли используйте: npm run dev:electron`);
+            } else {
+              showSplashError(`Не удается подключиться к сайту.\nПроверьте интернет соединение.`);
+            }
+            return;
+          }
+          
+          updateSplashProgress(75, `Попытка ${retryCount}/${maxRetries}...`);
+          setTimeout(checkServer, isDev ? 2000 : 3000);
         }
       };
 
