@@ -29,6 +29,21 @@ jobs:
             const config = require('./electron-builder.json');
             console.log('✅ electron-builder.json загружен успешно');
             console.log('📦 Targets:', Object.keys(config).filter(k => ['win', 'mac', 'linux'].includes(k)));
+            
+            // Проверяем все files из конфигурации
+            const files = config.files || [];
+            console.log('📁 Проверяем файлы из electron-builder.json:');
+            const fs = require('fs');
+            files.forEach(file => {
+              if (!file.includes('*') && !file.includes('node_modules')) {
+                if (fs.existsSync(file)) {
+                  console.log('✅', file);
+                } else {
+                  console.error('❌ Файл не найден:', file);
+                  process.exit(1);
+                }
+              }
+            });
           "
           
           # Проверяем что иконки существуют
@@ -38,6 +53,30 @@ jobs:
             echo "❌ Logo PNG не найден!"
             exit 1
           fi
+          
+          # Проверяем зависимости require в main.js
+          echo "🔍 Проверяем зависимости в electron/main.js..."
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            
+            if (fs.existsSync('electron/main.js')) {
+              const mainJs = fs.readFileSync('electron/main.js', 'utf8');
+              const requires = mainJs.match(/require\(['\']\.\/[^'\"]*['\'']\)/g) || [];
+              
+              requires.forEach(req => {
+                const modulePath = req.match(/require\(['\']\.\/([^'\"]*)['\'']\)/)[1];
+                const fullPath = path.join('electron', modulePath + '.js');
+                
+                if (fs.existsSync(fullPath)) {
+                  console.log('✅ Модуль найден:', modulePath);
+                } else {
+                  console.error('❌ Модуль не найден:', fullPath);
+                  process.exit(1);
+                }
+              });
+            }
+          "
           
           echo "🎉 Валидация прошла успешно!"
 
@@ -150,6 +189,12 @@ jobs:
 
       - name: Publish Release (remove draft)
         run: |
+          echo "Publishing release v0.1.${{ github.run_number }}..."
           gh release edit v0.1.${{ github.run_number }} --draft=false
+          echo "Release published successfully!"
+          
+          # Ждём секунду и проверяем статус
+          sleep 2
+          gh release view v0.1.${{ github.run_number }} --json isDraft,assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
