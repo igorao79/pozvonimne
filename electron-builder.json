@@ -115,9 +115,5 @@
     "icon": "public/logo.icns",
     "format": "ULFO"
   },
-  "compression": "maximum",
-  "nodeGypRebuild": false,
-  "buildDependenciesFromSource": false,
-  "npmRebuild": false,
   "nodeVersion": "18.17.0"
 }

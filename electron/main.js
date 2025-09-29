@@ -119,9 +119,7 @@ let tray;
 // Create system tray
 function createTray() {
   // Используем иконку приложения для трея
-  const iconPath = isDev 
-    ? path.join(__dirname, '../public/logo.png')
-    : path.join(process.resourcesPath, 'public/logo.png')
+  const iconPath = path.join(process.cwd(), 'public/logo.png')
 
   tray = new Tray(iconPath)
 
