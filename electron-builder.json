@@ -118,6 +118,5 @@
   "nodeGypRebuild": false,
   "buildDependenciesFromSource": false,
   "npmRebuild": false,
-  "nodeVersion": "18.17.0",
-  "afterAllArtifactBuild": "scripts/after-build.js"
+  "nodeVersion": "18.17.0"
 }
