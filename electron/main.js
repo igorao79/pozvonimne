@@ -1,4 +1,5 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, globalShortcut, desktopCapturer, nativeTheme, autoUpdater } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, globalShortcut, desktopCapturer, nativeTheme } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const isDev = process.env.NODE_ENV === 'development';
 

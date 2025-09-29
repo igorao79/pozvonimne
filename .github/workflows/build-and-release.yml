@@ -59,20 +59,37 @@ jobs:
           node -e "
             const fs = require('fs');
             const path = require('path');
+            const packageJson = require('./package.json');
             
             if (fs.existsSync('electron/main.js')) {
               const mainJs = fs.readFileSync('electron/main.js', 'utf8');
-              const requires = mainJs.match(/require\(['\']\.\/[^'\"]*['\'']\)/g) || [];
               
-              requires.forEach(req => {
+              // Проверяем локальные модули
+              const localRequires = mainJs.match(/require\(['\']\.\/[^'\"]*['\'']\)/g) || [];
+              localRequires.forEach(req => {
                 const modulePath = req.match(/require\(['\']\.\/([^'\"]*)['\'']\)/)[1];
                 const fullPath = path.join('electron', modulePath + '.js');
                 
                 if (fs.existsSync(fullPath)) {
-                  console.log('✅ Модуль найден:', modulePath);
+                  console.log('✅ Локальный модуль найден:', modulePath);
                 } else {
-                  console.error('❌ Модуль не найден:', fullPath);
+                  console.error('❌ Локальный модуль не найден:', fullPath);
                   process.exit(1);
+                }
+              });
+              
+              // Проверяем npm пакеты
+              const npmRequires = mainJs.match(/require\(['\'][^'\"\.\/][^'\"]*['\'']\)/g) || [];
+              npmRequires.forEach(req => {
+                const packageName = req.match(/require\(['\']([^'\"]*)['\'']\)/)[1];
+                if (packageName !== 'electron' && packageName !== 'path' && packageName !== 'fs') {
+                  const allDeps = {...(packageJson.dependencies || {}), ...(packageJson.devDependencies || {})};
+                  if (allDeps[packageName]) {
+                    console.log('✅ npm пакет найден:', packageName);
+                  } else {
+                    console.error('❌ npm пакет не найден в dependencies:', packageName);
+                    process.exit(1);
+                  }
                 }
               });
             }
