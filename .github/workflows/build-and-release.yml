@@ -8,7 +8,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Check out Git repository
@@ -43,8 +46,55 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Upload build artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: pozvonimne-linux
+          name: release-${{ matrix.os }}
           path: release/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create tag and release
+        run: |
+          RUN_NUM=${{ github.run_number }}
+          VERSION="0.1.${RUN_NUM}"
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v0.1.${{ github.run_number }}
+          name: Release v0.1.${{ github.run_number }}
+          body: |
+            🎉 Новый релиз приложения Позвони.мне
+            
+            ### 📦 Скачать:
+            - **Windows**: `.exe` и `.msi` файлы
+            - **macOS**: `.dmg` файл  
+            - **Linux**: `.AppImage` и `.deb` файлы
+            
+            ### ✨ Изменения:
+            - Новая версия приложения
+            - Исправления и улучшения
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/**/*
