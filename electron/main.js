@@ -29,62 +29,70 @@ function setupAutoUpdater() {
     return;
   }
 
-  // Configure auto-updater for update.electronjs.org
-  const server = 'https://update.electronjs.org';
-  const feed = `${server}/igorao79/pozvonimne/${process.platform}-${process.arch}/${app.getVersion()}`;
+  try {
+    // Configure electron-updater
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = true;
 
-  autoUpdater.setFeedURL({ url: feed });
-
-  // Auto-updater event handlers
-  autoUpdater.on('checking-for-update', () => {
-    console.log('Checking for update...');
-  });
-
-  autoUpdater.on('update-available', (info) => {
-    console.log('Update available:', info.version);
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Обновление доступно',
-      message: `Доступна новая версия ${info.version}. Загрузка началась.`,
-      buttons: ['OK']
+    // Auto-updater event handlers
+    autoUpdater.on('checking-for-update', () => {
+      console.log('Checking for update...');
     });
-  });
 
-  autoUpdater.on('update-not-available', (info) => {
-    console.log('Update not available:', info.version);
-  });
-
-  autoUpdater.on('error', (err) => {
-    console.error('Error in auto-updater:', err);
-  });
-
-  autoUpdater.on('download-progress', (progressObj) => {
-    let log_message = "Download speed: " + progressObj.bytesPerSecond;
-    log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
-    log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
-    console.log(log_message);
-  });
-
-  autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
-    console.log('Update downloaded:', releaseName);
-
-    const dialogOpts = {
-      type: 'info',
-      buttons: ['Перезагрузить сейчас', 'Позже'],
-      title: 'Обновление приложения',
-      message: process.platform === 'win32' ? releaseNotes : releaseName,
-      detail: 'Новое обновление было загружено. Перезагрузите приложение, чтобы применить обновления.'
-    };
-
-    dialog.showMessageBox(mainWindow, dialogOpts).then((returnValue) => {
-      if (returnValue.response === 0) autoUpdater.quitAndInstall();
+    autoUpdater.on('update-available', (info) => {
+      console.log('Update available:', info.version);
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Обновление доступно',
+        message: `Доступна новая версия ${info.version}. Хотите загрузить?`,
+        buttons: ['Да', 'Позже']
+      }).then((result) => {
+        if (result.response === 0) {
+          autoUpdater.downloadUpdate();
+        }
+      });
     });
-  });
 
-  // Check for updates after app is ready (with delay to ensure UI is ready)
-  setTimeout(() => {
-    autoUpdater.checkForUpdatesAndNotify();
-  }, 5000);
+    autoUpdater.on('update-not-available', (info) => {
+      console.log('Update not available');
+    });
+
+    autoUpdater.on('error', (err) => {
+      console.error('Error in auto-updater:', err);
+    });
+
+    autoUpdater.on('download-progress', (progressObj) => {
+      let log_message = "Download speed: " + progressObj.bytesPerSecond;
+      log_message = log_message + ' - Downloaded ' + Math.round(progressObj.percent) + '%';
+      log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+      console.log(log_message);
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log('Update downloaded:', info.version);
+
+      const dialogOpts = {
+        type: 'info',
+        buttons: ['Перезагрузить сейчас', 'Позже'],
+        title: 'Обновление приложения',
+        message: `Обновление до версии ${info.version} загружено`,
+        detail: 'Перезагрузите приложение, чтобы применить обновления.'
+      };
+
+      dialog.showMessageBox(mainWindow, dialogOpts).then((returnValue) => {
+        if (returnValue.response === 0) {
+          autoUpdater.quitAndInstall();
+        }
+      });
+    });
+
+    // Check for updates after app is ready (with delay to ensure UI is ready)
+    setTimeout(() => {
+      autoUpdater.checkForUpdatesAndNotify();
+    }, 5000);
+  } catch (error) {
+    console.error('Error setting up auto-updater:', error);
+  }
 }
 
 // Keep a global reference of the window object
@@ -208,7 +216,11 @@ async function createWindow() {
         }
       };
 
-    checkServer();
+      checkServer();
+    } catch (error) {
+      console.error('Error in loadApp:', error);
+      showSplashError(`Ошибка загрузки: ${error.message}`);
+    }
   };
 
   // Initial load with delay to ensure Next.js server is ready

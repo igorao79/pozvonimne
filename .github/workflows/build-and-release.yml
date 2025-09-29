@@ -92,6 +92,15 @@ jobs:
                   }
                 }
               });
+              
+              // Проверяем синтаксис JavaScript
+              try {
+                new Function(mainJs);
+                console.log('✅ Синтаксис main.js корректен');
+              } catch (syntaxError) {
+                console.error('❌ Синтаксическая ошибка в main.js:', syntaxError.message);
+                process.exit(1);
+              }
             }
           "
           
