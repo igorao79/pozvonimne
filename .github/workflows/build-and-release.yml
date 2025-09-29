@@ -6,6 +6,10 @@ on:
       - master
       - main
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -95,21 +99,6 @@ jobs:
         with:
           path: artifacts
 
-      - name: Create tag and release
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          
-          RUN_NUM=${{ github.run_number }}
-          VERSION="0.1.${RUN_NUM}"
-          TAG="v${VERSION}"
-          echo "Creating tag: ${TAG}"
-          
-          git tag "${TAG}"
-          git push origin "${TAG}"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -131,5 +120,6 @@ jobs:
             - Оптимизация для Windows
           draft: false
           prerelease: false
+          make_latest: true
           files: |
             artifacts/**/*
