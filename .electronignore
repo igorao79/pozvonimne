@@ -1,0 +1,57 @@
+# Ignore development files
+.next
+src
+public/sitemap*
+public/robots.txt
+
+# Ignore documentation and tests
+**/*.md
+**/LICENSE*
+**/CHANGELOG*
+**/README*
+**/test/**
+**/tests/**
+**/docs/**
+**/example/**
+**/examples/**
+
+# Ignore source maps and type definitions
+**/*.map
+**/*.d.ts
+
+# Ignore dev dependencies directories
+node_modules/@types
+node_modules/typescript
+node_modules/eslint*
+node_modules/@eslint
+node_modules/rimraf
+node_modules/webpack-bundle-analyzer
+
+# Ignore large unused modules
+node_modules/@fortawesome
+node_modules/tw-animate-css
+node_modules/node-emoji
+
+# Ignore git and other VCS
+.git
+.gitignore
+.github
+
+# Ignore build configs
+tsconfig.json
+next.config.ts
+tailwind.config.js
+postcss.config.js
+eslint.config.mjs
+
+# Ignore electron development files
+electron/dev-server.js
+electron/simple-dev.js
+electron/standalone.js
+electron/test.html
+
+# Ignore logs and temp files
+npm-debug.log*
+*.log
+.DS_Store
+Thumbs.db

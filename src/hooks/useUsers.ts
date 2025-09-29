@@ -110,22 +110,30 @@ export const useUsers = () => {
           return
         }
 
-        // Проверяем, нужно ли обновлять статус
-        const { data: userData } = await supabase
-          .from('user_profiles')
-          .select('last_seen, status')
-          .eq('id', currentUserId)
-          .single()
+        // В Electron приложении всегда обновляем статус как онлайн
+        const isElectron = typeof window !== 'undefined' && window.electronAPI
+        
+        if (isElectron) {
+          // В Electron всегда поддерживаем онлайн статус
+          await updateLastSeen()
+        } else {
+          // В браузере используем стандартную логику
+          const { data: userData } = await supabase
+            .from('user_profiles')
+            .select('last_seen, status')
+            .eq('id', currentUserId)
+            .single()
 
-        if (userData) {
-          const timeSinceLastSeen = Date.now() - new Date(userData.last_seen).getTime()
+          if (userData) {
+            const timeSinceLastSeen = Date.now() - new Date(userData.last_seen).getTime()
 
-          // Если прошло более 25 секунд, обновляем статус
-          if (timeSinceLastSeen > 25000) {
+            // Если прошло более 25 секунд, обновляем статус
+            if (timeSinceLastSeen > 25000) {
+              await updateLastSeen()
+            }
+          } else {
             await updateLastSeen()
           }
-        } else {
-          await updateLastSeen()
         }
       } catch (err) {
         // Обработка ошибки heartbeat
@@ -135,7 +143,12 @@ export const useUsers = () => {
     // Функция для установки статуса оффлайн
     const setOffline = async () => {
       try {
-        const result = await supabase.rpc('set_user_offline')
+        // В Electron приложении не устанавливаем оффлайн статус
+        const isElectron = typeof window !== 'undefined' && window.electronAPI
+        
+        if (!isElectron) {
+          const result = await supabase.rpc('set_user_offline')
+        }
       } catch (err) {
         // Обработка ошибки установки оффлайн
       }
@@ -144,8 +157,10 @@ export const useUsers = () => {
 
     updateLastSeen()
 
-    // Heartbeat каждые 30 секунд для поддержания статуса онлайн
-    const heartbeatInterval = setInterval(heartbeat, 30 * 1000)
+    // Heartbeat для поддержания статуса онлайн
+    const isElectron = typeof window !== 'undefined' && window.electronAPI
+    const heartbeatTime = isElectron ? 15 * 1000 : 30 * 1000 // 15 сек для Electron, 30 сек для браузера
+    const heartbeatInterval = setInterval(heartbeat, heartbeatTime)
 
     // Обновление списка пользователей каждые 15 секунд
     const fetchInterval = setInterval(() => {

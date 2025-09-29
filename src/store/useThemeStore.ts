@@ -24,22 +24,33 @@ const useThemeStore = create<ThemeState>()(
         if (typeof window !== 'undefined') {
           const root = document.documentElement
 
-          // For Electron, use a more efficient approach to avoid animation conflicts
+          // For Electron, use optimized approach with proper timing
           if (window.electronAPI) {
-            // Use requestAnimationFrame for smooth theme switching
+            // Use double requestAnimationFrame for better synchronization with GPU
             requestAnimationFrame(() => {
-              // Remove old classes
-              root.classList.remove('light', 'dark')
-              // Add new theme
-              root.classList.add(theme)
-              root.setAttribute('data-theme', theme)
+              requestAnimationFrame(() => {
+                // Force layout calculation before changes for smoother transition
+                root.getBoundingClientRect();
+                
+                // Apply changes in one batch to minimize reflows
+                root.classList.remove('light', 'dark')
+                root.classList.add(theme)
+                root.setAttribute('data-theme', theme)
 
-              // Update CSS custom properties
-              const isDark = theme === 'dark'
-              root.style.setProperty('--color-background', isDark ? '#0f172a' : '#ffffff')
-              root.style.setProperty('--color-foreground', isDark ? '#f8fafc' : '#0f172a')
-              root.style.setProperty('--color-card', isDark ? '#1e293b' : '#ffffff')
-              root.style.setProperty('--color-card-foreground', isDark ? '#f8fafc' : '#0f172a')
+                // Update CSS custom properties efficiently
+                const isDark = theme === 'dark'
+                const props = [
+                  ['--color-background', isDark ? '#0f172a' : '#ffffff'],
+                  ['--color-foreground', isDark ? '#f8fafc' : '#0f172a'],
+                  ['--color-card', isDark ? '#1e293b' : '#ffffff'],
+                  ['--color-card-foreground', isDark ? '#f8fafc' : '#0f172a']
+                ]
+                
+                // Batch style updates
+                props.forEach(([prop, value]) => {
+                  root.style.setProperty(prop, value)
+                })
+              })
             })
           } else {
             // Standard approach for web browsers

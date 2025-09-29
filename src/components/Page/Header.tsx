@@ -3,7 +3,9 @@
 import { User, Shield, Download } from 'lucide-react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { ThemeToggler } from '@/components/ui/theme-toggler'
+import { DownloadModal } from '@/components/ui/download-modal'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
+import { useEffect, useState } from 'react'
 
 interface HeaderProps {
   isAdmin: boolean
@@ -21,6 +23,12 @@ export default function Header({
   onSignOut
 }: HeaderProps) {
   const { downloadLatestRelease } = useAppUpdate()
+  const [isElectron, setIsElectron] = useState(false)
+
+  // Определяем, запущено ли приложение в Electron
+  useEffect(() => {
+    setIsElectron(typeof window !== 'undefined' && !!window.electronAPI)
+  }, [])
 
   const handleUpdateClick = () => {
     downloadLatestRelease()
@@ -52,15 +60,18 @@ export default function Header({
           <div className="flex items-center space-x-3">
             <ThemeToggler />
 
-            {/* Download Button */}
-            <button
-              onClick={handleUpdateClick}
-              className="p-2 rounded-md download-button hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-600 transition-all duration-200 border border-border cursor-pointer"
-              aria-label="Скачать приложение"
-              title="Скачать последнюю версию приложения"
-            >
-              <Download className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </button>
+            {/* Download Button - только в браузере */}
+            {!isElectron && (
+              <DownloadModal>
+                <button
+                  className="p-2 rounded-md download-button hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-600 transition-all duration-200 border border-border cursor-pointer"
+                  aria-label="Скачать приложение"
+                  title="Скачать последнюю версию приложения"
+                >
+                  <Download className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </button>
+              </DownloadModal>
+            )}
 
             {/* Admin Button - только для администраторов */}
             {isAdmin && (

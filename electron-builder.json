@@ -15,6 +15,15 @@
   },
   "generateUpdatesFilesForAllChannels": true,
   "detectUpdateChannel": true,
+  "compression": "maximum",
+  "asar": true,
+  "asarUnpack": [
+    "electron/splash.html",
+    "electron/logo.png"
+  ],
+  "npmRebuild": false,
+  "buildDependenciesFromSource": false,
+  "nodeGypRebuild": false,
   "files": [
     "out/**/*",
     "electron/main.js",
@@ -22,25 +31,24 @@
     "electron/webrtc-fix.js",
     "electron/splash.html",
     "electron/logo.png",
-    "node_modules/**/*",
-    "package.json"
+    "package.json",
+    "node_modules/electron-updater/**/*"
   ],
   "extraResources": [
     {
       "from": "public",
       "to": "public",
-      "filter": ["**/*"]
+      "filter": ["logo.png", "logo.ico"]
     }
   ],
+  "extraMetadata": {
+    "main": "electron/main.js"
+  },
   "win": {
     "target": [
       {
         "target": "nsis",
-        "arch": ["x64", "ia32"]
-      },
-      {
-        "target": "portable", 
-        "arch": ["x64", "ia32"]
+        "arch": ["x64"]
       }
     ],
     "icon": "public/logo.png",

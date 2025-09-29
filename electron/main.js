@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, globalShortcut, desktopCapturer, nativeTheme } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, globalShortcut, desktopCapturer, nativeTheme, Tray } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const isDev = process.env.NODE_ENV === 'development';
@@ -114,6 +114,62 @@ function setupAutoUpdater() {
 // Keep a global reference of the window object
 let mainWindow;
 let splashWindow;
+let tray;
+
+// Create system tray
+function createTray() {
+  // Используем иконку приложения для трея
+  const iconPath = isDev 
+    ? path.join(__dirname, '../public/logo.png')
+    : path.join(process.resourcesPath, 'public/logo.png')
+
+  tray = new Tray(iconPath)
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Показать',
+      click: () => {
+        if (mainWindow) {
+          if (mainWindow.isMinimized()) mainWindow.restore()
+          mainWindow.show()
+          mainWindow.focus()
+        }
+      }
+    },
+    {
+      label: 'Скрыть',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.hide()
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Выйти',
+      click: () => {
+        app.isQuiting = true
+        app.quit()
+      }
+    }
+  ])
+
+  tray.setToolTip('Позвони.мне')
+  tray.setContextMenu(contextMenu)
+
+  // Клик по трею - показать/скрыть окно
+  tray.on('click', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide()
+      } else {
+        if (mainWindow.isMinimized()) mainWindow.restore()
+        mainWindow.show()
+        mainWindow.focus()
+      }
+    }
+  })
+}
 
 function createSplashWindow() {
   splashWindow = new BrowserWindow({
@@ -298,7 +354,21 @@ async function createWindow() {
     mainWindow.webContents.openDevTools();
   }
 
-  // Handle window closed
+  // Handle window minimize - hide to tray
+  mainWindow.on('minimize', (event) => {
+    event.preventDefault();
+    mainWindow.hide();
+  });
+
+  // Handle window close - hide instead of quit
+  mainWindow.on('close', (event) => {
+    if (!app.isQuiting) {
+      event.preventDefault();
+      mainWindow.hide();
+      return false;
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -335,6 +405,9 @@ async function createWindow() {
 
 // App event listeners
 app.whenReady().then(async () => {
+  // Create system tray first
+  createTray();
+  
   // Create splash screen first
   createSplashWindow();
   updateSplashProgress(10, 'Запуск приложения...');
@@ -359,15 +432,21 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  // On macOS, keep the app running even when all windows are closed
-  if (process.platform !== 'darwin') {
+  // Don't quit the app when all windows are closed - keep running in tray
+  // except when explicitly quitting
+  if (app.isQuiting) {
     app.quit();
   }
+  // Keep app running in tray on all platforms
 });
 
 app.on('activate', () => {
-  // On macOS, re-create window when dock icon is clicked
-  if (BrowserWindow.getAllWindows().length === 0) {
+  // Show main window when dock icon is clicked (macOS)
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  } else if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
 });

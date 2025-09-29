@@ -6,3 +6,5 @@ export { default as ExternalLinkModal } from './ExternalLinkModal';
 export { default as CreatorModal } from './CreatorModal';
 export { default as PremiumNickname } from './PremiumNickname';
 export { default as PremiumSettingsModal } from './PremiumSettingsModal';
+export { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './dialog';
+export { Button } from './button';

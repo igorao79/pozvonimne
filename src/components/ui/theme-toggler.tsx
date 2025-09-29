@@ -50,23 +50,43 @@ export const ThemeToggler = ({ className }: Props) => {
       const bottom = window.innerHeight - top;
       const maxRad = Math.hypot(Math.max(left, right), Math.max(top, bottom));
 
-      // Use requestAnimationFrame for smoother Electron animations
+      // Optimized settings for different environments
       const isElectron = typeof window !== 'undefined' && window.electronAPI;
-      const duration = isElectron ? 500 : 700; // Slightly longer for Electron to ensure smoothness
-
-      document.documentElement.animate(
-        {
-          clipPath: [
-            `circle(0px at ${x}px ${y}px)`,
-            `circle(${maxRad}px at ${x}px ${y}px)`,
-          ],
-        },
-        {
-          duration: duration,
-          easing: "ease-in-out",
-          pseudoElement: "::view-transition-new(root)",
-        },
-      );
+      
+      if (isElectron) {
+        // For Electron: faster, simpler animation with hardware acceleration
+        const duration = 300; // Faster for Electron
+        
+        document.documentElement.animate(
+          {
+            clipPath: [
+              `circle(0px at ${x}px ${y}px)`,
+              `circle(${maxRad}px at ${x}px ${y}px)`,
+            ],
+          },
+          {
+            duration: duration,
+            easing: "cubic-bezier(0.4, 0.0, 0.2, 1)", // More optimized easing
+            pseudoElement: "::view-transition-new(root)",
+            composite: "replace", // Better performance
+          },
+        );
+      } else {
+        // For browser: standard animation
+        document.documentElement.animate(
+          {
+            clipPath: [
+              `circle(0px at ${x}px ${y}px)`,
+              `circle(${maxRad}px at ${x}px ${y}px)`,
+            ],
+          },
+          {
+            duration: 700,
+            easing: "ease-in-out",
+            pseudoElement: "::view-transition-new(root)",
+          },
+        );
+      }
     } else {
       // Fallback for browsers without View Transitions support
       toggleTheme();
