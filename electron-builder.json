@@ -106,11 +106,7 @@
     "deleteAppDataOnUninstall": false,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "Позвони.мне",
-    "publisherName": "Позвони.мне"
-  },
-  "portable": {
-    "artifactName": "pozvonimne-portable-${version}.${ext}"
+    "shortcutName": "Позвони.мне"
   },
   "dmg": {
     "contents": [
