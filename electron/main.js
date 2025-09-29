@@ -118,10 +118,16 @@ let tray;
 
 // Create system tray
 function createTray() {
-  // Используем иконку приложения для трея
-  const iconPath = path.join(process.cwd(), 'public/logo.png')
+  try {
+    // Используем иконку приложения для трея
+    const iconPath = isDev 
+      ? path.join(process.cwd(), 'public/logo.png')
+      : path.join(process.resourcesPath, 'public/logo.png')
 
-  tray = new Tray(iconPath)
+    console.log('Creating tray with icon:', iconPath)
+    console.log('Icon exists:', require('fs').existsSync(iconPath))
+
+    tray = new Tray(iconPath)
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -156,17 +162,21 @@ function createTray() {
   tray.setContextMenu(contextMenu)
 
   // Клик по трею - показать/скрыть окно
-  tray.on('click', () => {
-    if (mainWindow) {
-      if (mainWindow.isVisible()) {
-        mainWindow.hide()
-      } else {
-        if (mainWindow.isMinimized()) mainWindow.restore()
-        mainWindow.show()
-        mainWindow.focus()
+    tray.on('click', () => {
+      if (mainWindow) {
+        if (mainWindow.isVisible()) {
+          mainWindow.hide()
+        } else {
+          if (mainWindow.isMinimized()) mainWindow.restore()
+          mainWindow.show()
+          mainWindow.focus()
+        }
       }
-    }
-  })
+    })
+  } catch (error) {
+    console.error('Failed to create tray:', error)
+    // Continue without tray if icon is missing
+  }
 }
 
 function createSplashWindow() {
@@ -187,6 +197,9 @@ function createSplashWindow() {
     ? path.join(__dirname, 'splash.html')
     : path.join(__dirname, 'splash.html');
 
+  console.log('Loading splash from:', splashPath)
+  console.log('Splash file exists:', require('fs').existsSync(splashPath))
+
   splashWindow.loadFile(splashPath);
 
   // Центрируем окно
@@ -201,24 +214,42 @@ function createSplashWindow() {
 
 function updateSplashProgress(progress, message) {
   if (splashWindow && !splashWindow.isDestroyed()) {
-    splashWindow.webContents.send('splash-progress', { progress, message });
+    try {
+      splashWindow.webContents.send('splash-progress', { progress, message });
+    } catch (error) {
+      console.log('Could not update splash progress:', error.message)
+    }
   }
 }
 
 function showSplashError(errorMessage) {
   if (splashWindow && !splashWindow.isDestroyed()) {
-    splashWindow.webContents.send('splash-error', errorMessage);
+    try {
+      splashWindow.webContents.send('splash-error', errorMessage);
+    } catch (error) {
+      console.log('Could not show splash error:', error.message)
+    }
   }
 }
 
 function closeSplash() {
   if (splashWindow && !splashWindow.isDestroyed()) {
-    splashWindow.webContents.send('splash-close');
-    setTimeout(() => {
-      if (splashWindow && !splashWindow.isDestroyed()) {
-        splashWindow.close();
-      }
-    }, 500);
+    try {
+      splashWindow.webContents.send('splash-close');
+      setTimeout(() => {
+        try {
+          if (splashWindow && !splashWindow.isDestroyed()) {
+            splashWindow.close();
+          }
+        } catch (error) {
+          console.log('Could not close splash (timeout):', error.message)
+        }
+      }, 500);
+      splashWindow = null;
+    } catch (error) {
+      console.log('Could not close splash:', error.message)
+      splashWindow = null;
+    }
   }
 }
 
@@ -403,19 +434,51 @@ async function createWindow() {
 
 // App event listeners
 app.whenReady().then(async () => {
-  // Create system tray first
-  createTray();
+  console.log('🚀 App is ready, starting initialization...')
+  console.log('📁 __dirname:', __dirname)
+  console.log('📁 process.cwd():', process.cwd())
+  console.log('📁 process.resourcesPath:', process.resourcesPath)
+  console.log('🔧 isDev:', isDev)
   
-  // Create splash screen first
-  createSplashWindow();
-  updateSplashProgress(10, 'Запуск приложения...');
+  try {
+    // Create system tray first
+    console.log('🎯 Creating system tray...')
+    createTray();
+    console.log('✅ Tray created successfully')
+  } catch (error) {
+    console.error('❌ Tray creation failed:', error)
+  }
+  
+  try {
+    // Create splash screen first (optional - continue if fails)
+    console.log('💫 Creating splash screen...')
+    createSplashWindow();
+    updateSplashProgress(10, 'Запуск приложения...');
+    console.log('✅ Splash screen created')
+  } catch (error) {
+    console.error('❌ Splash screen creation failed, continuing without splash:', error)
+    // Continue without splash screen
+  }
   
   // Add delay to show splash
   await new Promise(resolve => setTimeout(resolve, 500));
   
-  // Create main window
-  await createWindow();
-  setupAutoUpdater();
+  try {
+    // Create main window
+    console.log('🪟 Creating main window...')
+    await createWindow();
+    console.log('✅ Main window created')
+  } catch (error) {
+    console.error('❌ Main window creation failed:', error)
+  }
+  
+  try {
+    console.log('🔄 Setting up auto-updater...')
+    setupAutoUpdater();
+    console.log('✅ Auto-updater setup complete')
+  } catch (error) {
+    console.error('❌ Auto-updater setup failed:', error)
+  }
 
   // Register global shortcuts
   if (process.platform === 'darwin') {
