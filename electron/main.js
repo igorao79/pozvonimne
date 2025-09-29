@@ -89,56 +89,124 @@ function setupAutoUpdater() {
 
 // Keep a global reference of the window object
 let mainWindow;
+let splashWindow;
 
-function createWindow() {
-  // Apply WebRTC fixes
-  applyWebRTCFixes();
-
-  // Create the browser window
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 800,
-    minHeight: 600,
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 400,
+    height: 300,
+    frame: false,
+    alwaysOnTop: true,
+    transparent: false,
+    resizable: false,
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      enableRemoteModule: false,
-      preload: path.join(__dirname, 'preload.js'),
-      webSecurity: true,
-      allowRunningInsecureContent: false,
-      // Screen capture permissions
-      experimentalFeatures: true,
-    },
-    icon: path.join(__dirname, '../public/logo.ico'),
-    titleBarStyle: 'default',
-    show: false, // Don't show until ready
+      nodeIntegration: true,
+      contextIsolation: false
+    }
   });
+
+  const splashPath = isDev 
+    ? path.join(__dirname, 'splash.html')
+    : path.join(__dirname, 'splash.html');
+
+  splashWindow.loadFile(splashPath);
+
+  // Центрируем окно
+  splashWindow.center();
+
+  splashWindow.on('closed', () => {
+    splashWindow = null;
+  });
+
+  return splashWindow;
+}
+
+function updateSplashProgress(progress, message) {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.webContents.send('splash-progress', { progress, message });
+  }
+}
+
+function showSplashError(errorMessage) {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.webContents.send('splash-error', errorMessage);
+  }
+}
+
+function closeSplash() {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.webContents.send('splash-close');
+    setTimeout(() => {
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        splashWindow.close();
+      }
+    }, 500);
+  }
+}
+
+async function createWindow() {
+  try {
+    updateSplashProgress(30, 'Инициализация WebRTC...');
+    // Apply WebRTC fixes
+    applyWebRTCFixes();
+
+    updateSplashProgress(50, 'Создание главного окна...');
+    // Create the browser window
+    mainWindow = new BrowserWindow({
+      width: 1200,
+      height: 800,
+      minWidth: 800,
+      minHeight: 600,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        enableRemoteModule: false,
+        preload: path.join(__dirname, 'preload.js'),
+        webSecurity: true,
+        allowRunningInsecureContent: false,
+        // Screen capture permissions
+        experimentalFeatures: true,
+      },
+      icon: path.join(__dirname, '../public/logo.ico'),
+      titleBarStyle: 'default',
+      show: false, // Don't show until ready
+    });
+  } catch (error) {
+    console.error('Error creating window:', error);
+    showSplashError(`Ошибка создания окна: ${error.message}`);
+    return;
+  }
 
   // Load the Next.js app
   const loadApp = () => {
-    // Always use localhost in development
-    let startUrl = 'http://localhost:3000';
-    
-    console.log('Loading URL:', startUrl);
-    console.log('Development mode:', isDev);
+    try {
+      updateSplashProgress(70, 'Подключение к серверу...');
+      
+      // Always use localhost in development
+      let startUrl = 'http://localhost:3000';
+      
+      console.log('Loading URL:', startUrl);
+      console.log('Development mode:', isDev);
 
-    // Check if Next.js server is running
-    const checkServer = async () => {
-      try {
-        const response = await fetch(startUrl);
-        if (response.ok) {
-          console.log('Next.js server is ready, loading app...');
-          mainWindow.loadURL(startUrl);
-        } else {
-          throw new Error('Server not ready');
+      // Check if Next.js server is running
+      const checkServer = async () => {
+        try {
+          updateSplashProgress(80, 'Проверка сервера...');
+          const response = await fetch(startUrl);
+          if (response.ok) {
+            console.log('Next.js server is ready, loading app...');
+            updateSplashProgress(90, 'Загрузка интерфейса...');
+            await mainWindow.loadURL(startUrl);
+          } else {
+            throw new Error('Server not ready');
+          }
+        } catch (error) {
+          console.error('Next.js server not ready:', error.message);
+          console.log('Retrying in 2 seconds...');
+          updateSplashProgress(75, 'Ожидание сервера...');
+          setTimeout(checkServer, 2000);
         }
-      } catch (error) {
-        console.error('Next.js server not ready:', error.message);
-        console.log('Retrying in 2 seconds...');
-        setTimeout(checkServer, 2000);
-      }
-    };
+      };
 
     checkServer();
   };
@@ -167,7 +235,17 @@ function createWindow() {
 
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
+    updateSplashProgress(100, 'Готово!');
+    setTimeout(() => {
+      closeSplash();
+      mainWindow.show();
+    }, 500);
+  });
+
+  // Handle load errors
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('Failed to load:', errorCode, errorDescription);
+    showSplashError(`Ошибка загрузки: ${errorDescription}`);
   });
 
   // Open DevTools in development
@@ -211,8 +289,16 @@ function createWindow() {
 }
 
 // App event listeners
-app.whenReady().then(() => {
-  createWindow();
+app.whenReady().then(async () => {
+  // Create splash screen first
+  createSplashWindow();
+  updateSplashProgress(10, 'Запуск приложения...');
+  
+  // Add delay to show splash
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // Create main window
+  await createWindow();
   setupAutoUpdater();
 
   // Register global shortcuts

@@ -144,39 +144,17 @@ jobs:
           node-version: 18
           cache: 'npm'
 
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        id: cache-node-modules
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-
-
-      - name: Cache Next.js build
-        uses: actions/cache@v4
-        id: cache-nextjs
-        with:
-          path: |
-            .next/cache
-            out
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
-            ${{ runner.os }}-nextjs-
-
       - name: Cache Electron binaries
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cache/electron
-            ~/AppData/Local/electron/Cache
-          key: ${{ runner.os }}-electron-${{ hashFiles('package-lock.json') }}
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: ${{ runner.os }}-electron-cache-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-electron-
+            ${{ runner.os }}-electron-cache-
 
       - name: Install dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Update version
@@ -192,7 +170,6 @@ jobs:
           Write-Host "Updated version to: $version"
 
       - name: Build Next.js app
-        if: steps.cache-nextjs.outputs.cache-hit != 'true'
         run: npm run build
 
       - name: Build Electron app
