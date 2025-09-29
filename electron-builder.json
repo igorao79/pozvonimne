@@ -8,7 +8,8 @@
       "owner": "igorao79",
       "repo": "pozvonimne",
       "private": false,
-      "releaseType": "release"
+      "releaseType": "release",
+      "publish": "always"
     }
   ],
   "directories": {
