@@ -3,13 +3,9 @@
   "productName": "Позвони.мне",
   "copyright": "Copyright © 2025 Позвони.мне",
   "publish": {
-    "provider": "github",
-    "owner": "igorao79",
-    "repo": "pozvonimne",
-    "private": false,
-    "releaseType": "release",
-    "vPrefixedTagName": true,
-    "publish": "always"
+    "provider": "generic",
+    "url": "https://github.com/igorao79/pozvonimne/releases/latest/download/",
+    "channel": "latest"
   },
   "directories": {
     "output": "release",
