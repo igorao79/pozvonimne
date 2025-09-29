@@ -30,9 +30,14 @@ function setupAutoUpdater() {
   }
 
   try {
-    // Configure electron-updater
+    // Configure electron-updater for differential updates
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.allowDowngrade = false;
+    autoUpdater.allowPrerelease = false;
+    
+    // Enable differential downloads (smaller updates)
+    autoUpdater.forceDevUpdateConfig = false;
 
     // Auto-updater event handlers
     autoUpdater.on('checking-for-update', () => {
@@ -62,10 +67,21 @@ function setupAutoUpdater() {
     });
 
     autoUpdater.on('download-progress', (progressObj) => {
-      let log_message = "Download speed: " + progressObj.bytesPerSecond;
-      log_message = log_message + ' - Downloaded ' + Math.round(progressObj.percent) + '%';
-      log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+      const percent = Math.round(progressObj.percent);
+      let log_message = "Download speed: " + Math.round(progressObj.bytesPerSecond / 1024) + " KB/s";
+      log_message = log_message + ' - Downloaded ' + percent + '%';
+      log_message = log_message + ' (' + Math.round(progressObj.transferred / 1024 / 1024 * 100) / 100 + "/" + Math.round(progressObj.total / 1024 / 1024 * 100) / 100 + ' MB)';
       console.log(log_message);
+      
+      // Показать прогресс в главном окне (если есть)
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('download-progress', {
+          percent: percent,
+          speed: Math.round(progressObj.bytesPerSecond / 1024),
+          transferred: Math.round(progressObj.transferred / 1024 / 1024 * 100) / 100,
+          total: Math.round(progressObj.total / 1024 / 1024 * 100) / 100
+        });
+      }
     });
 
     autoUpdater.on('update-downloaded', (info) => {

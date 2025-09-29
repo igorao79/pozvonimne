@@ -3,14 +3,18 @@
   "productName": "Позвони.мне",
   "copyright": "Copyright © 2025 Позвони.мне",
   "publish": {
-    "provider": "generic",
-    "url": "https://github.com/igorao79/pozvonimne/releases/latest/download/",
-    "channel": "latest"
+    "provider": "github",
+    "owner": "igorao79", 
+    "repo": "pozvonimne",
+    "private": false,
+    "releaseType": "release"
   },
   "directories": {
     "output": "release",
     "buildResources": "electron"
   },
+  "generateUpdatesFilesForAllChannels": true,
+  "detectUpdateChannel": true,
   "files": [
     "out/**/*",
     "electron/main.js",
@@ -35,12 +39,14 @@
         "arch": ["x64", "ia32"]
       },
       {
-        "target": "portable",
+        "target": "portable", 
         "arch": ["x64", "ia32"]
       }
     ],
     "icon": "public/logo.png",
-    "verifyUpdateCodeSignature": false
+    "verifyUpdateCodeSignature": false,
+    "publisherName": "Позвони.мне",
+    "requestedExecutionLevel": "asInvoker"
   },
   "mac": {
     "target": [
