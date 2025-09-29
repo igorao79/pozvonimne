@@ -139,26 +139,17 @@ jobs:
           echo "📁 Полная структура:"
           ls -la artifacts/
 
-      - name: Update Release with Files
+      - name: Upload exe files to existing release
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v0.1.${{ github.run_number }}
-          body: |
-            🎉 Новый релиз приложения Позвони.мне для Windows
-            
-            ### 📦 Скачать для Windows:
-            - **NSIS Installer**: `Позвони.мне Setup.exe` - полный установщик
-            - **Portable**: `pozvonimne-portable.exe` - портативная версия
-            
-            ### ✨ Изменения:
-            - Новая версия приложения
-            - Исправления и улучшения
-            - Оптимизация для Windows
-            
-            ✅ **Готово**: Все файлы собраны и готовы к скачиванию!
-          draft: false
-          prerelease: false
           files: |
             artifacts/release-windows/*.exe
+
+      - name: Publish Release (remove draft)
+        run: |
+          gh release edit v0.1.${{ github.run_number }} --draft=false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
