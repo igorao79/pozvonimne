@@ -2,6 +2,11 @@
   "appId": "com.pozvonimne.app",
   "productName": "Позвони.мне",
   "copyright": "Copyright © 2025 Позвони.мне",
+  "publish": {
+    "provider": "github",
+    "owner": "igorao79",
+    "repo": "pozvonimne"
+  },
   "directories": {
     "output": "release",
     "buildResources": "electron"
@@ -32,9 +37,7 @@
       }
     ],
     "icon": "public/logo.ico",
-    "verifyUpdateCodeSignature": false,
-    "publisherName": "Позвони.мне",
-    "signtool": "signtool"
+    "verifyUpdateCodeSignature": false
   },
   "mac": {
     "target": [
@@ -114,6 +117,5 @@
   "buildDependenciesFromSource": true,
   "npmRebuild": true,
   "nodeVersion": "18.17.0",
-  "afterSign": "scripts/notarize.js",
   "afterAllArtifactBuild": "scripts/after-build.js"
 }

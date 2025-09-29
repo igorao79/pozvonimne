@@ -4,13 +4,19 @@
   "private": true,
   "main": "electron/main.js",
   "homepage": "./",
+  "description": "Простое и безопасное приложение для аудио звонков с WebRTC",
+  "author": "igorao79",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/igorao79/pozvonimne.git"
+  },
   "scripts": {
     "dev": "next dev",
     "dev:turbo": "next dev --turbopack",
     "build": "next build",
     "build:electron": "npm run build:next && npm run build:electron:app",
     "build:next": "set NODE_ENV=production && npm run build",
-    "build:electron:app": "ELECTRON_BUILD=true set NODE_ENV=production && npm run build && npm rebuild && electron-builder",
+    "build:electron:app": "set ELECTRON_BUILD=true && set NODE_ENV=production && npm rebuild && electron-builder",
     "build:electron:dev": "set NODE_ENV=development && electron electron/main.js",
     "build:electron:prod": "npm run build:electron",
     "start": "next start",

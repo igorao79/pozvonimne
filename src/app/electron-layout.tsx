@@ -15,6 +15,7 @@ declare global {
       showMessageBox: (options: any) => Promise<any>
       getScreenSources: () => Promise<any[]>
       getSystemTheme: () => Promise<string>
+      checkForUpdates: () => Promise<{ updateAvailable: boolean; message: string }>
       // Add other methods as needed
     }
     electron?: {
