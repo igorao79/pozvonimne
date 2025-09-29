@@ -31,8 +31,14 @@
     "electron/webrtc-fix.js",
     "electron/splash.html",
     "electron/logo.png",
-    "package.json",
-    "node_modules/electron-updater/**/*"
+    "package.json"
+  ],
+  "extraFiles": [
+    {
+      "from": "node_modules/electron-updater",
+      "to": "node_modules/electron-updater",
+      "filter": ["**/*", "!**/*.md", "!**/LICENSE*", "!**/test/**"]
+    }
   ],
   "extraResources": [
     {

@@ -457,8 +457,20 @@ app.on('second-instance', () => {
   }
 });
 
-// Security: Disable hardware acceleration on some systems to prevent crashes
-app.disableHardwareAcceleration();
+// Performance and memory optimizations
+app.commandLine.appendSwitch('--no-sandbox');
+app.commandLine.appendSwitch('--disable-background-timer-throttling');
+app.commandLine.appendSwitch('--disable-renderer-backgrounding');
+app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows');
+
+// Memory optimization
+app.commandLine.appendSwitch('--memory-pressure-off');
+app.commandLine.appendSwitch('--max_old_space_size', '4096');
+
+// Only disable hardware acceleration if needed
+if (process.platform === 'linux') {
+  app.disableHardwareAcceleration();
+}
 
 // Handle app ready for production
 if (!isDev) {

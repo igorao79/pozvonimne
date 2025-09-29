@@ -68,13 +68,26 @@ const nextConfig: NextConfig = {
   webpack: (config, { dev, isServer }) => {
     // Optimize bundle size
     if (!dev && !isServer) {
+      // Enhanced tree shaking
+      config.optimization.usedExports = true;
+      config.optimization.sideEffects = false;
+      
+      // Split chunks for better caching
       config.optimization.splitChunks = {
         chunks: 'all',
+        minSize: 20000,
+        maxSize: 200000,
         cacheGroups: {
+          default: {
+            minChunks: 2,
+            priority: -20,
+            reuseExistingChunk: true,
+          },
           vendor: {
             test: /[\\/]node_modules[\\/]/,
             name: 'vendors',
             chunks: 'all',
+            priority: -10,
           },
           supabase: {
             test: /[\\/]node_modules[\\/]@supabase[\\/]/,
@@ -82,14 +95,26 @@ const nextConfig: NextConfig = {
             chunks: 'all',
             priority: 10,
           },
-          gsap: {
-            test: /[\\/]node_modules[\\/]gsap[\\/]/,
-            name: 'gsap',
+          lucide: {
+            test: /[\\/]node_modules[\\/]lucide-react[\\/]/,
+            name: 'lucide',
             chunks: 'all',
-            priority: 10,
+            priority: 5,
           },
         },
       };
+
+      // Remove unused CSS
+      config.optimization.usedExports = true;
+      
+      // Minimize bundle size for Electron
+      if (process.env.ELECTRON_BUILD) {
+        config.externals = config.externals || {};
+        config.externals['electron'] = 'commonjs electron';
+        config.externals['fs'] = 'commonjs fs';
+        config.externals['path'] = 'commonjs path';
+        config.externals['crypto'] = 'commonjs crypto';
+      }
     }
     
     return config;
