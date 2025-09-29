@@ -8,10 +8,7 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
 
     steps:
       - name: Check out Git repository
@@ -28,18 +25,15 @@ jobs:
 
       - name: Update version
         run: |
-          node -e "
-            const fs = require('fs');
-            const runNumber = '${{ github.run_number }}';
-            const version = \`0.1.\${runNumber}\`;
-            console.log('Генерируем версию на основе номера run');
-            console.log('New version:', version);
-            
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = version;
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-            console.log('Updated version to:', pkg.version);
-          "
+          $runNumber = "${{ github.run_number }}"
+          $version = "0.1.$runNumber"
+          Write-Host "Генерируем версию на основе номера run"
+          Write-Host "New version: $version"
+          
+          $packageJson = Get-Content "package.json" | ConvertFrom-Json
+          $packageJson.version = $version
+          $packageJson | ConvertTo-Json -Depth 100 | Set-Content "package.json"
+          Write-Host "Updated version to: $version"
 
       - name: Build Next.js app
         run: npm run build
@@ -53,7 +47,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.os }}
+          name: release-windows
           path: release/*
 
   release:
@@ -74,16 +68,14 @@ jobs:
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          node -e "
-            const { execSync } = require('child_process');
-            const runNumber = '${{ github.run_number }}';
-            const version = \`0.1.\${runNumber}\`;
-            const tag = \`v\${version}\`;
-            console.log('Creating tag:', tag);
-            
-            execSync(\`git tag \${tag}\`, { stdio: 'inherit' });
-            execSync(\`git push origin \${tag}\`, { stdio: 'inherit' });
-          "
+          
+          RUN_NUM=${{ github.run_number }}
+          VERSION="0.1.${RUN_NUM}"
+          TAG="v${VERSION}"
+          echo "Creating tag: ${TAG}"
+          
+          git tag "${TAG}"
+          git push origin "${TAG}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -96,16 +88,16 @@ jobs:
           tag_name: v0.1.${{ github.run_number }}
           name: Release v0.1.${{ github.run_number }}
           body: |
-            🎉 Новый релиз приложения Позвони.мне
+            🎉 Новый релиз приложения Позвони.мне для Windows
             
-            ### 📦 Скачать:
-            - **Windows**: `.exe` и `.msi` файлы
-            - **macOS**: `.dmg` файл  
-            - **Linux**: `.AppImage` и `.deb` файлы
+            ### 📦 Скачать для Windows:
+            - **NSIS Installer**: `.exe` установщик
+            - **Portable**: портативная версия
             
             ### ✨ Изменения:
             - Новая версия приложения
             - Исправления и улучшения
+            - Оптимизация для Windows
           draft: false
           prerelease: false
           files: |
