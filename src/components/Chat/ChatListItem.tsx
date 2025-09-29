@@ -44,10 +44,8 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
   truncateText
 }) => {
   // 🔥 ДИАГНОСТИКА: Логируем каждый рендер
-  console.log(`🔄 ChatListItem [${chat.id.slice(0, 8)}] рендерится`)
   // Получаем текущего пользователя для исключения
   const { userId } = useCallStore()
-  console.log(`👤 ChatListItem: userId=`, userId, 'typeof userId:', typeof userId)
 
   // Получаем премиум данные для приватного чата (для другого участника)
   const { premiumData: otherParticipantPremiumData } = useSinglePremiumData(
@@ -55,13 +53,11 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
   )
 
   const typingUsersWithTypes = useTypingUsersWithTypes(chat.id)
-  console.log(`🎯 ChatListItem: typingUsersWithTypes=`, typingUsersWithTypes)
 
   // Фильтруем текущего пользователя из списка
   const otherTypingUsersWithTypes = React.useMemo(() => {
     if (!userId) return typingUsersWithTypes
     const filtered = typingUsersWithTypes.filter(user => user.userId !== userId)
-    console.log(`🔍 ChatListItem: filtering - userId=${userId}, typingUsersWithTypes=`, typingUsersWithTypes, 'filtered=', filtered)
     return filtered
   }, [typingUsersWithTypes, userId])
 
@@ -69,7 +65,6 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
 
   // Определяем, есть ли пользователь, который записывает голосовое
   const isSomeoneRecordingVoice = otherTypingUsersWithTypes.some(user => user.type === 'voice')
-  console.log(`🔍 ChatListItem: computed values - isTyping=${isTyping}, isSomeoneRecordingVoice=${isSomeoneRecordingVoice}`)
 
   // Определяем, есть ли пользователь, который печатает текст
   const isSomeoneTypingText = otherTypingUsersWithTypes.some(user => user.type === 'text')

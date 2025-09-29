@@ -281,25 +281,13 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
       // Добавляем сообщение локально для немедленного отображения
       setMessages(prev => [...prev, tempMessage])
 
-      // Отправляем сообщение на сервер с таймаутом
+      // Отправляем сообщение на сервер
       console.log('📤 Отправляем сообщение на сервер...')
-      const sendPromise = supabase.rpc('send_message', {
+      const { data: messageId, error: sendError } = await supabase.rpc('send_message', {
         chat_uuid: chatId,
         message_content: text,
         message_type: 'text'
       })
-
-      // Создаем таймаут для отправки (10 секунд)
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Timeout: отправка сообщения заняла слишком много времени (>10s)'))
-        }, 10000)
-      })
-
-      const { data: messageId, error: sendError } = await Promise.race([
-        sendPromise,
-        timeoutPromise
-      ]) as any
 
       if (sendError) {
         console.error('Ошибка отправки сообщения:', sendError)

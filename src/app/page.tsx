@@ -8,6 +8,7 @@ import useCallStore from '@/store/useCallStore'
 import AuthForm from '@/components/Auth/AuthForm'
 import CallInterface from '@/components/Call/CallInterface'
 import { UserProfile } from '@/components/Profile'
+import { AdminPanel, BannedUserOverlay } from '@/components/Admin'
 import { getAssetPath } from '@/lib/utils'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { ThemeToggler } from '@/components/ui/theme-toggler'
@@ -17,12 +18,15 @@ import { useGlobalCallManager } from '@/hooks/useGlobalCallManager'
 import useCallStateSynchronizer from '@/hooks/useCallStateSynchronizer'
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
 import ExternalLinkProvider from '@/components/Providers/ExternalLinkProvider'
-import { User } from 'lucide-react'
+import { User, Shield } from 'lucide-react'
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [showProfile, setShowProfile] = useState(false)
+  const [showAdmin, setShowAdmin] = useState(false)
   const [resetChatTrigger, setResetChatTrigger] = useState(0)
+  const [isBanned, setIsBanned] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   
   // 🔥 КРИТИЧЕСКИЙ DEBUG HOOK для мониторинга производительности (упрощенная версия)
   const debugStartTime = Date.now()
@@ -103,11 +107,30 @@ export default function Home() {
   }, [isAuthenticated, user?.id, isGlobalCallManagerActive, isStateSyncActive])
 
   useEffect(() => {
-    // Check initial session
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          setUser(session.user)
+          setUserId(session.user.id)
+          setAuthenticated(true)
+        } else if (event === 'SIGNED_OUT') {
+          resetAll()
+          setIsBanned(false)
+          setIsAdmin(false)
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [supabase, setUser, setUserId, setAuthenticated, resetAll])
+
+  // Check initial session
+  useEffect(() => {
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        
+
         if (session?.user) {
           setUser(session.user)
           setUserId(session.user.id)
@@ -124,22 +147,39 @@ export default function Home() {
     }
 
     checkSession()
+  }, [supabase, setUser, setUserId, setAuthenticated])
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          setUser(session.user)
-          setUserId(session.user.id)
-          setAuthenticated(true)
-        } else if (event === 'SIGNED_OUT') {
-          resetAll()
-        }
+  // Проверяем статус бана и права администратора при аутентификации
+  useEffect(() => {
+    const checkStatus = async () => {
+      if (!isAuthenticated || !user?.id) {
+        setIsBanned(false)
+        setIsAdmin(false)
+        return
       }
-    )
 
-    return () => subscription.unsubscribe()
-  }, [supabase, setUser, setUserId, setAuthenticated, resetAll])
+      try {
+        // Проверяем статус бана
+        const { data: banData, error: banError } = await supabase.rpc('check_user_ban_status')
+        if (!banError && banData?.[0]) {
+          setIsBanned(banData[0].is_banned)
+        }
+
+        // Проверяем права администратора
+        const { data: adminData, error: adminError } = await supabase.rpc('is_admin')
+        if (!adminError) {
+          setIsAdmin(adminData)
+        }
+      } catch (err) {
+        console.error('Error checking ban status and admin rights:', err)
+        // При ошибке сбрасываем статусы
+        setIsBanned(false)
+        setIsAdmin(false)
+      }
+    }
+
+    checkStatus()
+  }, [isAuthenticated, user?.id, supabase])
 
   // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: НЕМЕДЛЕННЫЙ запуск синхронизации с детальной отладкой
   useEffect(() => {
@@ -207,6 +247,21 @@ export default function Home() {
     )
   }
 
+  // Если пользователь забанен, показываем экран бана
+  if (isBanned) {
+    return (
+      <ExternalLinkProvider>
+        <BannedUserOverlay 
+          onUnbanned={() => {
+            setIsBanned(false)
+            // Перезагружаем страницу для обновления состояния
+            window.location.reload()
+          }} 
+        />
+      </ExternalLinkProvider>
+    )
+  }
+
   return (
     <ExternalLinkProvider>
       <div className="h-screen flex flex-col overflow-hidden bg-background transition-colors">
@@ -235,6 +290,17 @@ export default function Home() {
             </div>
             <div className="flex items-center space-x-3">
               <ThemeToggler />
+              {/* Admin Button - только для администраторов */}
+              {isAdmin && (
+                <button
+                  onClick={() => setShowAdmin(true)}
+                  className="p-2 rounded-md admin-button hover:bg-yellow-100 dark:hover:bg-yellow-900/30 hover:ring-2 hover:ring-yellow-300 dark:hover:ring-yellow-600 transition-all duration-200 border border-border cursor-pointer"
+                  aria-label="Открыть админку"
+                  title="Административная панель"
+                >
+                  <Shield className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                </button>
+              )}
               <button
                 onClick={() => setShowProfile(true)}
                 className="p-2 rounded-md profile-button hover:bg-secondary/80 hover:ring-2 hover:ring-secondary/60 dark:hover:bg-gray-600 dark:hover:ring-gray-300 transition-all duration-200 border border-border cursor-pointer"
@@ -275,6 +341,13 @@ export default function Home() {
       {/* Profile Modal */}
       {showProfile && (
         <UserProfile onClose={() => setShowProfile(false)} />
+      )}
+
+      {/* Admin Panel */}
+      {showAdmin && (
+        <AdminPanel
+          onClose={() => setShowAdmin(false)}
+        />
       )}
 
       

@@ -17,6 +17,28 @@ const nextConfig: NextConfig = {
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',
     contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; sandbox;",
+    domains: [
+      'uasoayoovlureephzkns.supabase.co',
+      'lh3.googleusercontent.com', // Google avatars
+      'avatars.githubusercontent.com', // GitHub avatars
+    ],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'uasoayoovlureephzkns.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'avatars.githubusercontent.com',
+        pathname: '/**',
+      },
+    ],
   },
 
   // Experimental features for better performance

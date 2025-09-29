@@ -137,7 +137,6 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
 
       // Простой вызов без дополнительных параметров (исправлен PGRST203)
       const { data, error: chatsError } = await supabase.rpc('get_user_chats')
-        .abortSignal(AbortSignal.timeout(5000)) // Добавляем таймаут
 
       if (chatsError) {
         console.error(`❌ СИНХРОНИЗАЦИЯ [${instanceId.current}]: Ошибка загрузки чатов:`, chatsError)

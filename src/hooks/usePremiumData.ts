@@ -46,7 +46,6 @@ export const usePremiumData = (userIds: string[]) => {
         // Обновляем данными из базы
         if (data) {
           data.forEach(profile => {
-            console.log('usePremiumData: loading profile data:', profile)
             dataMap[profile.id] = {
               isPremium: profile.is_premium || false,
               premiumColor: profile.premium_color || '#FFFFFF',

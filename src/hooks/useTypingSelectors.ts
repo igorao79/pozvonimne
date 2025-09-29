@@ -63,7 +63,7 @@ export const useTypingUsersWithTypes = (chatId: string) => {
   const typingTypes = useTypingStore((state) => state.typingTypes[chatId])
 
   // 🔥 ДИАГНОСТИКА: Всегда логируем
-  console.log(`🎯 [useTypingUsersWithTypes] called for ${chatId.slice(0, 8)}, typingArray:`, typingArray, 'typingTypes:', typingTypes)
+
 
   return useMemo(() => {
     if (!typingArray) return []
@@ -73,10 +73,7 @@ export const useTypingUsersWithTypes = (chatId: string) => {
       type: typingTypes?.[userId] || 'text'
     }))
 
-    // Логируем только если есть изменения
-    if (result.length > 0) {
-      console.log(`🎯 [useTypingUsersWithTypes] ${chatId.slice(0, 8)} result:`, result)
-    }
+ 
 
     return result
   }, [typingArray, typingTypes, chatId])

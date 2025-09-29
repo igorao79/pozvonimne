@@ -413,21 +413,11 @@ const useChatSyncStore = create<ChatSyncState>()(
           schema: 'public',
           table: 'user_profiles'
         }, (payload) => {
-          // Логируем изменения статуса только в debug режиме
-          if (process.env.NODE_ENV === 'development') {
-            console.log('👥 Глобальное обновление: изменение статуса пользователя', {
-              userId: payload.new?.id?.slice(0, 8),
-              oldStatus: payload.old?.status,
-              newStatus: payload.new?.status,
-              oldLastSeen: payload.old?.last_seen,
-              newLastSeen: payload.new?.last_seen
-            })
-          }
 
           // Вызываем refresh для обновления списка пользователей
           const { userRefreshCallbacks } = get()
           if (userRefreshCallbacks && userRefreshCallbacks.size > 0) {
-            console.log('🔄 Уведомляем подписчиков об обновлении пользователей:', userRefreshCallbacks.size)
+          
             userRefreshCallbacks.forEach(callback => {
               try {
                 callback()
