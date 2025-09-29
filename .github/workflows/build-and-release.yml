@@ -6,12 +6,6 @@ on:
       - master
       - main
   workflow_dispatch:
-    inputs:
-      create_release:
-        description: 'Create GitHub release?'
-        required: false
-        default: 'false'
-        type: boolean
 
 jobs:
   build:
@@ -30,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Update version and create tag
+      - name: Update version
         run: |
           # Get run number for version
           RUN_NUM=${{ github.run_number }}
@@ -44,12 +38,6 @@ jobs:
 
           # Show updated version
           grep '"version"' package.json
-
-          # Create and push tag
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git tag "$TAG"
-          git push origin "$TAG"
 
       - name: Create Draft Release
         uses: softprops/action-gh-release@v1
