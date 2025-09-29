@@ -142,8 +142,8 @@ jobs:
             🎉 Новый релиз приложения Позвони.мне для Windows
             
             ### 📦 Скачать для Windows:
-            - **NSIS Installer**: `.exe` установщик
-            - **Portable**: портативная версия
+            - **NSIS Installer**: `Позвони.мне Setup.exe` - полный установщик
+            - **Portable**: `pozvonimne-portable.exe` - портативная версия
             
             ### ✨ Изменения:
             - Новая версия приложения
@@ -153,6 +153,6 @@ jobs:
             ✅ **Готово**: Все файлы собраны и готовы к скачиванию!
           draft: false
           prerelease: false
-          make_latest: true
           files: |
-            artifacts/**/*
+            artifacts/**/Позвони.мне Setup *.exe
+            artifacts/**/pozvonimne-portable-*.exe
