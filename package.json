@@ -16,7 +16,7 @@
     "build": "rimraf .next && next build",
     "build:electron": "npm run build:next && npm run build:electron:app",
     "build:next": "set NODE_ENV=production && npm run build",
-    "build:electron:app": "set ELECTRON_BUILD=true && set NODE_ENV=production && npm rebuild && electron-builder",
+    "build:electron:app": "set ELECTRON_BUILD=true && set NODE_ENV=production && electron-builder",
     "build:electron:dev": "set NODE_ENV=development && electron electron/main.js",
     "build:electron:prod": "npm run build:electron",
     "start": "next start",

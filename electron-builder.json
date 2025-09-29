@@ -113,9 +113,9 @@
     "format": "ULFO"
   },
   "compression": "maximum",
-  "nodeGypRebuild": true,
-  "buildDependenciesFromSource": true,
-  "npmRebuild": true,
+  "nodeGypRebuild": false,
+  "buildDependenciesFromSource": false,
+  "npmRebuild": false,
   "nodeVersion": "18.17.0",
   "afterAllArtifactBuild": "scripts/after-build.js"
 }

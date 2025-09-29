@@ -1,31 +1,20 @@
-name: Create Test Release
+name: Build and Release
 
 on:
+  push:
+    branches:
+      - master
+      - main
   workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create GitHub release?'
+        required: false
+        default: 'false'
+        type: boolean
 
 jobs:
-  test-release:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v4
-
-      - name: Create Test Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: test-${{ github.run_number }}
-          name: Test Release ${{ github.run_number }}
-          body: |
-            Тестовый релиз для проверки работы GitHub Actions
-
-            Этот релиз создан для тестирования автоматизации релизов.
-          draft: true
-          prerelease: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-and-release:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -50,6 +39,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pozvonimne-linux
+          path: release/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pozvonimne-linux
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -58,13 +64,14 @@ jobs:
           body: |
             Автоматический релиз #${{ github.run_number }}
 
-            ## Изменения
-            - Автоматическая сборка при пуше в основную ветку
-
             ## Скачивание
-            - Linux: pozvonimne-*.AppImage
-          files: release/*
+            - Linux AppImage: pozvonimne-*.AppImage
+
+            ## Особенности
+            - Автоматическая сборка при пуше в основную ветку
+            - Поддержка Linux (Ubuntu)
+          files: ./*
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN || github.token }}
