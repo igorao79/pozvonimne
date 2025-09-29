@@ -30,13 +30,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Update version
+      - name: Update version and create tag
         run: |
-          # Get current date and run number for version
-          DATE=$(date +%Y%m%d)
+          # Get run number for version
           RUN_NUM=${{ github.run_number }}
           VERSION="0.1.${RUN_NUM}"
+          TAG="v${VERSION}"
           echo "New version: $VERSION"
+          echo "New tag: $TAG"
 
           # Update package.json version
           sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json
@@ -44,37 +45,17 @@ jobs:
           # Show updated version
           grep '"version"' package.json
 
-      - name: Build Next.js app
-        run: npm run build
+          # Create and push tag
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag "$TAG"
+          git push origin "$TAG"
 
-      - name: Build Electron app
-        run: npm run build:electron:app
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: pozvonimne-linux
-          path: release/*
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'
-
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: pozvonimne-linux
-
-      - name: Create Release
+      - name: Create Draft Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ github.run_number }}
-          name: Release ${{ github.run_number }}
+          tag_name: v0.1.${{ github.run_number }}
+          name: Release 0.1.${{ github.run_number }}
           body: |
             Автоматический релиз #${{ github.run_number }}
 
@@ -84,8 +65,16 @@ jobs:
             ## Особенности
             - Автоматическая сборка при пуше в основную ветку
             - Поддержка Linux (Ubuntu)
-          files: ./*
-          draft: false
+          draft: true
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN || github.token }}
+
+      - name: Build Next.js app
+        run: npm run build
+
+      - name: Build Electron app
+        run: npm run build:electron:app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
