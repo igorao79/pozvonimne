@@ -26,21 +26,30 @@ jobs:
 
       - name: Update version
         run: |
+          # Генерируем версию на основе номера run
           RUN_NUM=${{ github.run_number }}
           VERSION="0.1.${RUN_NUM}"
           TAG="v${VERSION}"
           echo "New version: $VERSION"
           echo "New tag: $TAG"
+
+          # Обновляем package.json
           sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json
           grep '"version"' package.json
+
+          # Создаем и пушим тег
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag "$TAG"
+          git push origin "$TAG"
 
       - name: Build Next.js app
         run: npm run build
 
-      - name: Build Electron app
+      - name: Build Electron app and publish draft release
         run: npm run build:electron:app
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }} # Personal Access Token с правами repo
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload build artifacts
@@ -48,18 +57,3 @@ jobs:
         with:
           name: pozvonimne-linux
           path: release/*
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v0.1.${{ github.run_number }}
-          name: Release 0.1.${{ github.run_number }}
-          body: |
-            Автоматический релиз #${{ github.run_number }}
-
-            ## Скачивание
-            - Linux AppImage: pozvonimne-*.AppImage
-          draft: true
-          prerelease: false
