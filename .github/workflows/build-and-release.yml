@@ -1,39 +1,50 @@
-name: Deploy
+name: Build and Release
 
 on:
   push:
     branches:
+      - master
       - main
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Check out Git repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GH_TOKEN }} # ← твой PAT
 
-      - name: Setup Node.js
+      - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 18
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build project
+      - name: Update version
+        run: |
+          # Генерируем версию на основе номера run
+          RUN_NUM=${{ github.run_number }}
+          VERSION="0.1.${RUN_NUM}"
+          echo "New version: $VERSION"
+
+          # Обновляем package.json
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json
+          grep '"version"' package.json
+
+      - name: Build Next.js app
         run: npm run build
 
-      - name: Set git user
-        run: |
-          git config user.name "igorao79"
-          git config user.email "154910823+igorao79@users.noreply.github.com"
+      - name: Build Electron app
+        run: npm run build:electron:app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Push new version and tags
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          git tag v$VERSION || true
-          git push origin HEAD:main --tags
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pozvonimne-linux
+          path: release/*
