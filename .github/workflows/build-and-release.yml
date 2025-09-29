@@ -30,6 +30,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Update version
+        run: |
+          # Get current date and run number for version
+          DATE=$(date +%Y%m%d)
+          RUN_NUM=${{ github.run_number }}
+          VERSION="0.1.${RUN_NUM}"
+          echo "New version: $VERSION"
+
+          # Update package.json version
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json
+
+          # Show updated version
+          grep '"version"' package.json
+
       - name: Build Next.js app
         run: npm run build
 

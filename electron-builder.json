@@ -5,7 +5,9 @@
   "publish": {
     "provider": "github",
     "owner": "igorao79",
-    "repo": "pozvonimne"
+    "repo": "pozvonimne",
+    "private": false,
+    "releaseType": "release"
   },
   "directories": {
     "output": "release",
