@@ -132,6 +132,13 @@ jobs:
         with:
           path: artifacts
 
+      - name: Debug artifact structure
+        run: |
+          echo "🔍 Проверяем структуру artifacts:"
+          find artifacts -name "*.exe" -type f
+          echo "📁 Полная структура:"
+          ls -la artifacts/
+
       - name: Update Release with Files
         uses: softprops/action-gh-release@v1
         env:
@@ -154,5 +161,4 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            artifacts/**/Позвони.мне Setup *.exe
-            artifacts/**/pozvonimne-portable-*.exe
+            artifacts/release-windows/*.exe
