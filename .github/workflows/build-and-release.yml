@@ -7,7 +7,38 @@ on:
       - main
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Quick config validation
+        run: |
+          echo "🔍 Быстрая проверка конфигурации electron-builder..."
+          node -e "
+            const config = require('./electron-builder.json');
+            console.log('✅ electron-builder.json загружен успешно');
+            console.log('📦 Targets:', Object.keys(config).filter(k => ['win', 'mac', 'linux'].includes(k)));
+          "
+          
+          # Проверяем что иконки существуют
+          if [ -f "public/logo.png" ]; then
+            echo "✅ Logo PNG найден"
+          else
+            echo "❌ Logo PNG не найден!"
+            exit 1
+          fi
+          
+          echo "🎉 Валидация прошла успешно!"
+
   build:
+    needs: validate
     runs-on: windows-latest
 
     steps:
@@ -51,7 +82,7 @@ jobs:
           path: release/*
 
   release:
-    needs: build
+    needs: [validate, build]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     

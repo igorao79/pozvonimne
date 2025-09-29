@@ -82,9 +82,6 @@
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,
     "deleteAppDataOnUninstall": false,
-    "installerIcon": "public/logo.png",
-    "uninstallerIcon": "public/logo.png",
-    "installerHeaderIcon": "public/logo.png",
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "shortcutName": "Позвони.мне"
