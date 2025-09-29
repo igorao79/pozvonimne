@@ -37,7 +37,7 @@ jobs:
           sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json
           grep '"version"' package.json
 
-          # Создаем и пушим тег
+          # Создаем и пушим тег.
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git tag "$TAG"
