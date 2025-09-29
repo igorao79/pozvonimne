@@ -41,8 +41,41 @@ jobs:
           
           echo "🎉 Валидация прошла успешно!"
 
-  build:
+  create-release:
     needs: validate
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Create Draft Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v0.1.${{ github.run_number }}
+          name: Release v0.1.${{ github.run_number }}
+          body: |
+            🎉 Новый релиз приложения Позвони.мне для Windows
+            
+            ### 📦 Скачать для Windows:
+            - **NSIS Installer**: `.exe` установщик (готовится...)
+            - **Portable**: портативная версия (готовится...)
+            
+            ### ✨ Изменения:
+            - Новая версия приложения
+            - Исправления и улучшения
+            - Оптимизация для Windows
+            
+            🔄 **Статус**: Файлы собираются, будут добавлены автоматически...
+          draft: true
+          prerelease: false
+
+  build:
+    needs: [validate, create-release]
     runs-on: windows-latest
 
     steps:
@@ -85,8 +118,8 @@ jobs:
           name: release-windows
           path: release/*
 
-  release:
-    needs: [validate, build]
+  update-release:
+    needs: [validate, create-release, build]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     
@@ -99,14 +132,12 @@ jobs:
         with:
           path: artifacts
 
-      - name: Create Release
-        id: create_release
+      - name: Update Release with Files
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v0.1.${{ github.run_number }}
-          name: Release v0.1.${{ github.run_number }}
           body: |
             🎉 Новый релиз приложения Позвони.мне для Windows
             
@@ -118,6 +149,8 @@ jobs:
             - Новая версия приложения
             - Исправления и улучшения
             - Оптимизация для Windows
+            
+            ✅ **Готово**: Все файлы собраны и готовы к скачиванию!
           draft: false
           prerelease: false
           make_latest: true
