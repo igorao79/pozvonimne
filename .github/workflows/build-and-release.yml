@@ -33,9 +33,14 @@ jobs:
           VERSION="0.1.${RUN_NUM}"
           echo "New version: $VERSION"
 
-          # Обновляем package.json
-          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json
-          grep '"version"' package.json
+          # Обновляем package.json с помощью Node.js
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '$VERSION';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            console.log('Updated version to:', pkg.version);
+          "
 
       - name: Build Next.js app
         run: npm run build
@@ -70,6 +75,8 @@ jobs:
         run: |
           RUN_NUM=${{ github.run_number }}
           VERSION="0.1.${RUN_NUM}"
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
           git tag "v$VERSION"
           git push origin "v$VERSION"
         env:
