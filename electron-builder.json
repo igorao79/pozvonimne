@@ -59,7 +59,6 @@
     ],
     "icon": "public/logo.png",
     "verifyUpdateCodeSignature": false,
-    "publisherName": "Позвони.мне",
     "requestedExecutionLevel": "asInvoker"
   },
   "mac": {
@@ -107,7 +106,8 @@
     "deleteAppDataOnUninstall": false,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "Позвони.мне"
+    "shortcutName": "Позвони.мне",
+    "publisherName": "Позвони.мне"
   },
   "portable": {
     "artifactName": "pozvonimne-portable-${version}.${ext}"
