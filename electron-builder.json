@@ -36,7 +36,7 @@
         "arch": ["x64", "ia32"]
       }
     ],
-    "icon": "public/logo.ico",
+    "icon": "public/logo.png",
     "verifyUpdateCodeSignature": false
   },
   "mac": {
@@ -82,9 +82,9 @@
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,
     "deleteAppDataOnUninstall": false,
-    "installerIcon": "public/logo.ico",
-    "uninstallerIcon": "public/logo.ico",
-    "installerHeaderIcon": "public/logo.ico",
+    "installerIcon": "public/logo.png",
+    "uninstallerIcon": "public/logo.png",
+    "installerHeaderIcon": "public/logo.png",
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "shortcutName": "Позвони.мне"
