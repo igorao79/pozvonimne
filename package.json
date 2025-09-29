@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:turbo": "next dev --turbopack",
-    "build": "next build",
+    "build": "rimraf .next && next build",
     "build:electron": "npm run build:next && npm run build:electron:app",
     "build:next": "set NODE_ENV=production && npm run build",
     "build:electron:app": "set ELECTRON_BUILD=true && set NODE_ENV=production && npm rebuild && electron-builder",
@@ -69,6 +69,7 @@
     "eslint-config-next": "15.5.3",
     "next-sitemap": "^4.2.3",
     "node-fetch": "^3.3.2",
+    "rimraf": "^6.0.1",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.8",
     "typescript": "^5",
