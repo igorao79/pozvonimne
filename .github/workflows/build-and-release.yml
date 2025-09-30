@@ -80,9 +80,11 @@ jobs:
               
               // Проверяем npm пакеты
               const npmRequires = mainJs.match(/require\(['\'][^'\"\.\/][^'\"]*['\'']\)/g) || [];
+              const builtInModules = ['electron', 'path', 'fs', 'os', 'url', 'crypto', 'events', 'util', 'stream', 'buffer', 'http', 'https'];
+              
               npmRequires.forEach(req => {
                 const packageName = req.match(/require\(['\']([^'\"]*)['\'']\)/)[1];
-                if (packageName !== 'electron' && packageName !== 'path' && packageName !== 'fs') {
+                if (!builtInModules.includes(packageName)) {
                   const allDeps = {...(packageJson.dependencies || {}), ...(packageJson.devDependencies || {})};
                   if (allDeps[packageName]) {
                     console.log('✅ npm пакет найден:', packageName);
@@ -90,6 +92,8 @@ jobs:
                     console.error('❌ npm пакет не найден в dependencies:', packageName);
                     process.exit(1);
                   }
+                } else {
+                  console.log('✅ встроенный модуль Node.js:', packageName);
                 }
               });
               
