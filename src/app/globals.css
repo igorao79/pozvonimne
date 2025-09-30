@@ -81,23 +81,23 @@ html {
   will-change: background-color;
 }
 
-/* Electron-specific optimizations - fast transitions for smooth wave */
+/* Electron-specific optimizations - ultra-fast transitions for lightning wave */
 .electron-app * {
-  /* Fast transitions for wave animation */
-  transition: background-color 0.2s ease-out,
-              color 0.2s ease-out,
-              border-color 0.2s ease-out !important;
+  /* Lightning-fast transitions for wave animation */
+  transition: background-color 0.12s ease-out,
+              color 0.12s ease-out,
+              border-color 0.12s ease-out !important;
 }
 
-/* Interactive elements get slightly faster transitions */
+/* Interactive elements get extremely fast transitions */
 .electron-app button,
 .electron-app a,
 .electron-app input,
 .electron-app textarea {
-  transition: background-color 0.15s ease-out,
-              color 0.15s ease-out,
-              border-color 0.15s ease-out,
-              transform 0.1s ease-out !important;
+  transition: background-color 0.08s ease-out,
+              color 0.08s ease-out,
+              border-color 0.08s ease-out,
+              transform 0.06s ease-out !important;
 }
 
 /* Theme-aware elements optimization */
@@ -300,10 +300,10 @@ input:focus-visible {
   mix-blend-mode: normal;
 }
 
-/* Ultra-fast View Transitions for Electron */
+/* Lightning-fast View Transitions for Electron */
 .electron-app::view-transition-old(root),
 .electron-app::view-transition-new(root) {
-  animation-duration: 200ms !important;
+  animation-duration: 120ms !important;
   animation-timing-function: ease-out !important;
 }
 

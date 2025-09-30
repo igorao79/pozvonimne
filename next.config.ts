@@ -52,7 +52,6 @@ const nextConfig: NextConfig = {
     optimizePackageImports: [
       'lucide-react', 
       '@supabase/supabase-js',
-      'react-virtuoso'
       // Убираем GSAP из optimizePackageImports для предотвращения проблем с tree-shaking
     ],
     // Enable modern features for better performance

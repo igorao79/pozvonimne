@@ -41,7 +41,7 @@ export const ThemeToggler = ({ className }: Props) => {
       // Start theme switch immediately
       toggleTheme();
 
-      // Super fast wave animation (200ms total)
+      // Lightning fast wave animation (120ms total)
       const root = document.documentElement;
       root.animate(
         {
@@ -51,7 +51,7 @@ export const ThemeToggler = ({ className }: Props) => {
           ],
         },
         {
-          duration: 200, // Very fast wave
+          duration: 120, // Extremely fast wave
           easing: "ease-out",
           fill: "forwards",
         },

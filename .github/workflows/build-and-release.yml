@@ -192,7 +192,7 @@ jobs:
           npm install -g modclean
           
           Write-Host "🧽 Агрессивная очистка node_modules от ненужных файлов..."
-          modclean --run --path ./node_modules --patterns default:safe,default:common
+          modclean --run --path ./node_modules
           
           Write-Host "📊 Измерение размера node_modules после очистки..."
           $nodeModulesSize = (Get-ChildItem -Path "node_modules" -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
