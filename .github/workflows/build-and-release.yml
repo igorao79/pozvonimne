@@ -185,11 +185,18 @@ jobs:
           if (Test-Path "out") { Remove-Item -Recurse -Force "out" }
           if (Test-Path "release") { Remove-Item -Recurse -Force "release" }
           
-          Write-Host "📦 Очистка node_modules от dev зависимостей..."
-          npm prune --production
+          Write-Host "📦 Переустановка только production зависимостей..."
+          npm ci --production
           
-          Write-Host "🔧 Переустановка всех зависимостей..."
-          npm ci
+          Write-Host "🔧 Установка modclean для очистки node_modules..."
+          npm install -g modclean
+          
+          Write-Host "🧽 Агрессивная очистка node_modules от ненужных файлов..."
+          modclean --run --path ./node_modules --patterns default:safe,default:common
+          
+          Write-Host "📊 Измерение размера node_modules после очистки..."
+          $nodeModulesSize = (Get-ChildItem -Path "node_modules" -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
+          Write-Host "📦 Размер node_modules: $([math]::Round($nodeModulesSize, 2)) MB"
 
       - name: Build Next.js app (Production)
         run: npm run build
@@ -206,10 +213,31 @@ jobs:
           if (Test-Path "out") {
             Write-Host "📁 Очистка out директории от ненужных файлов..."
             Get-ChildItem -Path "out" -Recurse -Include "*.map", "*.txt", "*.md" | Remove-Item -Force -ErrorAction SilentlyContinue
+            Get-ChildItem -Path "out" -Recurse -Include "*.LICENSE.txt", "*.d.ts" | Remove-Item -Force -ErrorAction SilentlyContinue
             
             # Показываем размер out директории
             $outSize = (Get-ChildItem -Path "out" -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
             Write-Host "📊 Размер out директории: $([math]::Round($outSize, 2)) MB"
+          }
+          
+          Write-Host "🔧 Финальная очистка node_modules перед сборкой..."
+          # Дополнительные агрессивные исключения
+          if (Test-Path "node_modules") {
+            # Удаляем большие ненужные файлы
+            Get-ChildItem -Path "node_modules" -Recurse -Include "*.png", "*.jpg", "*.jpeg", "*.gif", "*.ico" -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 50KB } | Remove-Item -Force -ErrorAction SilentlyContinue
+            Get-ChildItem -Path "node_modules" -Recurse -Include "*.woff", "*.woff2", "*.ttf", "*.eot" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+            Get-ChildItem -Path "node_modules" -Recurse -Include "*.min.js.map", "*.css.map" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+            
+            # Удаляем языковые файлы (оставляем только English и Russian)
+            Get-ChildItem -Path "node_modules" -Recurse -Directory -Name "locale*" -ErrorAction SilentlyContinue | ForEach-Object {
+              $localePath = Join-Path "node_modules" $_
+              if (Test-Path $localePath) {
+                Get-ChildItem -Path $localePath -Exclude "*en*", "*ru*" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+              }
+            }
+            
+            $finalNodeModulesSize = (Get-ChildItem -Path "node_modules" -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
+            Write-Host "📦 Финальный размер node_modules: $([math]::Round($finalNodeModulesSize, 2)) MB"
           }
 
       - name: Build Electron app (Optimized)

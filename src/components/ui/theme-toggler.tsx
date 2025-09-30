@@ -21,40 +21,29 @@ export const ThemeToggler = ({ className }: Props) => {
     }
   }, [initSystemThemeListener]);
 
-  // Apply theme on mount and theme change
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      document.documentElement.classList.remove('light', 'dark');
-      document.documentElement.classList.add(theme);
-      document.documentElement.setAttribute('data-theme', theme);
-    }
-  }, [theme]);
+  // Note: Theme application is now handled only in useThemeStore to prevent conflicts
 
   const handleToggle = async () => {
     if (!buttonRef.current) return;
 
-    const { top, left, width, height } = buttonRef.current.getBoundingClientRect();
-    const y = top + height / 2;
-    const x = left + width / 2;
+    const isElectron = typeof window !== 'undefined' && window.electronAPI;
 
-    // Check if browser supports View Transitions
-    if (document.startViewTransition) {
-      await document.startViewTransition(() => {
-        flushSync(() => {
-          toggleTheme();
-        });
-      }).ready;
+    if (isElectron) {
+      // Ultra-fast wave animation for Electron
+      const { top, left, width, height } = buttonRef.current.getBoundingClientRect();
+      const y = top + height / 2;
+      const x = left + width / 2;
 
-      // Apply animation with optimized settings
       const right = window.innerWidth - left;
       const bottom = window.innerHeight - top;
       const maxRad = Math.hypot(Math.max(left, right), Math.max(top, bottom));
 
-      // Use requestAnimationFrame for smoother Electron animations
-      const isElectron = typeof window !== 'undefined' && window.electronAPI;
-      const duration = isElectron ? 500 : 700; // Slightly longer for Electron to ensure smoothness
+      // Start theme switch immediately
+      toggleTheme();
 
-      document.documentElement.animate(
+      // Super fast wave animation (200ms total)
+      const root = document.documentElement;
+      root.animate(
         {
           clipPath: [
             `circle(0px at ${x}px ${y}px)`,
@@ -62,14 +51,22 @@ export const ThemeToggler = ({ className }: Props) => {
           ],
         },
         {
-          duration: duration,
-          easing: "ease-in-out",
-          pseudoElement: "::view-transition-new(root)",
+          duration: 200, // Very fast wave
+          easing: "ease-out",
+          fill: "forwards",
         },
       );
     } else {
-      // Fallback for browsers without View Transitions support
-      toggleTheme();
+      // Use View Transitions for web browsers
+      if (document.startViewTransition) {
+        document.startViewTransition(() => {
+          flushSync(() => {
+            toggleTheme();
+          });
+        });
+      } else {
+        toggleTheme();
+      }
     }
   };
 
@@ -78,7 +75,7 @@ export const ThemeToggler = ({ className }: Props) => {
       ref={buttonRef}
       onClick={handleToggle}
       className={cn(
-        "p-2 rounded-md theme-button hover:bg-secondary/80 hover:ring-2 hover:ring-secondary/60 dark:hover:bg-gray-600 dark:hover:ring-gray-300 !transition-all !duration-200 border border-border cursor-pointer",
+        "p-2 rounded-md theme-button hover:bg-secondary/80 hover:ring-2 hover:ring-secondary/60 dark:hover:bg-gray-600 dark:hover:ring-gray-300 transition-colors-smooth border border-border cursor-pointer gpu-accelerated",
         className
       )}
       style={{

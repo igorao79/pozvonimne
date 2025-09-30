@@ -58,7 +58,7 @@
   --color-border-rgb: 51, 65, 85;
 }
 
-/* Base styles */
+/* Base styles with performance optimizations */
 * {
   @apply border-border;
 }
@@ -66,6 +66,46 @@
 body {
   @apply bg-background text-foreground;
   font-feature-settings: "rlig" 1, "calt" 1;
+  /* Optimize rendering for Electron */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Optimize theme transitions */
+html {
+  /* Much faster theme transitions for Electron */
+  transition: background-color 0.15s ease-out,
+              color 0.15s ease-out;
+  /* GPU acceleration */
+  transform: translateZ(0);
+  will-change: background-color;
+}
+
+/* Electron-specific optimizations - fast transitions for smooth wave */
+.electron-app * {
+  /* Fast transitions for wave animation */
+  transition: background-color 0.2s ease-out,
+              color 0.2s ease-out,
+              border-color 0.2s ease-out !important;
+}
+
+/* Interactive elements get slightly faster transitions */
+.electron-app button,
+.electron-app a,
+.electron-app input,
+.electron-app textarea {
+  transition: background-color 0.15s ease-out,
+              color 0.15s ease-out,
+              border-color 0.15s ease-out,
+              transform 0.1s ease-out !important;
+}
+
+/* Theme-aware elements optimization */
+.theme-transition {
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
 }
 
 button, a {
@@ -253,11 +293,18 @@ input:focus-visible {
   }
 }
 
-/* View transitions for theme switching */
+/* View transitions - disabled for Electron performance */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
+}
+
+/* Ultra-fast View Transitions for Electron */
+.electron-app::view-transition-old(root),
+.electron-app::view-transition-new(root) {
+  animation-duration: 200ms !important;
+  animation-timing-function: ease-out !important;
 }
 
 /* Utility classes for theme colors */
@@ -289,6 +336,25 @@ input:focus-visible {
 
 /* Special classes for smooth transitions */
 .bg-destructive\/10 { background-color: hsl(from var(--color-destructive) h s l / 0.1); }
+
+/* Optimized transition classes for better Electron performance */
+.transition-smooth {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
+}
+
+.transition-colors-smooth {
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
+}
+
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform;
+}
 
 /* Debug hover effects for dark theme */
 .dark .theme-button:hover,
