@@ -187,6 +187,9 @@ jobs:
           
           Write-Host "📦 Переустановка только production зависимостей..."
           npm ci --production
+
+          Write-Host "⚡ Установка electron для сборки..."
+          npm install electron@^38.2.0 --save-dev
           
           Write-Host "🔧 Установка modclean для очистки node_modules..."
           npm install -g modclean
