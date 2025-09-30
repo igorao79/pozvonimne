@@ -178,14 +178,72 @@ jobs:
           $packageJson | ConvertTo-Json -Depth 100 | Set-Content "package.json"
           Write-Host "Updated version to: $version"
 
-      - name: Build Next.js app
-        run: npm run build
+      - name: Clean and optimize dependencies
+        run: |
+          Write-Host "🧹 Очистка временных файлов..."
+          if (Test-Path ".next") { Remove-Item -Recurse -Force ".next" }
+          if (Test-Path "out") { Remove-Item -Recurse -Force "out" }
+          if (Test-Path "release") { Remove-Item -Recurse -Force "release" }
+          
+          Write-Host "📦 Очистка node_modules от dev зависимостей..."
+          npm prune --production
+          
+          Write-Host "🔧 Переустановка всех зависимостей..."
+          npm ci
 
-      - name: Build Electron app
+      - name: Build Next.js app (Production)
+        run: npm run build
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: 1
+          ANALYZE: false
+
+      - name: Optimize build output
+        run: |
+          Write-Host "🎯 Оптимизация размера сборки..."
+          
+          # Удаляем ненужные файлы из out директории
+          if (Test-Path "out") {
+            Write-Host "📁 Очистка out директории от ненужных файлов..."
+            Get-ChildItem -Path "out" -Recurse -Include "*.map", "*.txt", "*.md" | Remove-Item -Force -ErrorAction SilentlyContinue
+            
+            # Показываем размер out директории
+            $outSize = (Get-ChildItem -Path "out" -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
+            Write-Host "📊 Размер out директории: $([math]::Round($outSize, 2)) MB"
+          }
+
+      - name: Build Electron app (Optimized)
         run: npm run build:electron:app
         env:
+          NODE_ENV: production
+          ELECTRON_BUILD: true
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
+          ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
+
+      - name: Show build results
+        run: |
+          Write-Host "🎉 Результаты сборки:"
+          if (Test-Path "release") {
+            Get-ChildItem -Path "release" -Recurse -Include "*.exe" | ForEach-Object {
+              $sizeInMB = [math]::Round($_.Length / 1MB, 2)
+              Write-Host "📦 $($_.Name): $sizeInMB MB"
+            }
+            
+            $totalSize = (Get-ChildItem -Path "release" -Recurse -Include "*.exe" | Measure-Object -Property Length -Sum).Sum / 1MB
+            Write-Host "📊 Общий размер exe файлов: $([math]::Round($totalSize, 2)) MB"
+            
+            if ($totalSize -lt 150) {
+              Write-Host "✅ Отлично! Размер приложения оптимизирован до $([math]::Round($totalSize, 2)) MB"
+            } elseif ($totalSize -lt 200) {
+              Write-Host "⚠️  Размер приложения: $([math]::Round($totalSize, 2)) MB - неплохо, но можно лучше"
+            } else {
+              Write-Host "❌ Размер приложения: $([math]::Round($totalSize, 2)) MB - требуется дополнительная оптимизация"
+            }
+          } else {
+            Write-Host "❌ Директория release не найдена!"
+          }
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

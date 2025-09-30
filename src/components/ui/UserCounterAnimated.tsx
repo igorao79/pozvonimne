@@ -5,6 +5,7 @@ import { gsap } from 'gsap'
 import { useGSAP } from '@gsap/react'
 import useSupabaseStore from '@/store/useSupabaseStore'
 import useCallStore from '@/store/useCallStore'
+import { Star, Sparkles } from 'lucide-react'
 
 // Регистрируем useGSAP хук
 gsap.registerPlugin(useGSAP)
@@ -202,14 +203,25 @@ export const UserCounterAnimated = ({
         className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none"
       >
         {[0, 1, 2, 3].map(index => (
-          <i 
-            key={`left-${index}`}
-            className={`fas ${index % 2 === 0 ? 'fa-star' : 'fa-sparkles'} text-foreground dark:text-white text-base absolute`}
-            style={{
-              transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
-              opacity: 0
-            }}
-          />
+          index % 2 === 0 ? (
+            <Star 
+              key={`left-${index}`}
+              className="text-foreground dark:text-white w-4 h-4 absolute"
+              style={{
+                transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
+                opacity: 0
+              }}
+            />
+          ) : (
+            <Sparkles 
+              key={`left-${index}`}
+              className="text-foreground dark:text-white w-4 h-4 absolute"
+              style={{
+                transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
+                opacity: 0
+              }}
+            />
+          )
         ))}
       </div>
 
@@ -219,14 +231,25 @@ export const UserCounterAnimated = ({
         className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none"
       >
         {[4, 5, 6, 7].map(index => (
-          <i 
-            key={`right-${index}`}
-            className={`fas ${index % 2 === 0 ? 'fa-star' : 'fa-sparkles'} text-foreground dark:text-white text-base absolute`}
-            style={{
-              transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
-              opacity: 0
-            }}
-          />
+          index % 2 === 0 ? (
+            <Star 
+              key={`right-${index}`}
+              className="text-foreground dark:text-white w-4 h-4 absolute"
+              style={{
+                transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
+                opacity: 0
+              }}
+            />
+          ) : (
+            <Sparkles 
+              key={`right-${index}`}
+              className="text-foreground dark:text-white w-4 h-4 absolute"
+              style={{
+                transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
+                opacity: 0
+              }}
+            />
+          )
         ))}
       </div>
 
@@ -236,14 +259,25 @@ export const UserCounterAnimated = ({
         className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none"
       >
         {[8, 9, 10, 11, 12].map(index => (
-          <i 
-            key={`center-${index}`}
-            className={`fas ${index % 2 === 0 ? 'fa-star' : 'fa-sparkles'} text-foreground dark:text-yellow-300 text-base absolute`}
-            style={{
-              transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
-              opacity: 0
-            }}
-          />
+          index % 2 === 0 ? (
+            <Star 
+              key={`center-${index}`}
+              className="text-foreground dark:text-yellow-300 w-4 h-4 absolute"
+              style={{
+                transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
+                opacity: 0
+              }}
+            />
+          ) : (
+            <Sparkles 
+              key={`center-${index}`}
+              className="text-foreground dark:text-yellow-300 w-4 h-4 absolute"
+              style={{
+                transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
+                opacity: 0
+              }}
+            />
+          )
         ))}
       </div>
 

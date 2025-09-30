@@ -22,8 +22,35 @@
     "electron/webrtc-fix.js",
     "electron/splash.html",
     "electron/logo.png",
+    "package.json",
     "node_modules/**/*",
-    "package.json"
+    "!node_modules/**/*.md",
+    "!node_modules/**/*.txt",
+    "!node_modules/**/*.map",
+    "!node_modules/**/.cache/**/*",
+    "!node_modules/**/test/**/*",
+    "!node_modules/**/tests/**/*",
+    "!node_modules/**/spec/**/*",
+    "!node_modules/**/__tests__/**/*",
+    "!node_modules/**/docs/**/*",
+    "!node_modules/**/doc/**/*",
+    "!node_modules/**/example/**/*",
+    "!node_modules/**/examples/**/*",
+    "!node_modules/**/demo/**/*",
+    "!node_modules/**/demos/**/*",
+    "!node_modules/**/.nyc_output/**/*",
+    "!node_modules/**/coverage/**/*",
+    "!node_modules/**/*.d.ts",
+    "!node_modules/**/*.flow",
+    "!node_modules/**/.eslint*",
+    "!node_modules/**/LICENSE*",
+    "!node_modules/**/CHANGELOG*",
+    "!node_modules/**/HISTORY*",
+    "!node_modules/**/CONTRIBUTING*",
+    "!node_modules/**/AUTHORS*",
+    "!node_modules/**/CONTRIBUTORS*",
+    "!**/{*.ts,*.coffee}",
+    "!**/{tsconfig.json,*.config.js,*.config.ts}"
   ],
   "extraResources": [
     {
@@ -45,7 +72,7 @@
     ],
     "icon": "public/logo.png",
     "verifyUpdateCodeSignature": false,
-    "publisherName": "Позвони.мне",
+    "legalTrademarks": "Позвони.мне",
     "requestedExecutionLevel": "asInvoker"
   },
   "mac": {
@@ -86,15 +113,6 @@
     "synopsis": "Простое приложение для голосовых звонков",
     "description": "Простое и безопасное приложение для аудио звонков с WebRTC"
   },
-  "nsis": {
-    "oneClick": false,
-    "perMachine": false,
-    "allowToChangeInstallationDirectory": true,
-    "deleteAppDataOnUninstall": false,
-    "createDesktopShortcut": true,
-    "createStartMenuShortcut": true,
-    "shortcutName": "Позвони.мне"
-  },
   "portable": {
     "artifactName": "pozvonimne-portable-${version}.${ext}"
   },
@@ -111,5 +129,18 @@
   "nodeGypRebuild": false,
   "buildDependenciesFromSource": false,
   "npmRebuild": false,
-  "nodeVersion": "18.17.0"
+  "nodeVersion": "18.17.0",
+  "asar": true,
+  "asarUnpack": [],
+  "electronLanguages": ["en", "ru"],
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "deleteAppDataOnUninstall": false,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Позвони.мне",
+    "differentialPackage": true
+  }
 }

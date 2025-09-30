@@ -4,6 +4,7 @@ import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
 import useScreenShare from '@/hooks/useScreenShare'
 import VideoQualityControl from './VideoQualityControl'
+import { Eye, EyeOff } from 'lucide-react'
 
 interface CallControlsProps {
   isStreamHidden: boolean
@@ -132,9 +133,9 @@ const CallControls = ({ isStreamHidden, onToggleStreamVisibility }: CallControls
           title={isStreamHidden ? "Показать стрим" : "Скрыть стрим"}
         >
           {isStreamHidden ? (
-            <i className="fas fa-eye text-white text-lg"></i>
+            <Eye className="w-5 h-5 text-white" />
           ) : (
-            <i className="fas fa-eye-slash text-white text-lg"></i>
+            <EyeOff className="w-5 h-5 text-white" />
           )}
         </button>
       )}

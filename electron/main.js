@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, ipcMain, dialog, globalShortcut, desktopCapturer, nativeTheme } = require('electron');
 const { autoUpdater } = require('electron-updater');
+const log = require('electron-log');
 const path = require('path');
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -9,7 +10,7 @@ Menu.setApplicationMenu(null);
 // Listen for system theme changes and notify renderer
 nativeTheme.on('updated', () => {
   const isDarkMode = nativeTheme.shouldUseDarkColors;
-  console.log('System theme changed:', isDarkMode ? 'dark' : 'light');
+  if (isDev) console.log('System theme changed:', isDarkMode ? 'dark' : 'light');
 
   // Notify all windows about theme change
   BrowserWindow.getAllWindows().forEach(window => {
@@ -25,27 +26,32 @@ const { applyWebRTCFixes, getNetworkInterfaces } = require('./webrtc-fix');
 // Setup auto-updater
 function setupAutoUpdater() {
   if (isDev) {
-    console.log('Skipping auto-updater in development mode');
+    if (isDev) console.log('Skipping auto-updater in development mode');
     return;
   }
 
   try {
+    // Configure logging
+    log.transports.file.level = 'info';
+    autoUpdater.logger = log;
+    
     // Configure electron-updater for differential updates
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
     autoUpdater.allowDowngrade = false;
     autoUpdater.allowPrerelease = false;
     
-    // Enable differential downloads (smaller updates)
+    // Enable differential downloads (smaller updates like Discord)
     autoUpdater.forceDevUpdateConfig = false;
+    autoUpdater.disableDifferentialDownload = false;
 
     // Auto-updater event handlers
     autoUpdater.on('checking-for-update', () => {
-      console.log('Checking for update...');
+      log.info('Checking for update...');
     });
 
     autoUpdater.on('update-available', (info) => {
-      console.log('Update available:', info.version);
+      log.info('Update available:', info.version);
       dialog.showMessageBox(mainWindow, {
         type: 'info',
         title: 'Обновление доступно',
@@ -59,11 +65,11 @@ function setupAutoUpdater() {
     });
 
     autoUpdater.on('update-not-available', (info) => {
-      console.log('Update not available');
+      log.info('Update not available');
     });
 
     autoUpdater.on('error', (err) => {
-      console.error('Error in auto-updater:', err);
+      log.error('Error in auto-updater:', err);
     });
 
     autoUpdater.on('download-progress', (progressObj) => {
@@ -71,7 +77,7 @@ function setupAutoUpdater() {
       let log_message = "Download speed: " + Math.round(progressObj.bytesPerSecond / 1024) + " KB/s";
       log_message = log_message + ' - Downloaded ' + percent + '%';
       log_message = log_message + ' (' + Math.round(progressObj.transferred / 1024 / 1024 * 100) / 100 + "/" + Math.round(progressObj.total / 1024 / 1024 * 100) / 100 + ' MB)';
-      console.log(log_message);
+      log.info(log_message);
       
       // Показать прогресс в главном окне (если есть)
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -85,7 +91,7 @@ function setupAutoUpdater() {
     });
 
     autoUpdater.on('update-downloaded', (info) => {
-      console.log('Update downloaded:', info.version);
+      log.info('Update downloaded:', info.version);
 
       const dialogOpts = {
         type: 'info',
@@ -106,8 +112,14 @@ function setupAutoUpdater() {
     setTimeout(() => {
       autoUpdater.checkForUpdatesAndNotify();
     }, 5000);
+
+    // Set up periodic update checks every 5 minutes (300000ms)
+    setInterval(() => {
+      log.info('Checking for updates...');
+      autoUpdater.checkForUpdatesAndNotify();
+    }, 300000);
   } catch (error) {
-    console.error('Error setting up auto-updater:', error);
+    log.error('Error setting up auto-updater:', error);
   }
 }
 
@@ -209,8 +221,8 @@ async function createWindow() {
       // Use localhost in development, production URL in release
       let startUrl = isDev ? 'http://localhost:3000' : 'https://pozvonimne.vercel.app/';
       
-      console.log('Loading URL:', startUrl);
-      console.log('Development mode:', isDev);
+      if (isDev) console.log('Loading URL:', startUrl);
+      if (isDev) console.log('Development mode:', isDev);
 
       let retryCount = 0;
       const maxRetries = isDev ? 15 : 5; // В dev больше попыток для localhost
@@ -225,7 +237,7 @@ async function createWindow() {
           });
           
           if (response.ok) {
-            console.log('Server is ready, loading app...');
+            if (isDev) console.log('Server is ready, loading app...');
             updateSplashProgress(90, 'Загрузка интерфейса...');
             await mainWindow.loadURL(startUrl);
           } else {
@@ -233,7 +245,7 @@ async function createWindow() {
           }
         } catch (error) {
           retryCount++;
-          console.error(`Server check failed (${retryCount}/${maxRetries}):`, error.message);
+          if (isDev) console.error(`Server check failed (${retryCount}/${maxRetries}):`, error.message);
           
           if (retryCount >= maxRetries) {
             if (isDev) {
@@ -251,7 +263,7 @@ async function createWindow() {
 
       checkServer();
     } catch (error) {
-      console.error('Error in loadApp:', error);
+      if (isDev) console.error('Error in loadApp:', error);
       showSplashError(`Ошибка загрузки: ${error.message}`);
     }
   };
@@ -262,11 +274,11 @@ async function createWindow() {
 
   // Handle navigation errors
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-    console.error('Page failed to load:', errorCode, errorDescription, 'URL:', validatedURL);
+    if (isDev) console.error('Page failed to load:', errorCode, errorDescription, 'URL:', validatedURL);
 
     // If in development mode and it's a network error, retry
     if (isDev && errorCode === -102) { // ERR_CONNECTION_REFUSED
-      console.log('Connection refused, retrying in 3 seconds...');
+      if (isDev) console.log('Connection refused, retrying in 3 seconds...');
       setTimeout(() => {
         mainWindow.loadURL('http://localhost:3000');
       }, 3000);
@@ -275,7 +287,7 @@ async function createWindow() {
 
   // Handle successful navigation
   mainWindow.webContents.on('did-finish-load', () => {
-    console.log('Page loaded successfully');
+    if (isDev) console.log('Page loaded successfully');
   });
 
   // Show window when ready to prevent visual flash
@@ -289,7 +301,7 @@ async function createWindow() {
 
   // Handle load errors
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    console.error('Failed to load:', errorCode, errorDescription);
+    if (isDev) console.error('Failed to load:', errorCode, errorDescription);
     showSplashError(`Ошибка загрузки: ${errorDescription}`);
   });
 
