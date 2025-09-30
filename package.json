@@ -32,7 +32,7 @@
     "type-check": "tsc --noEmit",
     "analyze": "ANALYZE=true npm run build",
     "clean": "if exist .next rmdir /s /q .next && if exist out rmdir /s /q out && if exist release rmdir /s /q release",
-    "postbuild": "next-sitemap"
+    "postbuild": "echo Build completed successfully"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
@@ -66,9 +66,7 @@
     "electron-builder": "^26.0.12",
     "eslint": "^9",
     "eslint-config-next": "15.5.3",
-    "next-sitemap": "^4.2.3",
     "node-fetch": "^3.3.2",
-    "rimraf": "^6.0.1",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.8",
     "typescript": "^5",
