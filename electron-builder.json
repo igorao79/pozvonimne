@@ -117,6 +117,13 @@
     "!node_modules/**/node-gyp/**/*",
     "!node_modules/**/node-pre-gyp/**/*",
     "!node_modules/**/gyp/**/*",
+    "!node_modules/**/@img/**/*",
+    "!node_modules/**/sharp/**/*",
+    "!node_modules/**/@img/sharp-darwin-arm64/**/*",
+    "!node_modules/**/@img/sharp-darwin-x64/**/*",
+    "!node_modules/**/@img/sharp-linux-arm64/**/*",
+    "!node_modules/**/@img/sharp-linux-x64/**/*",
+    "!node_modules/**/@img/sharp-win32-ia32/**/*",
     "!**/{*.ts,*.coffee}",
     "!**/{tsconfig.json,*.config.js,*.config.ts}"
   ],
