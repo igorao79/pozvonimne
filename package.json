@@ -16,6 +16,7 @@
     "build:next": "set NODE_ENV=production && npm run build",
     "build:electron": "npm run optimize:build && npm run build:next && npm run build:electron:app",
     "build:electron:fast": "npm run build:next && npm run build:electron:app",
+    "build:electron:debug": "set NODE_ENV=production && rimraf .next && next build && set ELECTRON_BUILD=true && electron-builder --config electron-builder.json",
     "build:electron:app": "set ELECTRON_BUILD=true && set NODE_ENV=production && electron-builder --config electron-builder.json",
     "test:local": "electron electron/test-local.js",
     "optimize:build": "node scripts/optimize-build.js"

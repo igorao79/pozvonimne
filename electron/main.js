@@ -39,39 +39,39 @@ function setupAutoUpdater() {
     // Enable differential downloads (smaller updates)
     autoUpdater.forceDevUpdateConfig = false;
 
-    // Auto-updater event handlers
-    autoUpdater.on('checking-for-update', () => {
-      console.log('Checking for update...');
-    });
+  // Auto-updater event handlers
+  autoUpdater.on('checking-for-update', () => {
+    console.log('Checking for update...');
+  });
 
-    autoUpdater.on('update-available', (info) => {
-      console.log('Update available:', info.version);
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Обновление доступно',
+  autoUpdater.on('update-available', (info) => {
+    console.log('Update available:', info.version);
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Обновление доступно',
         message: `Доступна новая версия ${info.version}. Хотите загрузить?`,
         buttons: ['Да', 'Позже']
       }).then((result) => {
         if (result.response === 0) {
           autoUpdater.downloadUpdate();
         }
-      });
     });
+  });
 
-    autoUpdater.on('update-not-available', (info) => {
+  autoUpdater.on('update-not-available', (info) => {
       console.log('Update not available');
-    });
+  });
 
-    autoUpdater.on('error', (err) => {
-      console.error('Error in auto-updater:', err);
-    });
+  autoUpdater.on('error', (err) => {
+    console.error('Error in auto-updater:', err);
+  });
 
-    autoUpdater.on('download-progress', (progressObj) => {
+  autoUpdater.on('download-progress', (progressObj) => {
       const percent = Math.round(progressObj.percent);
       let log_message = "Download speed: " + Math.round(progressObj.bytesPerSecond / 1024) + " KB/s";
       log_message = log_message + ' - Downloaded ' + percent + '%';
       log_message = log_message + ' (' + Math.round(progressObj.transferred / 1024 / 1024 * 100) / 100 + "/" + Math.round(progressObj.total / 1024 / 1024 * 100) / 100 + ' MB)';
-      console.log(log_message);
+    console.log(log_message);
       
       // Показать прогресс в главном окне (если есть)
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -87,25 +87,25 @@ function setupAutoUpdater() {
     autoUpdater.on('update-downloaded', (info) => {
       console.log('Update downloaded:', info.version);
 
-      const dialogOpts = {
-        type: 'info',
-        buttons: ['Перезагрузить сейчас', 'Позже'],
-        title: 'Обновление приложения',
+    const dialogOpts = {
+      type: 'info',
+      buttons: ['Перезагрузить сейчас', 'Позже'],
+      title: 'Обновление приложения',
         message: `Обновление до версии ${info.version} загружено`,
         detail: 'Перезагрузите приложение, чтобы применить обновления.'
-      };
+    };
 
-      dialog.showMessageBox(mainWindow, dialogOpts).then((returnValue) => {
+    dialog.showMessageBox(mainWindow, dialogOpts).then((returnValue) => {
         if (returnValue.response === 0) {
           autoUpdater.quitAndInstall();
         }
-      });
     });
+  });
 
-    // Check for updates after app is ready (with delay to ensure UI is ready)
-    setTimeout(() => {
-      autoUpdater.checkForUpdatesAndNotify();
-    }, 5000);
+  // Check for updates after app is ready (with delay to ensure UI is ready)
+  setTimeout(() => {
+    autoUpdater.checkForUpdatesAndNotify();
+  }, 5000);
   } catch (error) {
     console.error('Error setting up auto-updater:', error);
   }
@@ -119,15 +119,44 @@ let tray;
 // Create system tray
 function createTray() {
   try {
-    // Используем иконку приложения для трея
-    const iconPath = isDev 
-      ? path.join(process.cwd(), 'public/logo.png')
-      : path.join(process.resourcesPath, 'public/logo.png')
+    // Используем иконку приложения для трея с fallback'ом
+    let iconPath;
+    if (isDev) {
+      iconPath = path.join(process.cwd(), 'public/logo.png');
+    } else {
+      // В production ищем в extraResources
+      iconPath = path.join(process.resourcesPath, 'public/logo.png');
+      
+      // Если не найдена, попробуем альтернативные пути
+      if (!require('fs').existsSync(iconPath)) {
+        const altPaths = [
+          path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'logo.png'),
+          path.join(__dirname, 'logo.png'),
+          path.join(process.resourcesPath, 'logo.png')
+        ];
+        
+        for (const altPath of altPaths) {
+          if (require('fs').existsSync(altPath)) {
+            iconPath = altPath;
+            break;
+          }
+        }
+      }
+    }
 
     console.log('Creating tray with icon:', iconPath)
     console.log('Icon exists:', require('fs').existsSync(iconPath))
 
-    tray = new Tray(iconPath)
+    // Если иконка не найдена, используем системную иконку
+    if (!require('fs').existsSync(iconPath)) {
+      console.warn('Tray icon not found, creating tray without custom icon')
+      // Создаем простую белую иконку 16x16
+      const nativeImage = require('electron').nativeImage;
+      const emptyIcon = nativeImage.createEmpty();
+      tray = new Tray(emptyIcon);
+    } else {
+      tray = new Tray(iconPath);
+    }
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -193,9 +222,65 @@ function createSplashWindow() {
     }
   });
 
-  const splashPath = isDev 
-    ? path.join(__dirname, 'splash.html')
-    : path.join(__dirname, 'splash.html');
+  // Правильные пути для splash screen
+  let splashPath;
+  if (isDev) {
+    splashPath = path.join(__dirname, 'splash.html');
+  } else {
+    // В production файлы находятся в resources/app.asar.unpacked
+    splashPath = path.join(__dirname, 'splash.html');
+    
+    // Если файл не найден, попробуем альтернативные пути
+    if (!require('fs').existsSync(splashPath)) {
+      const altPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'splash.html');
+      if (require('fs').existsSync(altPath)) {
+        splashPath = altPath;
+      } else {
+        // Создаем минимальный HTML прямо в коде
+        const tempHtml = path.join(require('os').tmpdir(), 'splash.html');
+        require('fs').writeFileSync(tempHtml, `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { 
+                margin: 0; 
+                padding: 20px; 
+                background: linear-gradient(135deg, #1e293be6, #1e293bcc);
+                color: white; 
+                font-family: Arial, sans-serif; 
+                text-align: center;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                height: 100vh;
+              }
+              .progress { 
+                width: 80%; 
+                height: 4px; 
+                background: #333; 
+                margin: 20px auto; 
+                border-radius: 2px; 
+              }
+              .progress-bar { 
+                height: 100%; 
+                background: #0066cc; 
+                width: 0%; 
+                border-radius: 2px; 
+              }
+            </style>
+          </head>
+          <body>
+            <h2>Позвони.мне</h2>
+            <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+            <p id="status">Запуск приложения...</p>
+          </body>
+          </html>
+        `);
+        splashPath = tempHtml;
+      }
+    }
+  }
 
   console.log('Loading splash from:', splashPath)
   console.log('Splash file exists:', require('fs').existsSync(splashPath))
@@ -256,30 +341,30 @@ function closeSplash() {
 async function createWindow() {
   try {
     updateSplashProgress(30, 'Инициализация WebRTC...');
-    // Apply WebRTC fixes
-    applyWebRTCFixes();
+  // Apply WebRTC fixes
+  applyWebRTCFixes();
 
     updateSplashProgress(50, 'Создание главного окна...');
-    // Create the browser window
-    mainWindow = new BrowserWindow({
-      width: 1200,
-      height: 800,
-      minWidth: 800,
-      minHeight: 600,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        enableRemoteModule: false,
-        preload: path.join(__dirname, 'preload.js'),
-        webSecurity: true,
-        allowRunningInsecureContent: false,
-        // Screen capture permissions
-        experimentalFeatures: true,
-      },
-      icon: path.join(__dirname, '../public/logo.ico'),
-      titleBarStyle: 'default',
-      show: false, // Don't show until ready
-    });
+  // Create the browser window
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    minWidth: 800,
+    minHeight: 600,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      preload: path.join(__dirname, 'preload.js'),
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      // Screen capture permissions
+      experimentalFeatures: true,
+    },
+    icon: path.join(__dirname, '../public/logo.ico'),
+    titleBarStyle: 'default',
+    show: false, // Don't show until ready
+  });
   } catch (error) {
     console.error('Error creating window:', error);
     showSplashError(`Ошибка создания окна: ${error.message}`);
@@ -293,30 +378,30 @@ async function createWindow() {
       
       // Use localhost in development, production URL in release
       let startUrl = isDev ? 'http://localhost:3000' : 'https://pozvonimne.vercel.app/';
-      
-      console.log('Loading URL:', startUrl);
-      console.log('Development mode:', isDev);
+    
+    console.log('Loading URL:', startUrl);
+    console.log('Development mode:', isDev);
 
       let retryCount = 0;
       const maxRetries = isDev ? 15 : 5; // В dev больше попыток для localhost
 
       // Check if server is running
-      const checkServer = async () => {
-        try {
+    const checkServer = async () => {
+      try {
           updateSplashProgress(80, isDev ? 'Ожидание dev сервера...' : 'Подключение к сайту...');
           
           const response = await fetch(startUrl, { 
             timeout: isDev ? 5000 : 10000 // В dev меньше таймаут
           });
           
-          if (response.ok) {
+        if (response.ok) {
             console.log('Server is ready, loading app...');
             updateSplashProgress(90, 'Загрузка интерфейса...');
             await mainWindow.loadURL(startUrl);
-          } else {
+        } else {
             throw new Error(`Server returned ${response.status}`);
-          }
-        } catch (error) {
+        }
+      } catch (error) {
           retryCount++;
           console.error(`Server check failed (${retryCount}/${maxRetries}):`, error.message);
           
@@ -331,10 +416,10 @@ async function createWindow() {
           
           updateSplashProgress(75, `Попытка ${retryCount}/${maxRetries}...`);
           setTimeout(checkServer, isDev ? 2000 : 3000);
-        }
-      };
+      }
+    };
 
-      checkServer();
+    checkServer();
     } catch (error) {
       console.error('Error in loadApp:', error);
       showSplashError(`Ошибка загрузки: ${error.message}`);
@@ -368,7 +453,7 @@ async function createWindow() {
     updateSplashProgress(100, 'Готово!');
     setTimeout(() => {
       closeSplash();
-      mainWindow.show();
+    mainWindow.show();
     }, 500);
   });
 
@@ -474,7 +559,7 @@ app.whenReady().then(async () => {
   
   try {
     console.log('🔄 Setting up auto-updater...')
-    setupAutoUpdater();
+  setupAutoUpdater();
     console.log('✅ Auto-updater setup complete')
   } catch (error) {
     console.error('❌ Auto-updater setup failed:', error)
@@ -532,7 +617,7 @@ app.commandLine.appendSwitch('--max_old_space_size', '4096');
 
 // Only disable hardware acceleration if needed
 if (process.platform === 'linux') {
-  app.disableHardwareAcceleration();
+app.disableHardwareAcceleration();
 }
 
 // Handle app ready for production
