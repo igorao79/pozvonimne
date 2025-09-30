@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:turbo": "next dev --turbopack",
-    "build": "rimraf .next && next build",
+    "build": "if exist .next rmdir /s /q .next && next build",
     "build:electron": "npm run build:next && npm run build:electron:app",
     "build:next": "set NODE_ENV=production && npm run build",
     "build:electron:app": "set ELECTRON_BUILD=true && set NODE_ENV=production && electron-builder",
