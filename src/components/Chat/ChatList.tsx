@@ -532,7 +532,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
           </div>
         ) : (
           <>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-border">
               {chats.map((chat) => (
                 <ChatListItem
                   key={chat.id}
