@@ -136,7 +136,7 @@ jobs:
             - Оптимизация для Windows
             
             🔄 **Статус**: Файлы собираются, будут добавлены автоматически...
-          draft: true
+          draft: false
           prerelease: false
 
   build:
@@ -311,15 +311,4 @@ jobs:
           tag_name: v0.1.${{ github.run_number }}
           files: |
             artifacts/release-windows/*.exe
-
-      - name: Publish Release (remove draft)
-        run: |
-          echo "Publishing release v0.1.${{ github.run_number }}..."
-          gh release edit v0.1.${{ github.run_number }} --draft=false
-          echo "Release published successfully!"
-          
-          # Ждём секунду и проверяем статус
-          sleep 2
-          gh release view v0.1.${{ github.run_number }} --json isDraft,assets
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          draft: false

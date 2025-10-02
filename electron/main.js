@@ -1,8 +1,12 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, globalShortcut, desktopCapturer, nativeTheme } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, globalShortcut, desktopCapturer, nativeTheme, Tray } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 const path = require('path');
 const isDev = process.env.NODE_ENV === 'development';
+
+// Флаг для отслеживания первого запуска
+let isFirstLaunch = true;
+let isQuitting = false;
 
 // Remove default menu
 Menu.setApplicationMenu(null);
@@ -230,6 +234,94 @@ ipcMain.on('skip-update', () => {
 // Keep a global reference of the window object
 let mainWindow;
 let splashWindow;
+let tray = null;
+
+// Создание системного трея
+function createTray() {
+  if (tray) return; // Трей уже создан
+
+  const iconPath = isDev 
+    ? path.join(__dirname, 'logo.png')
+    : path.join(process.resourcesPath, 'electron', 'logo.png');
+  
+  tray = new Tray(iconPath);
+  
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Показать приложение',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Проверить обновления',
+      click: async () => {
+        if (!isDev) {
+          try {
+            const result = await autoUpdater.checkForUpdates();
+            if (result && result.updateInfo) {
+              dialog.showMessageBox({
+                type: 'info',
+                title: 'Обновление доступно',
+                message: `Доступна новая версия ${result.updateInfo.version}`,
+                buttons: ['OK']
+              });
+            } else {
+              dialog.showMessageBox({
+                type: 'info',
+                title: 'Обновлений нет',
+                message: 'У вас установлена последняя версия',
+                buttons: ['OK']
+              });
+            }
+          } catch (error) {
+            log.error('Error checking updates from tray:', error);
+          }
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: `Версия ${app.getVersion()}`,
+      enabled: false
+    },
+    { type: 'separator' },
+    {
+      label: 'Выход',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setToolTip('Позвони.мне - Аудио звонки');
+  tray.setContextMenu(contextMenu);
+
+  // Показать окно при клике на иконку в трее
+  tray.on('click', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }
+  });
+
+  // Двойной клик - показать окно
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
 
 function createSplashWindow() {
   splashWindow = new BrowserWindow({
@@ -414,6 +506,23 @@ async function createWindow() {
     mainWindow.webContents.openDevTools();
   }
 
+  // Handle window close - минимизируем в трей вместо закрытия
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+      
+      // Показываем уведомление при первом сворачивании
+      if (tray && !tray.isDestroyed()) {
+        tray.displayBalloon({
+          title: 'Позвони.мне',
+          content: 'Приложение свернуто в системный трей. Кликните на иконку для открытия.'
+        });
+      }
+      return false;
+    }
+  });
+
   // Handle window closed
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -451,34 +560,51 @@ async function createWindow() {
 
 // App event listeners
 app.whenReady().then(async () => {
-  // Create splash screen first
-  createSplashWindow();
-  updateSplashProgress(10, 'Запуск приложения...');
+  // Создаем системный трей сразу
+  createTray();
   
-  // ВАЖНО: Проверяем обновления ДО создания главного окна
-  const canProceed = await checkForUpdatesOnStartup();
-  
-  // Если обновление найдено, ждем действия пользователя
-  if (updateRequired && !isDev) {
-    log.info('⏸️ Waiting for user to handle update...');
-    // Ждем пока пользователь не нажмет кнопку в splash
-    await new Promise(resolve => {
-      const checkInterval = setInterval(() => {
-        if (!updateRequired || updateCheckComplete) {
-          clearInterval(checkInterval);
-          resolve();
-        }
-      }, 500);
-    });
-  }
-  
-  // Продолжаем только если проверка завершена
-  if (updateCheckComplete || isDev) {
-    // Add delay to show splash
-    await new Promise(resolve => setTimeout(resolve, 500));
+  // Splash screen показываем ТОЛЬКО при первом запуске приложения
+  if (isFirstLaunch) {
+    // Create splash screen first
+    createSplashWindow();
+    updateSplashProgress(10, 'Запуск приложения...');
     
-    // Create main window
-    await createWindow();
+    // ВАЖНО: Проверяем обновления ДО создания главного окна
+    const canProceed = await checkForUpdatesOnStartup();
+    
+    // Если обновление найдено, ждем действия пользователя
+    if (updateRequired && !isDev) {
+      log.info('⏸️ Waiting for user to handle update...');
+      // Ждем пока пользователь не нажмет кнопку в splash
+      await new Promise(resolve => {
+        const checkInterval = setInterval(() => {
+          if (!updateRequired || updateCheckComplete) {
+            clearInterval(checkInterval);
+            resolve();
+          }
+        }, 500);
+      });
+    }
+    
+    // Продолжаем только если проверка завершена
+    if (updateCheckComplete || isDev) {
+      // Add delay to show splash
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Create main window
+      await createWindow();
+      
+      // Сбрасываем флаг первого запуска после создания окна
+      isFirstLaunch = false;
+    }
+  } else {
+    // При повторном открытии (из трея) - без splash screen
+    if (!mainWindow) {
+      await createWindow();
+    } else {
+      mainWindow.show();
+      mainWindow.focus();
+    }
   }
 
   // Register global shortcuts
@@ -493,9 +619,15 @@ app.whenReady().then(async () => {
   }
 });
 
+// Устанавливаем флаг при выходе из приложения
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
 app.on('window-all-closed', () => {
-  // On macOS, keep the app running even when all windows are closed
-  if (process.platform !== 'darwin') {
+  // НЕ закрываем приложение - оно работает в трее
+  // Приложение закроется только при выборе "Выход" из меню трея
+  if (process.platform !== 'darwin' && isQuitting) {
     app.quit();
   }
 });
