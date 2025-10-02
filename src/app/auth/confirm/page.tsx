@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { CheckCircle, XCircle, Loader2, Home, LogIn } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import useThemeStore from '@/store/useThemeStore'
-import { ThemeToggler } from '@/components/ui/theme-toggler'
+import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler'
 import { getAssetPath } from '@/lib/utils'
 import ExternalLinkProvider from '@/components/Providers/ExternalLinkProvider'
 
@@ -155,7 +155,7 @@ const EmailConfirmationContent = () => {
                   Позвони.мне
                 </h1>
               </div>
-              <ThemeToggler />
+              <AnimatedThemeToggler />
             </div>
           </div>
         </header>

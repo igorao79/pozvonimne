@@ -144,7 +144,6 @@ button, a {
   animation: fade-in-up 0.6s ease-out;
 }
 
-
 @keyframes speaking-wave {
   0% {
     transform: scale(1);
@@ -545,4 +544,7 @@ input:focus-visible {
   max-width: 100%;
   white-space: pre-wrap;
 }
-
+::view-transition-old(root), ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+}

@@ -1,4 +1,4 @@
-export { ThemeToggler } from './theme-toggler';
+export { AnimatedThemeToggler } from './animated-theme-toggler';
 export { RandomFact } from './random-fact';
 export { UserCounter } from './user-counter';
 export { default as PremiumModal } from './PremiumModal';

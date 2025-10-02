@@ -243,8 +243,8 @@ jobs:
             Write-Host "📦 Финальный размер node_modules: $([math]::Round($finalNodeModulesSize, 2)) MB"
           }
 
-      - name: Build Electron app (Optimized)
-        run: npm run build:electron:app
+      - name: Build Electron app (Windows Only)
+        run: npm run build:electron:win
         env:
           NODE_ENV: production
           ELECTRON_BUILD: true

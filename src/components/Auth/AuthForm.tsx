@@ -7,7 +7,7 @@ import useCallStore from '@/store/useCallStore'
 import LoginForm from './LoginForm'
 import RegisterForm from './RegisterForm'
 import EmailVerificationModal from './EmailVerificationModal'
-import { ThemeToggler } from '@/components/ui/theme-toggler'
+import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler'
 import { getAssetPath } from '@/lib/utils'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { translateAuthError, getDisplayErrorMessage } from '@/utils/authErrorTranslations'
@@ -165,7 +165,7 @@ const AuthForm = () => {
               </h1>
             </div>
             <div className="flex items-center">
-              <ThemeToggler />
+              <AnimatedThemeToggler />
             </div>
           </div>
         </div>

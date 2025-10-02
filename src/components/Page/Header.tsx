@@ -2,7 +2,7 @@
 
 import { User, Shield, Download } from 'lucide-react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { ThemeToggler } from '@/components/ui/theme-toggler'
+import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
 
 interface HeaderProps {
@@ -50,7 +50,7 @@ export default function Header({
             </h1>
           </div>
           <div className="flex items-center space-x-3">
-            <ThemeToggler />
+            <AnimatedThemeToggler />
 
             {/* Download Button */}
             <button
