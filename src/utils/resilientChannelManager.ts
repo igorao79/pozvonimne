@@ -170,6 +170,7 @@ class ResilientChannelManager {
     const channelState = this.channels.get(channelName)
     if (!channelState) {
       console.warn(`⚠️ [ResilientChannel] Cannot recreate - channel not found: ${channelName}`)
+      console.log(`🔍 [ResilientChannel] Available channels:`, Array.from(this.channels.keys()))
       return
     }
 

@@ -39,6 +39,15 @@ export const startConnectionMonitoring = (
           // Вместо переподключения завершаем звонок
           const { endCall, setError } = useCallStore.getState()
           setError('Соединение потеряно')
+          
+          // Регистрируем ошибку в мониторе производительности
+          try {
+            const { performanceMonitor } = await import('./performanceMonitor')
+            performanceMonitor.recordConnectionFailure(userId || 'unknown', `${connectionState}/${iceConnectionState}`)
+          } catch (e) {
+            console.warn('Failed to record performance failure:', e)
+          }
+          
           endCall()
         } else if (connectionState === 'disconnected' || iceConnectionState === 'disconnected') {
           console.warn(`📊 [User ${userId?.slice(0, 8)}] Connection disconnected, monitoring...`)
@@ -54,6 +63,16 @@ export const startConnectionMonitoring = (
                 // Вместо переподключения завершаем звонок
                 const { endCall, setError } = useCallStore.getState()
                 setError('Соединение потеряно')
+                
+                // Регистрируем ошибку в мониторе производительности
+                try {
+                  import('./performanceMonitor').then(({ performanceMonitor }) => {
+                    performanceMonitor.recordConnectionFailure(userId || 'unknown', `timeout_${currentState}/${currentIceState}`)
+                  })
+                } catch (e) {
+                  console.warn('Failed to record performance failure:', e)
+                }
+                
                 endCall()
               }
             }

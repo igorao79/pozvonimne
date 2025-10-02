@@ -93,8 +93,8 @@ class WebRTCPerformanceMonitor {
     const failureRate = this.metrics.failedConnections / Math.max(1, this.metrics.connectionAttempts)
     const timeSinceLastCleanup = Date.now() - this.metrics.lastCleanupTime
 
-    // Предупреждения о производительности
-    if (failureRate > 0.3) {
+    // Предупреждения о производительности (только если есть реальные попытки)
+    if (this.metrics.connectionAttempts > 0 && failureRate > 0.5) {
       console.warn(`⚠️ Performance Warning: High failure rate (${(failureRate * 100).toFixed(1)}%)`)
     }
 

@@ -25,17 +25,18 @@ export const useChatListRealtime = ({
     onChatUpdate()
   }, [onChatUpdate])
 
-  // 🔥 ПОДКЛЮЧАЕМСЯ к глобальному store (он УЖЕ работает!)
+  // 🔥 ПОДКЛЮЧАЕМСЯ к глобальному store (ИСПРАВЛЕНО: не ждем isGlobalSyncActive!)
   useEffect(() => {
-    if (!userId || !isGlobalSyncActive) {
-      console.log('🔥 ГЛОБАЛЬНЫЙ STORE: userId отсутствует или sync неактивен')
+    if (!userId) {
+      console.log('🔥 ГЛОБАЛЬНЫЙ STORE: userId отсутствует')
       return
     }
 
-    console.log('🔥 ГЛОБАЛЬНЫЙ STORE: Регистрируем callback для ChatList')
+    console.log('🔥 ГЛОБАЛЬНЫЙ STORE: Регистрируем callback для ChatList (не ждем активации)')
     console.log('🔍 ГЛОБАЛЬНЫЙ STORE: userId:', userId.slice(0, 8))
+    console.log('🔍 ГЛОБАЛЬНЫЙ STORE: isGlobalSyncActive:', isGlobalSyncActive)
     
-    // Регистрируем наш callback в глобальном store
+    // Регистрируем наш callback в глобальном store СРАЗУ
     const unregister = registerRefreshCallback(stableCallback)
     
     console.log('🎉 ГЛОБАЛЬНЫЙ STORE: ChatList подключен к глобальной синхронизации!')
@@ -44,7 +45,7 @@ export const useChatListRealtime = ({
       console.log('🔥 ГЛОБАЛЬНЫЙ STORE: Отключаем ChatList от глобальной синхронизации')
       unregister()
     }
-  }, [userId, isGlobalSyncActive, registerRefreshCallback, stableCallback])
+  }, [userId, registerRefreshCallback, stableCallback])
 
   // 🔥 ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ при изменении lastMessageUpdate
   useEffect(() => {

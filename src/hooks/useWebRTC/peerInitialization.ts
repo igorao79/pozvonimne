@@ -238,8 +238,16 @@ export const initializePeer = async (
 
         // Добавляем обработчики событий для трека (без onended, чтобы не ломать соединение)
         // track.onended = () => console.log(`Remote audio track ${index} ended`)
-        track.onmute = () => console.log(`Remote audio track ${index} muted`)
-        track.onunmute = () => console.log(`Remote audio track ${index} unmuted`)
+        track.onmute = () => {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`Remote audio track ${index} muted`)
+          }
+        }
+        track.onunmute = () => {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`Remote audio track ${index} unmuted`)
+          }
+        }
       })
 
       // Обрабатываем video tracks (для screen sharing)

@@ -541,15 +541,26 @@ const CallScreen = () => {
           controls={false}
           muted={false}
           style={{ display: 'none' }}
-          onLoadedData={() => console.log('Remote audio loaded data')}
+          onLoadedData={() => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Remote audio loaded data')
+            }
+          }}
           onCanPlay={() => {
-            console.log('Remote audio can play')
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Remote audio can play')
+            }
             if (remoteAudioRef.current) {
-              console.log('Auto-starting remote audio...')
               remoteAudioRef.current.play()
-                .then(() => console.log('Remote audio auto-play successful'))
+                .then(() => {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('Remote audio auto-play successful')
+                  }
+                })
                 .catch((error) => {
-                  console.log('Remote audio auto-play failed:', error.name)
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('Remote audio auto-play failed:', error.name)
+                  }
                   const startAudioOnClick = () => {
                     if (remoteAudioRef.current) {
                       remoteAudioRef.current.play().catch(console.error)
@@ -562,20 +573,50 @@ const CallScreen = () => {
                 })
             }
           }}
-          onPlay={() => console.log('Remote audio started playing')}
-          onPause={() => console.log('Remote audio paused')}
-          onError={(e) => console.error('Remote audio error:', e)}
-          onVolumeChange={() => console.log('Remote audio volume changed:', remoteAudioRef.current?.volume)}
-          onLoadedMetadata={() => {
-            console.log('Remote audio metadata loaded')
-            if (remoteAudioRef.current) {
-              console.log('Audio duration:', remoteAudioRef.current.duration)
+          onPlay={() => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Remote audio started playing')
             }
           }}
-          onStalled={() => console.log('Remote audio stalled')}
-          onSuspend={() => console.log('Remote audio suspended')}
-          onWaiting={() => console.log('Remote audio waiting')}
-          onEnded={() => console.log('Remote audio ended')}
+          onPause={() => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Remote audio paused')
+            }
+          }}
+          onError={(e) => console.error('Remote audio error:', e)}
+          onVolumeChange={() => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Remote audio volume changed:', remoteAudioRef.current?.volume)
+            }
+          }}
+          onLoadedMetadata={() => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Remote audio metadata loaded')
+              if (remoteAudioRef.current) {
+                console.log('Audio duration:', remoteAudioRef.current.duration)
+              }
+            }
+          }}
+          onStalled={() => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Remote audio stalled')
+            }
+          }}
+          onSuspend={() => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Remote audio suspended')
+            }
+          }}
+          onWaiting={() => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Remote audio waiting')
+            }
+          }}
+          onEnded={() => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Remote audio ended')
+            }
+          }}
         />
 
         {/* Screen Sharing Window */}
