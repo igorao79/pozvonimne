@@ -128,6 +128,92 @@
             display: none;
         }
 
+        .update-dialog {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(30, 41, 59, 0.98);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            max-width: 380px;
+            width: 90%;
+            z-index: 1000;
+        }
+
+        .update-dialog h3 {
+            margin: 0 0 15px 0;
+            font-size: 20px;
+            color: white;
+        }
+
+        .update-dialog p {
+            margin: 0 0 20px 0;
+            font-size: 14px;
+            line-height: 1.6;
+            opacity: 0.9;
+        }
+
+        .update-version {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 6px;
+            display: inline-block;
+            margin: 10px 0;
+            font-weight: 600;
+        }
+
+        .update-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .update-button {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .update-button.primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .update-button.primary:hover {
+            background: #2563eb;
+        }
+
+        .update-button.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .update-button.secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .download-info {
+            display: none;
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .download-info .speed {
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
         .spinner {
             width: 20px;
             height: 20px;
@@ -154,6 +240,27 @@
     <div class="status" id="status">Запуск приложения...</div>
     <div class="error" id="error"></div>
 
+    <!-- Диалог обновления -->
+    <div class="update-dialog" id="updateDialog">
+        <h3>🎉 Доступно обновление</h3>
+        <p>Доступна новая версия приложения</p>
+        <div class="update-version" id="updateVersion">v0.0.0</div>
+        <p style="font-size: 13px; opacity: 0.7;">Для продолжения работы рекомендуется установить обновление</p>
+        
+        <div class="update-buttons">
+            <button class="update-button primary" id="updateButton">Обновить сейчас</button>
+            <button class="update-button secondary" id="skipButton">Продолжить</button>
+        </div>
+        
+        <div class="download-info" id="downloadInfo">
+            <div>Загрузка: <span id="downloadPercent">0</span>%</div>
+            <div class="speed">
+                <span id="downloadSpeed">0</span> KB/s • 
+                <span id="downloadSize">0/0</span> MB
+            </div>
+        </div>
+    </div>
+
     <script>
         const { ipcRenderer } = require('electron');
 
@@ -161,6 +268,14 @@
         const progressBar = document.getElementById('progressBar');
         const status = document.getElementById('status');
         const error = document.getElementById('error');
+        const updateDialog = document.getElementById('updateDialog');
+        const updateVersion = document.getElementById('updateVersion');
+        const updateButton = document.getElementById('updateButton');
+        const skipButton = document.getElementById('skipButton');
+        const downloadInfo = document.getElementById('downloadInfo');
+        const downloadPercent = document.getElementById('downloadPercent');
+        const downloadSpeed = document.getElementById('downloadSpeed');
+        const downloadSize = document.getElementById('downloadSize');
 
         // Слушаем события от main процесса
         ipcRenderer.on('splash-progress', (event, data) => {
@@ -177,6 +292,62 @@
 
         ipcRenderer.on('splash-close', () => {
             window.close();
+        });
+
+        // ОБНОВЛЕНИЯ: Показать диалог доступного обновления
+        ipcRenderer.on('update-available', (event, data) => {
+            console.log('✨ Update available:', data.version);
+            updateVersion.textContent = `v${data.version}`;
+            updateDialog.style.display = 'block';
+            status.textContent = 'Доступно обновление';
+        });
+
+        // ОБНОВЛЕНИЯ: Прогресс скачивания
+        ipcRenderer.on('update-download-progress', (event, data) => {
+            console.log('📥 Download progress:', data.percent + '%');
+            downloadPercent.textContent = data.percent;
+            downloadSpeed.textContent = data.speed;
+            downloadSize.textContent = `${data.transferred}/${data.total}`;
+            downloadInfo.style.display = 'block';
+            
+            // Обновляем основной прогресс бар
+            progressBar.style.width = data.percent + '%';
+            status.textContent = `Загрузка обновления: ${data.percent}%`;
+        });
+
+        // ОБНОВЛЕНИЯ: Обновление скачано
+        ipcRenderer.on('update-downloaded', (event, data) => {
+            console.log('✅ Update downloaded:', data.version);
+            status.textContent = 'Обновление готово, перезапуск...';
+            progressBar.style.width = '100%';
+            downloadInfo.style.display = 'none';
+            updateDialog.innerHTML = `
+                <h3>✅ Обновление готово</h3>
+                <p>Приложение будет перезапущено для применения обновлений...</p>
+            `;
+        });
+
+        // ОБНОВЛЕНИЯ: Пользователь пропустил обновление
+        ipcRenderer.on('update-skipped', () => {
+            console.log('⏭️ Update skipped, continuing...');
+            updateDialog.style.display = 'none';
+            status.textContent = 'Продолжаем загрузку...';
+        });
+
+        // Кнопка "Обновить сейчас"
+        updateButton.addEventListener('click', () => {
+            console.log('🚀 User clicked update button');
+            updateButton.disabled = true;
+            skipButton.disabled = true;
+            updateButton.textContent = 'Загрузка...';
+            ipcRenderer.send('start-update-download');
+        });
+
+        // Кнопка "Продолжить" (пропустить обновление)
+        skipButton.addEventListener('click', () => {
+            console.log('⏭️ User clicked skip button');
+            updateDialog.style.display = 'none';
+            ipcRenderer.send('skip-update');
         });
 
         // Симуляция прогресса для начала

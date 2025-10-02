@@ -23,105 +23,209 @@ nativeTheme.on('updated', () => {
 // Import WebRTC fixes
 const { applyWebRTCFixes, getNetworkInterfaces } = require('./webrtc-fix');
 
-// Setup auto-updater
-function setupAutoUpdater() {
+// Переменная для отслеживания статуса обновления
+let updateCheckComplete = false;
+let updateRequired = false;
+
+// Определяем, является ли это portable версией
+function isPortableVersion() {
+  // Portable версия запускается из .exe файла напрямую
+  // Установленная версия находится в Program Files или AppData
+  const appPath = app.getAppPath();
+  const exePath = app.getPath('exe');
+  
+  // Проверяем наличие папки установки
+  const isInstalled = exePath.includes('AppData') || 
+                      exePath.includes('Program Files') ||
+                      exePath.includes('Program Files (x86)');
+  
+  log.info(`App path: ${appPath}`);
+  log.info(`Exe path: ${exePath}`);
+  log.info(`Is installed: ${isInstalled}`);
+  
+  return !isInstalled;
+}
+
+// Setup auto-updater - БЛОКИРУЮЩАЯ проверка при запуске
+async function checkForUpdatesOnStartup() {
   if (isDev) {
-    if (isDev) console.log('Skipping auto-updater in development mode');
-    return;
+    log.info('Skipping auto-updater in development mode');
+    return true; // Разрешаем продолжить в dev режиме
   }
 
-  try {
-    // Configure logging
-    log.transports.file.level = 'info';
-    autoUpdater.logger = log;
+  // Проверяем, является ли это portable версией
+  const isPortable = isPortableVersion();
+  
+  if (isPortable) {
+    log.info('📦 Portable version detected - manual update only');
+    updateSplashProgress(20, 'Portable версия - ручное обновление');
     
-    // Configure electron-updater for differential updates
-    autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = true;
-    autoUpdater.allowDowngrade = false;
-    autoUpdater.allowPrerelease = false;
-    
-    // Enable differential downloads (smaller updates like Discord)
-    autoUpdater.forceDevUpdateConfig = false;
-    autoUpdater.disableDifferentialDownload = false;
-
-    // Auto-updater event handlers
-    autoUpdater.on('checking-for-update', () => {
-      log.info('Checking for update...');
-    });
-
-    autoUpdater.on('update-available', (info) => {
-      log.info('Update available:', info.version);
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Обновление доступно',
-        message: `Доступна новая версия ${info.version}. Хотите загрузить?`,
-        buttons: ['Да', 'Позже']
-      }).then((result) => {
-        if (result.response === 0) {
-          autoUpdater.downloadUpdate();
-        }
-      });
-    });
-
-    autoUpdater.on('update-not-available', (info) => {
-      log.info('Update not available');
-    });
-
-    autoUpdater.on('error', (err) => {
-      log.error('Error in auto-updater:', err);
-    });
-
-    autoUpdater.on('download-progress', (progressObj) => {
-      const percent = Math.round(progressObj.percent);
-      let log_message = "Download speed: " + Math.round(progressObj.bytesPerSecond / 1024) + " KB/s";
-      log_message = log_message + ' - Downloaded ' + percent + '%';
-      log_message = log_message + ' (' + Math.round(progressObj.transferred / 1024 / 1024 * 100) / 100 + "/" + Math.round(progressObj.total / 1024 / 1024 * 100) / 100 + ' MB)';
-      log.info(log_message);
-      
-      // Показать прогресс в главном окне (если есть)
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('download-progress', {
-          percent: percent,
-          speed: Math.round(progressObj.bytesPerSecond / 1024),
-          transferred: Math.round(progressObj.transferred / 1024 / 1024 * 100) / 100,
-          total: Math.round(progressObj.total / 1024 / 1024 * 100) / 100
+    // Все равно проверяем обновления, но не блокируем
+    return new Promise((resolve) => {
+      try {
+        autoUpdater.logger = log;
+        autoUpdater.autoDownload = false;
+        
+        autoUpdater.on('update-available', (info) => {
+          log.info('✨ Update available for portable:', info.version);
+          
+          // Показываем уведомление с ссылкой
+          if (splashWindow && !splashWindow.isDestroyed()) {
+            splashWindow.webContents.send('update-available-portable', {
+              version: info.version,
+              downloadUrl: `https://github.com/igorao79/pozvonimne/releases/latest`
+            });
+          }
         });
+        
+        autoUpdater.on('update-not-available', () => {
+          log.info('✅ Portable app is up to date');
+        });
+        
+        autoUpdater.on('error', (err) => {
+          log.error('❌ Error checking portable update:', err);
+        });
+        
+        // Проверяем, но не блокируем
+        autoUpdater.checkForUpdates().catch(() => {});
+        
+        // Через 5 секунд продолжаем в любом случае
+        setTimeout(() => {
+          resolve(true);
+        }, 5000);
+        
+      } catch (error) {
+        log.error('Error in portable update check:', error);
+        resolve(true);
       }
     });
+  }
 
-    autoUpdater.on('update-downloaded', (info) => {
-      log.info('Update downloaded:', info.version);
+  return new Promise((resolve) => {
+    try {
+      // Configure logging
+      log.transports.file.level = 'info';
+      autoUpdater.logger = log;
+      
+      // Configure electron-updater
+      autoUpdater.autoDownload = false; // Не скачиваем автоматически
+      autoUpdater.autoInstallOnAppQuit = false;
+      autoUpdater.allowDowngrade = false;
+      autoUpdater.allowPrerelease = false;
+      autoUpdater.disableDifferentialDownload = false; // Дифференциальные обновления как в Discord
 
-      const dialogOpts = {
-        type: 'info',
-        buttons: ['Перезагрузить сейчас', 'Позже'],
-        title: 'Обновление приложения',
-        message: `Обновление до версии ${info.version} загружено`,
-        detail: 'Перезагрузите приложение, чтобы применить обновления.'
-      };
+      updateSplashProgress(15, 'Проверка обновлений...');
 
-      dialog.showMessageBox(mainWindow, dialogOpts).then((returnValue) => {
-        if (returnValue.response === 0) {
-          autoUpdater.quitAndInstall();
+      // Проверяем обновления
+      autoUpdater.on('checking-for-update', () => {
+        log.info('🔍 Checking for updates...');
+        updateSplashProgress(20, 'Поиск обновлений...');
+      });
+
+      autoUpdater.on('update-available', (info) => {
+        log.info('✨ Update available:', info.version);
+        updateRequired = true;
+        
+        // Показываем уведомление в splash screen
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashWindow.webContents.send('update-available', {
+            version: info.version,
+            releaseNotes: info.releaseNotes,
+            releaseDate: info.releaseDate
+          });
         }
       });
-    });
 
-    // Check for updates after app is ready (with delay to ensure UI is ready)
-    setTimeout(() => {
-      autoUpdater.checkForUpdatesAndNotify();
-    }, 5000);
+      autoUpdater.on('update-not-available', () => {
+        log.info('✅ App is up to date');
+        updateSplashProgress(25, 'Приложение актуально');
+        updateCheckComplete = true;
+        resolve(true); // Продолжаем запуск
+      });
 
-    // Set up periodic update checks every 5 minutes (300000ms)
-    setInterval(() => {
-      log.info('Checking for updates...');
-      autoUpdater.checkForUpdatesAndNotify();
-    }, 300000);
-  } catch (error) {
-    log.error('Error setting up auto-updater:', error);
-  }
+      autoUpdater.on('error', (err) => {
+        log.error('❌ Error in auto-updater:', err);
+        updateSplashProgress(25, 'Ошибка проверки обновлений');
+        updateCheckComplete = true;
+        resolve(true); // Продолжаем запуск даже при ошибке
+      });
+
+      autoUpdater.on('download-progress', (progressObj) => {
+        const percent = Math.round(progressObj.percent);
+        const speed = Math.round(progressObj.bytesPerSecond / 1024);
+        const transferred = Math.round(progressObj.transferred / 1024 / 1024 * 100) / 100;
+        const total = Math.round(progressObj.total / 1024 / 1024 * 100) / 100;
+        
+        log.info(`📥 Downloading: ${percent}% (${transferred}/${total} MB) @ ${speed} KB/s`);
+        
+        // Обновляем прогресс в splash
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashWindow.webContents.send('update-download-progress', {
+            percent,
+            speed,
+            transferred,
+            total
+          });
+        }
+      });
+
+      autoUpdater.on('update-downloaded', (info) => {
+        log.info('✅ Update downloaded:', info.version);
+        
+        // Уведомляем splash что обновление скачано
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashWindow.webContents.send('update-downloaded', {
+            version: info.version
+          });
+        }
+        
+        // Автоматически перезапускаем через 2 секунды
+        setTimeout(() => {
+          log.info('🔄 Restarting to apply update...');
+          autoUpdater.quitAndInstall(false, true);
+        }, 2000);
+      });
+
+      // Запускаем проверку
+      autoUpdater.checkForUpdates().catch((error) => {
+        log.error('Failed to check for updates:', error);
+        updateCheckComplete = true;
+        resolve(true);
+      });
+
+      // Таймаут на проверку обновлений - 10 секунд
+      setTimeout(() => {
+        if (!updateCheckComplete && !updateRequired) {
+          log.info('⏱️ Update check timeout, continuing...');
+          updateCheckComplete = true;
+          resolve(true);
+        }
+      }, 10000);
+
+    } catch (error) {
+      log.error('Error in checkForUpdatesOnStartup:', error);
+      resolve(true); // Продолжаем запуск при ошибке
+    }
+  });
 }
+
+// Обработчик для кнопки "Обновить" из splash screen
+ipcMain.on('start-update-download', () => {
+  log.info('🚀 User confirmed update download');
+  updateSplashProgress(30, 'Скачивание обновления...');
+  autoUpdater.downloadUpdate();
+});
+
+// Обработчик для отмены обновления (продолжить со старой версией)
+ipcMain.on('skip-update', () => {
+  log.info('⏭️ User skipped update');
+  updateRequired = false;
+  updateCheckComplete = true;
+  // Отправляем событие для продолжения загрузки
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.webContents.send('update-skipped');
+  }
+});
 
 // Keep a global reference of the window object
 let mainWindow;
@@ -351,12 +455,31 @@ app.whenReady().then(async () => {
   createSplashWindow();
   updateSplashProgress(10, 'Запуск приложения...');
   
-  // Add delay to show splash
-  await new Promise(resolve => setTimeout(resolve, 500));
+  // ВАЖНО: Проверяем обновления ДО создания главного окна
+  const canProceed = await checkForUpdatesOnStartup();
   
-  // Create main window
-  await createWindow();
-  setupAutoUpdater();
+  // Если обновление найдено, ждем действия пользователя
+  if (updateRequired && !isDev) {
+    log.info('⏸️ Waiting for user to handle update...');
+    // Ждем пока пользователь не нажмет кнопку в splash
+    await new Promise(resolve => {
+      const checkInterval = setInterval(() => {
+        if (!updateRequired || updateCheckComplete) {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      }, 500);
+    });
+  }
+  
+  // Продолжаем только если проверка завершена
+  if (updateCheckComplete || isDev) {
+    // Add delay to show splash
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Create main window
+    await createWindow();
+  }
 
   // Register global shortcuts
   if (process.platform === 'darwin') {
@@ -472,17 +595,24 @@ ipcMain.handle('show-save-dialog', async (event, options) => {
   return dialog.showSaveDialog(mainWindow, options);
 });
 
-// Handle app updates
+// Handle app updates - ручная проверка из приложения
 ipcMain.handle('check-for-updates', async () => {
   if (isDev) {
     return { updateAvailable: false, message: 'Обновления недоступны в режиме разработки' };
   }
 
   try {
-    await autoUpdater.checkForUpdates();
-    return { updateAvailable: false, message: 'Проверка обновлений запущена' };
+    const result = await autoUpdater.checkForUpdates();
+    if (result && result.updateInfo) {
+      return { 
+        updateAvailable: true, 
+        version: result.updateInfo.version,
+        message: `Доступна версия ${result.updateInfo.version}` 
+      };
+    }
+    return { updateAvailable: false, message: 'У вас последняя версия' };
   } catch (error) {
-    console.error('Error checking for updates:', error);
+    log.error('Error checking for updates:', error);
     return { updateAvailable: false, message: 'Ошибка при проверке обновлений' };
   }
 });
