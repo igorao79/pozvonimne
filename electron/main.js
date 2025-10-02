@@ -240,11 +240,73 @@ let tray = null;
 function createTray() {
   if (tray) return; // Трей уже создан
 
-  const iconPath = isDev 
-    ? path.join(__dirname, 'logo.png')
-    : path.join(process.resourcesPath, 'electron', 'logo.png');
+  // Для Windows нужен .ico файл
+  let iconPath;
+  if (isDev) {
+    // В dev режиме используем ico из public
+    iconPath = path.join(__dirname, '..', 'public', 'logo.ico');
+  } else {
+    // В production пробуем разные пути
+    const possiblePaths = [
+      path.join(process.resourcesPath, 'public', 'logo.ico'),
+      path.join(process.resourcesPath, 'app.asar.unpacked', 'public', 'logo.ico'),
+      path.join(__dirname, '..', 'public', 'logo.ico'),
+      path.join(process.resourcesPath, 'electron', 'logo.png')
+    ];
+    
+    // Находим первый существующий файл
+    const fs = require('fs');
+    iconPath = possiblePaths.find(p => {
+      try {
+        return fs.existsSync(p);
+      } catch (e) {
+        return false;
+      }
+    }) || possiblePaths[0];
+    
+    log.info('Tray icon path:', iconPath);
+  }
   
-  tray = new Tray(iconPath);
+  try {
+    const { nativeImage } = require('electron');
+    const fs = require('fs');
+    
+    // Проверяем, существует ли файл
+    if (fs.existsSync(iconPath)) {
+      const icon = nativeImage.createFromPath(iconPath);
+      if (!icon.isEmpty()) {
+        tray = new Tray(icon);
+        log.info('✅ Tray created successfully with icon:', iconPath);
+        if (isDev) console.log('✅ Системный трей создан с иконкой:', iconPath);
+      } else {
+        throw new Error('Icon is empty');
+      }
+    } else {
+      throw new Error('Icon file not found: ' + iconPath);
+    }
+  } catch (error) {
+    log.error('❌ Failed to create tray:', error.message);
+    if (isDev) console.error('❌ Ошибка создания трея:', error.message);
+    
+    // Пробуем создать с пустой иконкой (fallback)
+    try {
+      const { nativeImage } = require('electron');
+      // Создаем простую квадратную иконку 16x16
+      const canvas = require('electron').nativeImage.createEmpty();
+      tray = new Tray(canvas);
+      log.info('⚠️ Tray created with empty icon (fallback)');
+      if (isDev) console.warn('⚠️ Трей создан с пустой иконкой (запасной вариант)');
+    } catch (e) {
+      log.error('❌ Failed to create tray even with empty icon:', e);
+      if (isDev) console.error('❌ Не удалось создать трей даже с пустой иконкой:', e);
+      return;
+    }
+  }
+  
+  if (!tray) {
+    log.error('❌ Tray is null after creation attempt');
+    return;
+  }
   
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -286,8 +348,14 @@ function createTray() {
     },
     { type: 'separator' },
     {
-      label: `Версия ${app.getVersion()}`,
-      enabled: false
+      label: `Позвони.мне v${app.getVersion()}`,
+      enabled: false,
+      icon: null
+    },
+    {
+      label: `Electron v${process.versions.electron}`,
+      enabled: false,
+      visible: isDev // Показываем только в dev режиме
     },
     { type: 'separator' },
     {
@@ -299,8 +367,16 @@ function createTray() {
     }
   ]);
 
-  tray.setToolTip('Позвони.мне - Аудио звонки');
+  const appVersion = app.getVersion();
+  tray.setToolTip(`Позвони.мне v${appVersion} - Аудио звонки`);
   tray.setContextMenu(contextMenu);
+  
+  if (isDev) {
+    console.log(`📱 Версия приложения: ${appVersion}`);
+    console.log(`⚡ Версия Electron: ${process.versions.electron}`);
+    console.log(`🟢 Версия Node: ${process.versions.node}`);
+  }
+  log.info(`App version in tray: ${appVersion}`);
 
   // Показать окно при клике на иконку в трее
   tray.on('click', () => {
@@ -508,16 +584,29 @@ async function createWindow() {
 
   // Handle window close - минимизируем в трей вместо закрытия
   mainWindow.on('close', (event) => {
+    if (isDev) console.log('🔻 Window close event. isQuitting:', isQuitting, 'Tray exists:', !!tray);
+    
     if (!isQuitting) {
       event.preventDefault();
       mainWindow.hide();
+      log.info('Window hidden to tray');
+      if (isDev) console.log('✅ Окно спрятано в трей');
       
-      // Показываем уведомление при первом сворачивании
+      // Показываем уведомление при сворачивании
       if (tray && !tray.isDestroyed()) {
-        tray.displayBalloon({
-          title: 'Позвони.мне',
-          content: 'Приложение свернуто в системный трей. Кликните на иконку для открытия.'
-        });
+        try {
+          tray.displayBalloon({
+            title: 'Позвони.мне',
+            content: 'Приложение свернуто в системный трей. Кликните на иконку для открытия.'
+          });
+          if (isDev) console.log('💬 Balloon notification displayed');
+        } catch (error) {
+          log.error('Failed to display balloon:', error);
+          if (isDev) console.error('❌ Ошибка показа уведомления:', error);
+        }
+      } else {
+        log.warn('Tray is not available for balloon notification');
+        if (isDev) console.warn('⚠️ Трей недоступен для уведомления');
       }
       return false;
     }
@@ -561,7 +650,17 @@ async function createWindow() {
 // App event listeners
 app.whenReady().then(async () => {
   // Создаем системный трей сразу
+  log.info('🚀 App ready, creating tray...');
+  if (isDev) console.log('🚀 Приложение готово, создаем трей...');
   createTray();
+  
+  if (tray) {
+    log.info('✅ Tray is ready');
+    if (isDev) console.log('✅ Трей создан и готов');
+  } else {
+    log.error('❌ Tray creation failed!');
+    if (isDev) console.error('❌ Не удалось создать трей!');
+  }
   
   // Splash screen показываем ТОЛЬКО при первом запуске приложения
   if (isFirstLaunch) {
