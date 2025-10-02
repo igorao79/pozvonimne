@@ -1,6 +1,7 @@
 import type { PeerRefs } from './types'
 import { checkKeepAliveActivity } from './keepAlive'
 import useCallStore from '@/store/useCallStore'
+import { performanceMonitor } from './performanceMonitor'
 
 // Функция для мониторинга состояния соединения
 export const startConnectionMonitoring = (
@@ -42,7 +43,6 @@ export const startConnectionMonitoring = (
           
           // Регистрируем ошибку в мониторе производительности
           try {
-            const { performanceMonitor } = await import('./performanceMonitor')
             performanceMonitor.recordConnectionFailure(userId || 'unknown', `${connectionState}/${iceConnectionState}`)
           } catch (e) {
             console.warn('Failed to record performance failure:', e)
@@ -66,9 +66,7 @@ export const startConnectionMonitoring = (
                 
                 // Регистрируем ошибку в мониторе производительности
                 try {
-                  import('./performanceMonitor').then(({ performanceMonitor }) => {
-                    performanceMonitor.recordConnectionFailure(userId || 'unknown', `timeout_${currentState}/${currentIceState}`)
-                  })
+                  performanceMonitor.recordConnectionFailure(userId || 'unknown', `timeout_${currentState}/${currentIceState}`)
                 } catch (e) {
                   console.warn('Failed to record performance failure:', e)
                 }
