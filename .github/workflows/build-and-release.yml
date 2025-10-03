@@ -106,46 +106,8 @@ jobs:
           
           echo "🎉 Валидация прошла успешно!"
 
-  create-release:
-    needs: validate
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
-    
-    steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v4
-
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v0.1.${{ github.run_number }}
-          name: Release v0.1.${{ github.run_number }}
-          body: |
-            🎉 Новый релиз приложения Позвони.мне для Windows
-            
-            ### 📦 Скачать:
-            - **Windows Installer**: `pozvonimne-setup-0.1.${{ github.run_number }}.exe` - установщик с автообновлением
-            - **latest.yml**: файл для автообновления (загрузится автоматически)
-            
-            ### ✨ Изменения:
-            - Новая версия приложения
-            - Исправления и улучшения  
-            - Оптимизация для Windows
-            - ✅ Автообновление работает
-            - ✅ Системный трей
-            - ✅ Single instance lock
-            
-            ### 🔄 Автообновление:
-            Старые версии приложения автоматически обнаружат это обновление при запуске.
-          draft: false
-          prerelease: false
-          make_latest: true
-
   build:
-    needs: [validate, create-release]
+    needs: validate
     runs-on: windows-latest
 
     steps:
@@ -171,17 +133,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Update version
+      - name: Update version and create tag
         run: |
           $runNumber = "${{ github.run_number }}"
           $version = "0.1.$runNumber"
+          $tag = "v$version"
           Write-Host "Генерируем версию на основе номера run"
           Write-Host "New version: $version"
+          Write-Host "New tag: $tag"
           
           $packageJson = Get-Content "package.json" | ConvertFrom-Json
           $packageJson.version = $version
           $packageJson | ConvertTo-Json -Depth 100 | Set-Content "package.json"
           Write-Host "Updated version to: $version"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag $tag
+          Write-Host "Created git tag: $tag"
 
       - name: Clean and optimize dependencies
         run: |
@@ -286,5 +255,3 @@ jobs:
         with:
           name: release-windows
           path: release/*
-
-  # update-release не нужен - electron-builder публикует напрямую в релиз
