@@ -8,6 +8,31 @@ const isDev = process.env.NODE_ENV === 'development';
 let isFirstLaunch = true;
 let isQuitting = false;
 
+// 🔒 SINGLE INSTANCE LOCK - предотвращаем множественный запуск
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // Если уже есть запущенный экземпляр - завершаем этот
+  log.info('⚠️ Another instance is already running. Quitting...');
+  app.quit();
+} else {
+  // Обрабатываем попытку запустить второй экземпляр
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    log.info('🔔 Second instance attempt detected');
+    // Если окно существует - показываем его
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      if (!mainWindow.isVisible()) {
+        mainWindow.show();
+      }
+      mainWindow.focus();
+      log.info('✅ Focused existing window');
+    }
+  });
+}
+
 // Remove default menu
 Menu.setApplicationMenu(null);
 
@@ -206,65 +231,103 @@ function createTray() {
 
   // Для Windows нужен .ico файл
   let iconPath;
+  const fs = require('fs');
+  
   if (isDev) {
     // В dev режиме используем ico из public
     iconPath = path.join(__dirname, '..', 'public', 'logo.ico');
+    log.info('🔧 Dev tray icon path:', iconPath);
   } else {
-    // В production пробуем разные пути
+    // В production пробуем разные пути (в порядке приоритета)
     const possiblePaths = [
+      // 1. Из папки electron (включена в files конфига)
+      path.join(__dirname, 'logo.ico'),
+      // 2. Из resources/electron
+      path.join(process.resourcesPath, 'electron', 'logo.ico'),
+      // 3. Из resources/public
       path.join(process.resourcesPath, 'public', 'logo.ico'),
-      path.join(process.resourcesPath, 'app.asar.unpacked', 'public', 'logo.ico'),
-      path.join(__dirname, '..', 'public', 'logo.ico'),
-      path.join(process.resourcesPath, 'electron', 'logo.png')
+      // 4. Из app.asar.unpacked
+      path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'logo.ico'),
+      // 5. Относительный путь как fallback
+      path.join(__dirname, '..', 'public', 'logo.ico')
     ];
     
-    // Находим первый существующий файл
-    const fs = require('fs');
-    iconPath = possiblePaths.find(p => {
-      try {
-        return fs.existsSync(p);
-      } catch (e) {
-        return false;
-      }
-    }) || possiblePaths[0];
+    log.info('🔍 Searching for tray icon in production...');
+    log.info('__dirname:', __dirname);
+    log.info('process.resourcesPath:', process.resourcesPath);
     
-    log.info('Tray icon path:', iconPath);
+    // Находим первый существующий файл
+    iconPath = possiblePaths.find(p => {
+      const exists = fs.existsSync(p);
+      log.info(`  ${exists ? '✅' : '❌'} ${p}`);
+      return exists;
+    });
+    
+    if (!iconPath) {
+      log.error('❌ No tray icon found! Tried paths:', possiblePaths);
+      iconPath = possiblePaths[0]; // fallback
+    } else {
+      log.info('✅ Found tray icon:', iconPath);
+    }
   }
   
+  const { nativeImage } = require('electron');
+  let trayIcon = null;
+  
   try {
-    const { nativeImage } = require('electron');
-    const fs = require('fs');
-    
-    // Проверяем, существует ли файл
+    // Пытаемся загрузить иконку из файла
     if (fs.existsSync(iconPath)) {
-      const icon = nativeImage.createFromPath(iconPath);
-      if (!icon.isEmpty()) {
-        tray = new Tray(icon);
-        log.info('✅ Tray created successfully with icon:', iconPath);
-        if (isDev) console.log('✅ Системный трей создан с иконкой:', iconPath);
+      trayIcon = nativeImage.createFromPath(iconPath);
+      if (!trayIcon.isEmpty()) {
+        log.info('✅ Loaded tray icon from file:', iconPath);
+        if (isDev) console.log('✅ Иконка трея загружена из файла:', iconPath);
       } else {
-        throw new Error('Icon is empty');
+        log.warn('⚠️ Icon file is empty:', iconPath);
+        trayIcon = null;
       }
     } else {
-      throw new Error('Icon file not found: ' + iconPath);
+      log.warn('⚠️ Icon file not found:', iconPath);
     }
   } catch (error) {
-    log.error('❌ Failed to create tray:', error.message);
-    if (isDev) console.error('❌ Ошибка создания трея:', error.message);
-    
-    // Пробуем создать с пустой иконкой (fallback)
+    log.error('❌ Error loading icon:', error.message);
+  }
+  
+  // Если иконка не загрузилась, используем иконку приложения
+  if (!trayIcon || trayIcon.isEmpty()) {
+    log.info('🔄 Trying to use app icon as fallback...');
     try {
-      const { nativeImage } = require('electron');
-      // Создаем простую квадратную иконку 16x16
-      const canvas = require('electron').nativeImage.createEmpty();
-      tray = new Tray(canvas);
-      log.info('⚠️ Tray created with empty icon (fallback)');
-      if (isDev) console.warn('⚠️ Трей создан с пустой иконкой (запасной вариант)');
+      // Получаем иконку приложения
+      const appIcon = app.getAppPath() + '/electron/logo.ico';
+      if (fs.existsSync(appIcon)) {
+        trayIcon = nativeImage.createFromPath(appIcon);
+        log.info('✅ Using app icon for tray');
+      } else {
+        // Создаем минимальную иконку из PNG
+        const pngIcon = path.join(__dirname, 'logo.png');
+        if (fs.existsSync(pngIcon)) {
+          trayIcon = nativeImage.createFromPath(pngIcon);
+          log.info('✅ Using PNG icon for tray');
+        } else {
+          // Последний fallback - пустая иконка
+          trayIcon = nativeImage.createEmpty();
+          log.warn('⚠️ Using empty icon as last resort');
+        }
+      }
     } catch (e) {
-      log.error('❌ Failed to create tray even with empty icon:', e);
-      if (isDev) console.error('❌ Не удалось создать трей даже с пустой иконкой:', e);
-      return;
+      log.error('❌ Fallback icon loading failed:', e.message);
+      trayIcon = nativeImage.createEmpty();
     }
+  }
+  
+  // Создаем трей с загруженной иконкой
+  try {
+    tray = new Tray(trayIcon);
+    log.info('✅ Tray created successfully');
+    if (isDev) console.log('✅ Системный трей создан успешно');
+  } catch (error) {
+    log.error('❌ Failed to create tray:', error.message);
+    if (isDev) console.error('❌ Не удалось создать трей:', error.message);
+    return;
   }
   
   if (!tray) {
@@ -699,14 +762,6 @@ app.on('activate', () => {
   // On macOS, re-create window when dock icon is clicked
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
-  }
-});
-
-app.on('second-instance', () => {
-  // Someone tried to run a second instance, focus our window instead
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
   }
 });
 

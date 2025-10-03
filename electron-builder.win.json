@@ -22,6 +22,7 @@
     "electron/webrtc-fix.js",
     "electron/splash.html",
     "electron/logo.png",
+    "electron/logo.ico",
     "package.json",
     "node_modules/**/*",
     "!node_modules/**/*.md",
@@ -164,6 +165,8 @@
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "shortcutName": "Позвони.мне",
-    "differentialPackage": true
+    "differentialPackage": true,
+    "runAfterFinish": true,
+    "include": "build/installer.nsh"
   }
 }
