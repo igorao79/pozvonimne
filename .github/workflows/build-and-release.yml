@@ -249,7 +249,7 @@ jobs:
           }
 
       - name: Build Electron app (Windows Only)
-        run: npm run build:electron:win
+        run: npm run build:electron:win -- --publish always
         env:
           NODE_ENV: production
           ELECTRON_BUILD: true
@@ -257,8 +257,6 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
           ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
-          EP_DRAFT: false
-          EP_PRE_RELEASE: false
 
       - name: Show build results
         run: |
