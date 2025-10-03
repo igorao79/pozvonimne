@@ -139,10 +139,6 @@
       {
         "target": "nsis",
         "arch": ["x64", "ia32"]
-      },
-      {
-        "target": "portable", 
-        "arch": ["x64", "ia32"]
       }
     ],
     "icon": "public/logo.png",
@@ -187,9 +183,6 @@
     "category": "Network",
     "synopsis": "Простое приложение для голосовых звонков",
     "description": "Простое и безопасное приложение для аудио звонков с WebRTC"
-  },
-  "portable": {
-    "artifactName": "pozvonimne-portable-${version}.${ext}"
   },
   "dmg": {
     "contents": [

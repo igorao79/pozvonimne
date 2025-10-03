@@ -139,19 +139,12 @@
       {
         "target": "nsis",
         "arch": ["x64", "ia32"]
-      },
-      {
-        "target": "portable", 
-        "arch": ["x64", "ia32"]
       }
     ],
     "icon": "public/logo.png",
     "verifyUpdateCodeSignature": false,
     "legalTrademarks": "Позвони.мне",
     "requestedExecutionLevel": "asInvoker"
-  },
-  "portable": {
-    "artifactName": "pozvonimne-portable-${version}.${ext}"
   },
   "compression": "maximum",
   "removePackageScripts": true,

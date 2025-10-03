@@ -31,79 +31,19 @@ const { applyWebRTCFixes, getNetworkInterfaces } = require('./webrtc-fix');
 let updateCheckComplete = false;
 let updateRequired = false;
 
-// Определяем, является ли это portable версией
-function isPortableVersion() {
-  // Portable версия запускается из .exe файла напрямую
-  // Установленная версия находится в Program Files или AppData
-  const appPath = app.getAppPath();
-  const exePath = app.getPath('exe');
-  
-  // Проверяем наличие папки установки
-  const isInstalled = exePath.includes('AppData') || 
-                      exePath.includes('Program Files') ||
-                      exePath.includes('Program Files (x86)');
-  
-  log.info(`App path: ${appPath}`);
-  log.info(`Exe path: ${exePath}`);
-  log.info(`Is installed: ${isInstalled}`);
-  
-  return !isInstalled;
-}
+// Удалили определение portable - обновления работают для ВСЕХ версий
 
 // Setup auto-updater - БЛОКИРУЮЩАЯ проверка при запуске
 async function checkForUpdatesOnStartup() {
   if (isDev) {
-    log.info('Skipping auto-updater in development mode');
-    return true; // Разрешаем продолжить в dev режиме
+    log.info('⏭️ Skipping auto-updater in development mode');
+    return true;
   }
-
-  // Проверяем, является ли это portable версией
-  const isPortable = isPortableVersion();
   
-  if (isPortable) {
-    log.info('📦 Portable version detected - manual update only');
-    updateSplashProgress(20, 'Portable версия - ручное обновление');
-    
-    // Все равно проверяем обновления, но не блокируем
-    return new Promise((resolve) => {
-      try {
-        autoUpdater.logger = log;
-        autoUpdater.autoDownload = false;
-        
-        autoUpdater.on('update-available', (info) => {
-          log.info('✨ Update available for portable:', info.version);
-          
-          // Показываем уведомление с ссылкой
-          if (splashWindow && !splashWindow.isDestroyed()) {
-            splashWindow.webContents.send('update-available-portable', {
-              version: info.version,
-              downloadUrl: `https://github.com/igorao79/pozvonimne/releases/latest`
-            });
-          }
-        });
-        
-        autoUpdater.on('update-not-available', () => {
-          log.info('✅ Portable app is up to date');
-        });
-        
-        autoUpdater.on('error', (err) => {
-          log.error('❌ Error checking portable update:', err);
-        });
-        
-        // Проверяем, но не блокируем
-        autoUpdater.checkForUpdates().catch(() => {});
-        
-        // Через 5 секунд продолжаем в любом случае
-        setTimeout(() => {
-          resolve(true);
-        }, 5000);
-        
-      } catch (error) {
-        log.error('Error in portable update check:', error);
-        resolve(true);
-      }
-    });
-  }
+  log.info('🔄 Starting update check...');
+  log.info('📍 App version:', app.getVersion());
+  log.info('📦 App path:', app.getAppPath());
+  log.info('🗂️ Exe path:', app.getPath('exe'));
 
   return new Promise((resolve) => {
     try {
@@ -111,13 +51,24 @@ async function checkForUpdatesOnStartup() {
       log.transports.file.level = 'info';
       autoUpdater.logger = log;
       
+      // ВАЖНО: Явно указываем GitHub как источник обновлений
+      autoUpdater.setFeedURL({
+        provider: 'github',
+        owner: 'igorao79',
+        repo: 'pozvonimne',
+        private: false
+      });
+      log.info('📡 Feed URL configured for GitHub releases');
+      
       // Configure electron-updater
       autoUpdater.autoDownload = false; // Не скачиваем автоматически
       autoUpdater.autoInstallOnAppQuit = false;
       autoUpdater.allowDowngrade = false;
       autoUpdater.allowPrerelease = false;
-      autoUpdater.disableDifferentialDownload = false; // Дифференциальные обновления как в Discord
-
+      autoUpdater.disableDifferentialDownload = false; // Дифференциальные обновления
+      autoUpdater.fullChangelog = true; // Полный changelog
+      
+      log.info('⚙️ AutoUpdater configured');
       updateSplashProgress(15, 'Проверка обновлений...');
 
       // Проверяем обновления
@@ -127,7 +78,13 @@ async function checkForUpdatesOnStartup() {
       });
 
       autoUpdater.on('update-available', (info) => {
-        log.info('✨ Update available:', info.version);
+        log.info('✨ ============ UPDATE AVAILABLE ============');
+        log.info('Current version:', app.getVersion());
+        log.info('New version:', info.version);
+        log.info('Release date:', info.releaseDate);
+        log.info('Files:', JSON.stringify(info.files, null, 2));
+        log.info('========================================');
+        
         updateRequired = true;
         
         // Показываем уведомление в splash screen
@@ -137,6 +94,8 @@ async function checkForUpdatesOnStartup() {
             releaseNotes: info.releaseNotes,
             releaseDate: info.releaseDate
           });
+        } else {
+          log.warn('⚠️ Splash window not available for update dialog');
         }
       });
 
@@ -148,7 +107,12 @@ async function checkForUpdatesOnStartup() {
       });
 
       autoUpdater.on('error', (err) => {
-        log.error('❌ Error in auto-updater:', err);
+        log.error('❌ ============ UPDATE ERROR ============');
+        log.error('Error message:', err.message);
+        log.error('Error stack:', err.stack);
+        log.error('Feed URL:', autoUpdater.getFeedURL());
+        log.error('========================================');
+        
         updateSplashProgress(25, 'Ошибка проверки обновлений');
         updateCheckComplete = true;
         resolve(true); // Продолжаем запуск даже при ошибке
