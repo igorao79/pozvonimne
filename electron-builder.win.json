@@ -2,13 +2,16 @@
   "appId": "com.pozvonimne.app",
   "productName": "Позвони.мне",
   "copyright": "Copyright © 2025 Позвони.мне",
-  "publish": {
-    "provider": "github",
-    "owner": "igorao79", 
-    "repo": "pozvonimne",
-    "private": false,
-    "releaseType": "release"
-  },
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "igorao79", 
+      "repo": "pozvonimne",
+      "private": false,
+      "releaseType": "release",
+      "publishAutoUpdate": true
+    }
+  ],
   "directories": {
     "output": "release",
     "buildResources": "electron"

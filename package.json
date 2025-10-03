@@ -33,7 +33,10 @@
     "type-check": "tsc --noEmit",
     "analyze": "cross-env ANALYZE=true npm run build",
     "clean": "next build --clean",
-    "postbuild": "echo Build completed successfully"
+    "postbuild": "echo Build completed successfully",
+    "test:updater": "cross-env NODE_ENV=production electron electron/test-updater-window.js",
+    "test:update-server": "node scripts/test-update-server.js",
+    "test:update-config": "node scripts/check-update-config.js"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

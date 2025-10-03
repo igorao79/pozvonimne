@@ -45,3 +45,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# test files for auto-updater
+electron/test-updater.js
+electron/test-updater-window.js
+electron/test-updater-preload.js
+electron/test-updater.html
+scripts/test-update-server.js
+scripts/check-update-config.js
+dev-app-update.yml
+build/installer.nsh

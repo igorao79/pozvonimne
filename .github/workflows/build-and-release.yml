@@ -115,7 +115,7 @@ jobs:
       - name: Check out Git repository
         uses: actions/checkout@v4
 
-      - name: Create Draft Release
+      - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v1
         env:
@@ -127,16 +127,22 @@ jobs:
             🎉 Новый релиз приложения Позвони.мне для Windows
             
             ### 📦 Скачать:
-            - **Windows Installer**: `.exe` установщик с автообновлением
+            - **Windows Installer**: `pozvonimne-setup-0.1.${{ github.run_number }}.exe` - установщик с автообновлением
+            - **latest.yml**: файл для автообновления (загрузится автоматически)
             
             ### ✨ Изменения:
             - Новая версия приложения
-            - Исправления и улучшения
+            - Исправления и улучшения  
             - Оптимизация для Windows
+            - ✅ Автообновление работает
+            - ✅ Системный трей
+            - ✅ Single instance lock
             
-            🔄 **Статус**: Файлы собираются, будут добавлены автоматически...
+            ### 🔄 Автообновление:
+            Старые версии приложения автоматически обнаружат это обновление при запуске.
           draft: false
           prerelease: false
+          make_latest: true
 
   build:
     needs: [validate, create-release]
@@ -251,6 +257,8 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
           ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
+          EP_DRAFT: false
+          EP_PRE_RELEASE: false
 
       - name: Show build results
         run: |
@@ -281,33 +289,4 @@ jobs:
           name: release-windows
           path: release/*
 
-  update-release:
-    needs: [validate, create-release, build]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
-    
-    steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Debug artifact structure
-        run: |
-          echo "🔍 Проверяем структуру artifacts:"
-          find artifacts -name "*.exe" -type f
-          echo "📁 Полная структура:"
-          ls -la artifacts/
-
-      - name: Upload exe files to existing release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v0.1.${{ github.run_number }}
-          files: |
-            artifacts/release-windows/*.exe
-          draft: false
+  # update-release не нужен - electron-builder публикует напрямую в релиз
