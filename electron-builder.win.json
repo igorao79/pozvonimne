@@ -166,7 +166,6 @@
     "createStartMenuShortcut": true,
     "shortcutName": "Позвони.мне",
     "differentialPackage": true,
-    "runAfterFinish": true,
-    "include": "build/installer.nsh"
+    "runAfterFinish": true
   }
 }
