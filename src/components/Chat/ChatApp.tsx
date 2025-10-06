@@ -347,7 +347,13 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
       {/* Модал создания чата */}
       <CreateChatModal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => {
+          setShowCreateModal(false)
+          // Восстанавливаем фокус на чат после закрытия модального окна
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('restoreChatFocus'))
+          }, 100)
+        }}
         onChatCreated={handleChatCreated}
       />
 

@@ -27,6 +27,13 @@ export default function MainLayout({
   const [showProfile, setShowProfile] = useState(false)
   const [showAdmin, setShowAdmin] = useState(false)
 
+  // Функция для восстановления фокуса на чат после закрытия модальных окон
+  const restoreChatFocus = () => {
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('restoreChatFocus'))
+    }, 100)
+  }
+
   const handleLogoClick = () => {
     // Сбрасываем состояние к начальному виду - закрываем профиль и сбрасываем чаты
     setShowProfile(false)
@@ -55,13 +62,19 @@ export default function MainLayout({
 
       {/* Profile Modal */}
       {showProfile && (
-        <UserProfile onClose={() => setShowProfile(false)} />
+        <UserProfile onClose={() => {
+          setShowProfile(false)
+          restoreChatFocus()
+        }} />
       )}
 
       {/* Admin Panel */}
       {showAdmin && (
         <AdminPanel
-          onClose={() => setShowAdmin(false)}
+          onClose={() => {
+            setShowAdmin(false)
+            restoreChatFocus()
+          }}
         />
       )}
     </div>

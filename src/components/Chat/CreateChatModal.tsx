@@ -123,22 +123,17 @@ const CreateChatModal = ({ isOpen, onClose, onChatCreated }: CreateChatModalProp
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const lastSeenDate = new Date(lastSeen.getFullYear(), lastSeen.getMonth(), lastSeen.getDate())
 
-    if (lastSeenDate.getTime() === today.getTime()) {
-      return `был в сети в ${lastSeen.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
-    }
-
-    return `был в сети ${lastSeen.toLocaleDateString('ru-RU')}`
   }
 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="create-chat-title">
       <div className="bg-card rounded-lg max-w-md w-full max-h-[80vh] flex flex-col border border-border">
         {/* Заголовок */}
         <div className="p-4 border-b">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Новый чат</h2>
+            <h2 id="create-chat-title" className="text-lg font-semibold text-foreground">Новый чат</h2>
             <button
               onClick={onClose}
               className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors"

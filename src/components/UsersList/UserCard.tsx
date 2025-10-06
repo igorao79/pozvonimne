@@ -55,7 +55,7 @@ const UserCard = ({ user, isInCall, callingUserId, formatLastSeen, onCallUser, o
               }`}>
                 ● {formatLastSeen(user.last_seen, user.status) === 'онлайн'
                   ? 'онлайн'
-                  : `Был в сети: ${formatLastSeen(user.last_seen, user.status)}`}
+                  : `не в сети`}
               </p>
             )}
           </button>

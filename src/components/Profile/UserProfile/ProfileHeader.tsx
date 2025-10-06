@@ -3,7 +3,7 @@ import { ProfileHeaderProps } from './types'
 const ProfileHeader = ({ onClose }: ProfileHeaderProps) => {
   return (
     <div className="flex items-center justify-between mb-6">
-      <h2 className="text-2xl font-bold text-foreground">Профиль</h2>
+      <h2 id="profile-modal-title" className="text-2xl font-bold text-foreground">Профиль</h2>
       <button
         onClick={onClose}
         className="text-muted-foreground hover:text-foreground transition-colors"

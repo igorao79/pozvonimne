@@ -13,7 +13,6 @@ interface NetworkDiagnostics {
 
 // Диагностика сетевого соединения для WebRTC
 export const runNetworkDiagnostics = async (): Promise<NetworkDiagnostics> => {
-  console.log('🔍 Запуск диагностики сети WebRTC...')
   
   const diagnostics: NetworkDiagnostics = {
     stunReachable: false,
@@ -54,12 +53,7 @@ export const runNetworkDiagnostics = async (): Promise<NetworkDiagnostics> => {
           diagnostics.stunReachable = true
         }
 
-        console.log(`🔍 ICE candidate:`, {
-          type: event.candidate.type,
-          protocol: event.candidate.protocol,
-          address: event.candidate.address,
-          port: event.candidate.port
-        })
+
       }
     }
 
@@ -73,12 +67,10 @@ export const runNetworkDiagnostics = async (): Promise<NetworkDiagnostics> => {
     // Ждем завершения ICE gathering (максимум 10 секунд)
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
-        console.log('🔍 ICE gathering timeout')
         resolve()
       }, 10000)
 
       pc.onicegatheringstatechange = () => {
-        console.log('🔍 ICE gathering state:', pc.iceGatheringState)
         if (pc.iceGatheringState === 'complete') {
           clearTimeout(timeout)
           resolve()
@@ -103,7 +95,6 @@ export const runNetworkDiagnostics = async (): Promise<NetworkDiagnostics> => {
     console.error('🔍 Ошибка диагностики:', error)
   }
 
-  console.log('🔍 Результаты диагностики:', diagnostics)
   return diagnostics
 }
 
@@ -140,13 +131,10 @@ export const getNetworkRecommendations = (diagnostics: NetworkDiagnostics): stri
 
 // Запустить диагностику при проблемах соединения
 export const diagnoseConnectionFailure = async (): Promise<void> => {
-  console.log('🚨 Диагностика причин Connection failed...')
   
   const diagnostics = await runNetworkDiagnostics()
   const recommendations = getNetworkRecommendations(diagnostics)
   
-  console.log('📋 Рекомендации по исправлению:')
-  recommendations.forEach(rec => console.log(rec))
   
   return
 }

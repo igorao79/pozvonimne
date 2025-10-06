@@ -13,6 +13,10 @@ const PremiumSettingsSection = ({ userId, isPremium }: PremiumSettingsSectionPro
 
   const handleCloseSettings = () => {
     setIsSettingsModalOpen(false)
+    // Восстанавливаем фокус на чат после закрытия модального окна
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('restoreChatFocus'))
+    }, 100)
   }
 
   if (!isPremium) {

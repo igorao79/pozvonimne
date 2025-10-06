@@ -1,6 +1,13 @@
 import { useRef, useCallback, useEffect, useState } from 'react'
 import { MessageInputRef } from '@/components/Chat/ChatInterface/MessageInput'
 
+// Расширяем WindowEventMap для кастомного события
+declare global {
+  interface WindowEventMap {
+    'restoreChatFocus': CustomEvent
+  }
+}
+
 export const useChatFocus = () => {
   const messageInputRef = useRef<MessageInputRef>(null)
   const [isActive, setIsActive] = useState(true)
@@ -30,17 +37,19 @@ export const useChatFocus = () => {
     const handleGlobalClick = (e: MouseEvent) => {
       // Не восстанавливаем фокус если кликнули на input или emoji picker
       const target = e.target as Element
-      const isInputClick = target?.closest?.('input[type="text"]')
+      const isInputClick = target?.closest?.('input[type="text"], textarea, input[type="email"], input[type="password"]')
       const isEmojiPickerClick = target?.closest?.('[data-emoji-picker]')
-      const isModalClick = target?.closest?.('[role="dialog"]')
+      const isModalClick = target?.closest?.('[role="dialog"], .fixed.inset-0, [aria-modal="true"]')
       const isButtonClick = target?.tagName === 'BUTTON' && !target?.closest?.('form')
+      const isSelectClick = target?.closest?.('select, [role="combobox"], [role="listbox"]')
 
       // Восстанавливаем фокус если:
-      // - Не кликнули на сам input
+      // - Не кликнули на сам input/textarea
       // - Не кликнули на emoji picker
       // - Не кликнули на модальные окна
       // - Не кликнули на кнопки вне формы
-      if (!isInputClick && !isEmojiPickerClick && !isModalClick && !isButtonClick && isActive) {
+      // - Не кликнули на select элементы
+      if (!isInputClick && !isEmojiPickerClick && !isModalClick && !isButtonClick && !isSelectClick && isActive) {
         setTimeout(() => focusInput(), 10)
       }
     }
@@ -54,8 +63,16 @@ export const useChatFocus = () => {
 
       // Не перехватываем клавиши навигации в других элементах
       const activeElement = document.activeElement
-      if (activeElement && activeElement !== document.body &&
-          activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA') {
+      
+      // Если фокус на любом интерактивном элементе, не перехватываем
+      if (activeElement && activeElement !== document.body && (
+          activeElement.tagName === 'INPUT' || 
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.tagName === 'SELECT' ||
+          activeElement.tagName === 'BUTTON' ||
+          activeElement.closest('[role="dialog"]') ||
+          activeElement.closest('[aria-modal="true"]')
+      )) {
         return
       }
 

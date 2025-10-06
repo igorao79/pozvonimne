@@ -10,12 +10,15 @@ interface VoiceMessageInputProps {
   chatId: string
 }
 
+// Состояния записи голосового сообщения
+type RecordingState = 'ready' | 'recording' | 'recorded'
+
 export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
   onVoiceSubmit,
   disabled = false,
   chatId
 }) => {
-  const [isRecording, setIsRecording] = useState(false)
+  const [recordingState, setRecordingState] = useState<RecordingState>('ready')
   const [isPlaying, setIsPlaying] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
@@ -41,6 +44,7 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
   const analyserRef = useRef<AnalyserNode | null>(null)
   const animationRef = useRef<number | null>(null)
   const serverIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const recordingTimeRef = useRef<number>(0)
 
   // Проверяем разрешение на использование микрофона
   useEffect(() => {
@@ -128,6 +132,37 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
         setAudioBlob(blob)
         const url = URL.createObjectURL(blob)
         setAudioUrl(url)
+        
+        // Автоматически отправляем голосовое сообщение после записи
+        setTimeout(() => {
+          const finalRecordingTime = recordingTimeRef.current
+          if (blob && finalRecordingTime > 0) {
+            console.log('🎤 [VoiceMessageInput] Автоматическая отправка голосового сообщения')
+            onVoiceSubmit(blob, finalRecordingTime)
+            
+            // Очищаем индикатор через RPC вызов через 1 секунду после отправки
+            setTimeout(async () => {
+              if (typingStarted && userId && chatId && supabase) {
+                console.log('🎤 [VoiceMessageInput] Очищаем индикатор после отправки голосового сообщения через RPC', { chatId, userId })
+                try {
+                  await supabase.rpc('clear_typing_indicator_fixed', {
+                    chat_uuid: chatId,
+                    user_uuid: userId
+                  })
+                  console.log('✅ [VoiceMessageInput] Индикатор очищен через RPC')
+                } catch (err) {
+                  console.error('❌ [VoiceMessageInput] Ошибка очистки индикатора:', err)
+                }
+                setTypingStarted(false)
+              }
+            }, 1000)
+            
+            // Сбрасываем состояние после отправки
+            setTimeout(() => {
+              resetState()
+            }, 1500)
+          }
+        }, 100)
 
         // Останавливаем все треки
         stream.getTracks().forEach(track => track.stop())
@@ -136,17 +171,27 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
 
       mediaRecorderRef.current = mediaRecorder
       mediaRecorder.start(100) // Записываем чанки каждые 100ms
-      setIsRecording(true)
+      setRecordingState('recording')
       setRecordingTime(0)
+      recordingTimeRef.current = 0
 
       // Таймер записи
       timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1)
+        setRecordingTime(prev => {
+          const newTime = prev + 1
+          recordingTimeRef.current = newTime // Сохраняем актуальное значение в ref
+          // Автоматически останавливаем запись через 60 секунд
+          if (newTime >= 60) {
+            stopRecording()
+          }
+          return newTime
+        })
       }, 1000)
 
     } catch (error) {
       console.error('Ошибка при запуске записи:', error)
       setHasPermission(false)
+      setRecordingState('ready')
       // Очищаем интервал при ошибке
       if (serverIntervalRef.current) {
         clearInterval(serverIntervalRef.current)
@@ -156,14 +201,11 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
   }, [disabled, hasPermission, userId, chatId, startTyping, typingStarted])
 
   const stopRecording = useCallback(async () => {
-    console.log('🎤 [VoiceMessageInput] Остановка записи, isRecording:', isRecording)
+    console.log('🎤 [VoiceMessageInput] Остановка записи, recordingState:', recordingState)
 
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && recordingState === 'recording') {
       mediaRecorderRef.current.stop()
     }
-
-    // Всегда устанавливаем isRecording = false
-    setIsRecording(false)
 
     // Очищаем интервал сервера
     if (serverIntervalRef.current) {
@@ -182,36 +224,27 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
       clearInterval(timerRef.current)
       timerRef.current = null
     }
-  }, [isRecording, stopTyping, typingStarted])
+  }, [recordingState, stopTyping, typingStarted])
 
-  // Глобальные обработчики событий для надежной остановки записи
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      if (isRecording) {
-        console.log('🎤 [VoiceMessageInput] Глобальный mouseup - останавливаем запись')
+  // Обработчик клика по кнопке записи - управляет состояниями
+  const handleRecordClick = useCallback(() => {
+    if (disabled || hasPermission === null) return
+
+    switch (recordingState) {
+      case 'ready':
+        // Первый клик - начинаем запись
+        startRecording()
+        break
+      case 'recording':
+        // Второй клик - останавливаем запись и автоматически отправляем
         stopRecording()
-      }
+        // Автоматическая отправка произойдет в mediaRecorder.onstop
+        break
+      case 'recorded':
+        // Это состояние теперь не используется, так как сразу отправляем
+        break
     }
-
-    const handleGlobalTouchEnd = () => {
-      if (isRecording) {
-        console.log('🎤 [VoiceMessageInput] Глобальный touchend - останавливаем запись')
-        stopRecording()
-      }
-    }
-
-    if (isRecording) {
-      window.addEventListener('mouseup', handleGlobalMouseUp)
-      window.addEventListener('touchend', handleGlobalTouchEnd)
-      window.addEventListener('touchcancel', handleGlobalTouchEnd)
-    }
-
-    return () => {
-      window.removeEventListener('mouseup', handleGlobalMouseUp)
-      window.removeEventListener('touchend', handleGlobalTouchEnd)
-      window.removeEventListener('touchcancel', handleGlobalTouchEnd)
-    }
-  }, [isRecording]) // Убрали stopRecording из зависимостей, чтобы избежать бесконечного цикла
+  }, [recordingState, disabled, hasPermission, startRecording, stopRecording])
 
   const playAudio = useCallback(() => {
     if (audioRef.current) {
@@ -227,39 +260,14 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
     }
   }, [])
 
-  const sendVoiceMessage = useCallback(async () => {
-    if (audioBlob && recordingTime > 0) {
-      console.log('🎤 [VoiceMessageInput] Отправка голосового сообщения')
-
-      onVoiceSubmit(audioBlob, recordingTime)
-
-      // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Очищаем индикатор через RPC вызов через 1 секунду после отправки
-      setTimeout(async () => {
-        if (typingStarted) {
-          console.log('🎤 [VoiceMessageInput] Очищаем индикатор после отправки голосового сообщения через RPC', { chatId, userId })
-          try {
-            await supabase.rpc('clear_typing_indicator_fixed', {
-              chat_uuid: chatId,
-              user_uuid: userId
-            })
-            console.log('✅ [VoiceMessageInput] Индикатор очищен через RPC')
-          } catch (err) {
-            console.error('❌ [VoiceMessageInput] Ошибка очистки индикатора:', err)
-          }
-          setTypingStarted(false)
-        }
-      }, 1000)
-
-      resetState()
-    }
-  }, [audioBlob, recordingTime, onVoiceSubmit, supabase, chatId, userId, typingStarted])
 
   const resetState = useCallback(() => {
     console.log('🎤 [VoiceMessageInput] Сброс состояния')
 
-    setIsRecording(false)
+    setRecordingState('ready')
     setIsPlaying(false)
     setRecordingTime(0)
+    recordingTimeRef.current = 0
     setAudioBlob(null)
     setTypingStarted(false)
 
@@ -299,103 +307,80 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
     )
   }
 
+  // Функция для получения текста в зависимости от состояния
+  const getButtonText = () => {
+    switch (recordingState) {
+      case 'ready':
+        return 'Нажмите еще раз для начала записи'
+      case 'recording':
+        return 'Нажмите для остановки и отправки'
+      case 'recorded':
+        return 'Отправка...'
+      default:
+        return 'Нажмите еще раз для начала записи'
+    }
+  }
+
+  const getSubText = () => {
+    switch (recordingState) {
+      case 'ready':
+        return 'Готов к записи'
+      case 'recording':
+        return formatTime(recordingTime)
+      case 'recorded':
+        return 'Голосовое сообщение отправляется...'
+      default:
+        return 'Готов к записи'
+    }
+  }
+
   return (
     <div className="flex items-center space-x-4 p-4">
-      {/* Основной контрол записи/воспроизведения */}
+      {/* Основной контрол записи */}
       <div className="flex-1 flex items-center space-x-3">
-        {audioBlob ? (
-          // Режим прослушивания
-          <div className="flex items-center space-x-3 flex-1">
-            <button
-              onClick={isPlaying ? pauseAudio : playAudio}
-              disabled={disabled}
-              className="flex-shrink-0 w-12 h-12 bg-primary text-primary-foreground rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />}
-            </button>
-
-            <div className="flex-1">
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-200"
-                  style={{ width: isPlaying ? '60%' : '0%' }} // Заглушка для прогресс-бара
-                />
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>0:00</span>
-                <span>{formatTime(recordingTime)}</span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          // Режим записи
-          <div className="flex items-center space-x-3 flex-1">
-            <button
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onMouseLeave={stopRecording}
-              onTouchStart={startRecording}
-              onTouchEnd={stopRecording}
-              onTouchCancel={stopRecording}
-              disabled={disabled || hasPermission === null}
-              className={`flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 ${
-                isRecording
-                  ? 'bg-red-500 text-white animate-pulse scale-110'
-                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
-              } disabled:opacity-50`}
-            >
+        <div className="flex items-center space-x-3 flex-1">
+          <button
+            onClick={handleRecordClick}
+            disabled={disabled || hasPermission === null}
+            className={`flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 ${
+              recordingState === 'recording'
+                ? 'bg-red-500 text-white animate-pulse scale-110'
+                : 'bg-green-500 text-white hover:bg-green-600'
+            } disabled:opacity-50`}
+          >
+            {recordingState === 'recording' ? (
+              <StopCircle className="w-8 h-8" />
+            ) : (
               <Mic className="w-8 h-8" />
-            </button>
+            )}
+          </button>
 
-            <div className="flex-1">
-              <div className="text-sm font-medium">
-                {isRecording ? 'Запись...' : 'Нажмите и удерживайте для записи'}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {isRecording ? formatTime(recordingTime) : 'Максимум 60 секунд'}
-              </div>
-              {isRecording && (
-                <div className="flex items-center space-x-1 mt-1">
-                  <div className="flex space-x-1">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <div
-                        key={i}
-                        className={`w-1 bg-red-500 rounded-full animate-pulse`}
-                        style={{
-                          height: `${Math.random() * 16 + 4}px`,
-                          animationDelay: `${i * 0.1}s`
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
+          <div className="flex-1">
+            <div className="text-sm font-medium">
+              {getButtonText()}
             </div>
+            <div className="text-xs text-muted-foreground">
+              {getSubText()}
+            </div>
+            {recordingState === 'recording' && (
+              <div className="flex items-center space-x-1 mt-1">
+                <div className="flex space-x-1">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={i}
+                      className={`w-1 bg-red-500 rounded-full animate-pulse`}
+                      style={{
+                        height: `${Math.random() * 16 + 4}px`,
+                        animationDelay: `${i * 0.1}s`
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
-
-      {/* Кнопка отправки */}
-      {audioBlob && (
-        <button
-          onClick={sendVoiceMessage}
-          disabled={disabled}
-          className="flex-shrink-0 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 font-medium"
-        >
-          Отправить
-        </button>
-      )}
-
-      {/* Скрытый audio элемент для воспроизведения */}
-      {audioUrl && (
-        <audio
-          ref={audioRef}
-          src={audioUrl}
-          onEnded={() => setIsPlaying(false)}
-          onPause={() => setIsPlaying(false)}
-          onPlay={() => setIsPlaying(true)}
-        />
-      )}
     </div>
   )
 }

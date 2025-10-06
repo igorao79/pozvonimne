@@ -66,7 +66,7 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
       <div className="bg-card rounded-lg w-full max-w-sm sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden border border-border animate-in fade-in duration-300">
         <div className="p-4 sm:p-6">
           <div className="animate-in slide-in-from-top-2 duration-300">

@@ -95,6 +95,17 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
 
   const { messageInputRef, focusInput, focusAfterSend, disableAutoFocus, enableAutoFocus } = useChatFocus()
 
+  // Слушаем глобальное событие для восстановления фокуса на чат
+  useEffect(() => {
+    const handleRestoreChatFocus = () => {
+      enableAutoFocus()
+      setTimeout(() => focusInput(), 100)
+    }
+
+    window.addEventListener('restoreChatFocus', handleRestoreChatFocus)
+    return () => window.removeEventListener('restoreChatFocus', handleRestoreChatFocus)
+  }, [enableAutoFocus, focusInput])
+
   const { handleCall, handleCancelCall } = useChatActions({
     chat,
     onError: setError
@@ -502,7 +513,13 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
         messageId={editModal.messageId}
         currentContent={editModal.currentContent}
         onSave={handleSaveEdit}
-        onCancel={handleCancelEdit}
+        onCancel={() => {
+          handleCancelEdit()
+          // Восстанавливаем фокус на чат после закрытия модального окна
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('restoreChatFocus'))
+          }, 100)
+        }}
       />
     </div>
   )

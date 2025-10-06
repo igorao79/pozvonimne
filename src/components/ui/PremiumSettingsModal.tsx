@@ -206,6 +206,9 @@ const PremiumSettingsModal: React.FC<PremiumSettingsModalProps> = ({
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
       onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="premium-settings-title"
     >
       <div       className={`
         relative w-full max-w-lg mx-auto rounded-lg shadow-xl max-h-[90vh] overflow-y-auto
@@ -221,7 +224,7 @@ const PremiumSettingsModal: React.FC<PremiumSettingsModalProps> = ({
           flex items-center justify-between p-6 pb-4
           ${currentTheme === 'dark' ? 'border-gray-700' : 'border-gray-200'}
         `}>
-          <h2 className={`
+          <h2 id="premium-settings-title" className={`
             text-xl font-bold
             ${currentTheme === 'dark' ? 'text-white' : 'text-gray-900'}
           `}>

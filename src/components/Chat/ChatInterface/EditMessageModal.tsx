@@ -77,11 +77,11 @@ export const EditMessageModal: React.FC<EditMessageModalProps> = ({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-message-title">
       <div className="bg-background rounded-lg shadow-xl max-w-md w-full border border-border">
         {/* Заголовок */}
         <div className="px-4 py-3 border-b border-border">
-          <h3 className="text-lg font-semibold">Редактировать сообщение</h3>
+          <h3 id="edit-message-title" className="text-lg font-semibold">Редактировать сообщение</h3>
         </div>
 
         {/* Содержимое */}

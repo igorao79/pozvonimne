@@ -26,20 +26,9 @@ const AuthForm = () => {
     setError(null)
     
     try {
-      // Если выбрано "Запомнить меня", устанавливаем сессию на 90 дней
-      // В противном случае используем настройки по умолчанию (обычно 7 дней)
-      const authOptions = rememberMe ? {
-        data: {
-          // Можно добавить дополнительные данные в сессию
-          remember_me: true,
-          expires_at: Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60), // 90 дней в секундах
-        }
-      } : undefined
-
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password,
-        options: authOptions
+        password
       })
 
       if (error) {
@@ -49,15 +38,28 @@ const AuthForm = () => {
       }
 
       if (data.user) {
-        setUser(data.user)
-        setUserId(data.user.id)
-        setAuthenticated(true)
+        // Проверяем, подтвержден ли email при входе
+        const isEmailConfirmed = data.user.email_confirmed_at !== null
+        
+        if (isEmailConfirmed) {
+          setUser(data.user)
+          setUserId(data.user.id)
+          setAuthenticated(true)
 
-        // Сохраняем информацию о rememberMe в localStorage для Electron
-        if (typeof window !== 'undefined' && rememberMe) {
-          localStorage.setItem('rememberMe', 'true')
-          localStorage.setItem('lastLoginTime', Date.now().toString())
-          console.log('💾 Сохранена настройка "Запомнить меня"')
+          // Сохраняем информацию о rememberMe в localStorage для Electron
+          if (typeof window !== 'undefined' && rememberMe) {
+            localStorage.setItem('rememberMe', 'true')
+            localStorage.setItem('lastLoginTime', Date.now().toString())
+            console.log('💾 Сохранена настройка "Запомнить меня"')
+          }
+          
+          console.log('✅ User logged in with verified email:', data.user.email)
+        } else {
+          // Email не подтвержден - не авторизуем пользователя
+          setUser(data.user)
+          setUserId(data.user.id)
+          setAuthenticated(false)
+          console.log('📧 User tried to login but email not verified:', data.user.email)
         }
       }
     } catch (err) {
@@ -91,8 +93,19 @@ const AuthForm = () => {
       }
 
       if (data.user) {
-        // Проверяем, подтвержден ли email
-        const isEmailConfirmed = data.user.email_confirmed_at !== null
+        // Детальное логирование для отладки
+        console.log('🔍 [REGISTRATION DEBUG] User data:', {
+          id: data.user.id,
+          email: data.user.email,
+          email_confirmed_at: data.user.email_confirmed_at,
+          confirmed_at: data.user.confirmed_at,
+          email_confirmed: data.user.email_confirmed_at !== null,
+          user_metadata: data.user.user_metadata,
+          app_metadata: data.user.app_metadata
+        })
+        
+        // Проверяем, подтвержден ли email (покрываем null и undefined)
+        const isEmailConfirmed = !!data.user.email_confirmed_at
         
         if (isEmailConfirmed) {
           // Email уже подтвержден (автоподтверждение в Supabase)
@@ -106,6 +119,7 @@ const AuthForm = () => {
           setShowEmailVerification(true)
           setError(null) // Очищаем ошибки
           console.log('📧 Email требует подтверждения, показываем модальное окно')
+          // НЕ устанавливаем пользователя в store, чтобы он остался на странице авторизации
         }
       }
     } catch (err) {
@@ -222,13 +236,16 @@ const AuthForm = () => {
       </div>
       
       {/* Модальное окно подтверждения email */}
-      <EmailVerificationModal
-        isOpen={showEmailVerification}
-        onClose={() => setShowEmailVerification(false)}
-        email={registeredEmail}
-        onResendEmail={handleResendEmail}
-        isResending={isResendingEmail}
-      />
+      {showEmailVerification && (
+        <EmailVerificationModal
+          isOpen={showEmailVerification}
+          email={registeredEmail}
+          onClose={() => setShowEmailVerification(false)}
+          onResendEmail={handleResendEmail}
+          isResending={isResendingEmail}
+        />
+      )}
+
     </div>
   )
 }
