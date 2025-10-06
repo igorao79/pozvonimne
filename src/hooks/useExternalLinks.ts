@@ -18,10 +18,23 @@ export const useExternalLinks = () => {
       const link = new URL(url, window.location.origin)
       const currentDomain = window.location.hostname
       
+      // Список разрешенных доменов (не требующих модального окна)
+      const allowedDomains = [
+        'github.com',
+        'api.github.com'
+      ]
+      
       // Проверяем, является ли ссылка внешней
-      return link.hostname !== currentDomain && 
-             !link.hostname.endsWith('.pozvonimne.vercel.app') &&
-             link.hostname !== 'pozvonimne.vercel.app'
+      const isExternal = link.hostname !== currentDomain && 
+                        !link.hostname.endsWith('.pozvonimne.vercel.app') &&
+                        link.hostname !== 'pozvonimne.vercel.app'
+      
+      // Если ссылка внешняя, но на разрешенном домене, не считаем её внешней
+      if (isExternal && allowedDomains.includes(link.hostname)) {
+        return false
+      }
+      
+      return isExternal
     } catch {
       // Если URL невалидный, считаем его внутренним
       return false

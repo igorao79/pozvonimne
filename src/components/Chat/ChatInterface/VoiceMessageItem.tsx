@@ -15,10 +15,16 @@ export const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [audioLoaded, setAudioLoaded] = useState(false)
+  const [waveHeights, setWaveHeights] = useState<number[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const animationRef = useRef<number | null>(null)
+  const baseHeightsRef = useRef<number[]>([8, 12, 18, 24, 16, 20, 14, 22, 10, 26, 18, 15, 20, 12, 24, 16, 19, 13, 21, 17])
 
   useEffect(() => {
+    // Инициализируем статичные высоты волн
+    console.log('🌊 [VoiceMessageItem] Инициализируем волны:', baseHeightsRef.current)
+    setWaveHeights(baseHeightsRef.current)
+
     const audio = new Audio(audioUrl)
     audioRef.current = audio
 
@@ -26,6 +32,9 @@ export const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
     const handleEnded = () => {
       setIsPlaying(false)
       setCurrentTime(0)
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+      }
     }
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime)
@@ -44,6 +53,37 @@ export const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
       }
     }
   }, [audioUrl])
+
+  // Анимация волн во время воспроизведения
+  useEffect(() => {
+    console.log('🌊 [VoiceMessageItem] Статус воспроизведения изменился:', isPlaying)
+    
+    if (isPlaying) {
+      const animateWaves = () => {
+        const time = Date.now() * 0.01
+        const newHeights = baseHeightsRef.current.map((baseHeight, i) => {
+          // Более выраженная анимация с большими колебаниями
+          const wave1 = Math.sin(time + i * 0.8) * 0.7
+          const wave2 = Math.sin(time * 1.3 + i * 0.5) * 0.5
+          const wave3 = Math.sin(time * 0.7 + i * 1.2) * 0.4
+          const multiplier = 1.2 + wave1 + wave2 + wave3
+          // Увеличиваем диапазон высот для более заметной анимации
+          return Math.max(4, Math.min(35, baseHeight * multiplier))
+        })
+        setWaveHeights(newHeights)
+        animationRef.current = requestAnimationFrame(animateWaves)
+      }
+      console.log('🌊 [VoiceMessageItem] Запускаем анимацию волн')
+      animateWaves()
+    } else {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+      }
+      // Возвращаем к базовым высотам
+      console.log('🌊 [VoiceMessageItem] Останавливаем анимацию, возвращаем к базовым высотам')
+      setWaveHeights(baseHeightsRef.current)
+    }
+  }, [isPlaying])
 
   const togglePlayback = () => {
     if (!audioRef.current) return
@@ -74,10 +114,8 @@ export const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
-
   return (
-    <div className={`flex items-center space-x-3 p-3 rounded-lg min-w-[200px] ${
+    <div className={`flex items-center space-x-3 p-3 rounded-lg min-w-[200px] max-w-full ${
       isOwn
         ? 'bg-primary/10 border border-primary/20'
         : 'bg-muted/50 border border-border'
@@ -96,39 +134,32 @@ export const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
       </button>
 
       {/* Визуализация звука */}
-      <div className="flex-1 flex items-center space-x-2">
-        <Volume2 className={`w-4 h-4 ${isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'}`} />
+      <div className="flex-1 flex items-center space-x-2 min-w-0">
+        <Volume2 className={`w-4 h-4 flex-shrink-0 ${isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'}`} />
 
         {/* Волновая визуализация */}
-        <div className="flex items-center space-x-0.5 flex-1">
-          {Array.from({ length: 20 }, (_, i) => (
+        <div className="flex items-end space-x-0.5 flex-1 min-w-0">
+          {waveHeights.length > 0 ? waveHeights.map((height, i) => (
             <div
               key={i}
-              className={`w-0.5 rounded-full transition-all duration-200 ${
-                isPlaying ? 'bg-primary' : 'bg-muted-foreground/40'
-              }`}
+              className={`w-0.5 rounded-full transition-all duration-100 flex-shrink-0`}
               style={{
-                height: isPlaying ? `${Math.random() * 20 + 4}px` : '4px',
-                animationDelay: isPlaying ? `${i * 0.1}s` : '0s'
+                height: `${height}px`,
+                transformOrigin: 'bottom',
+                backgroundColor: isPlaying ? '#3b82f6' : 'rgba(156, 163, 175, 0.6)' // Принудительные цвета
               }}
             />
-          ))}
+          )) : (
+            <div className="text-xs text-red-500">Нет данных волн</div>
+          )}
         </div>
 
-        {/* Прогресс-бар */}
-        <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary rounded-full transition-all duration-200"
-            style={{ width: `${progress}%` }}
-          />
+        {/* Таймер - показывает общее время или прошедшее время при воспроизведении */}
+        <div className={`text-xs font-mono flex-shrink-0 ${
+          isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+        }`}>
+          {isPlaying ? formatTime(currentTime) : formatTime(duration)}
         </div>
-      </div>
-
-      {/* Время */}
-      <div className={`text-xs font-mono min-w-[40px] ${
-        isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
-      }`}>
-        {formatTime(currentTime)} / {formatTime(duration)}
       </div>
     </div>
   )

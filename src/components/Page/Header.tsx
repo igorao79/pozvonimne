@@ -20,9 +20,12 @@ export default function Header({
   onAdminClick,
   onSignOut
 }: HeaderProps) {
-  const { downloadLatestRelease } = useAppUpdate()
+  const { downloadLatestRelease, isDownloading, requestNotificationPermission } = useAppUpdate()
 
-  const handleUpdateClick = () => {
+  const handleUpdateClick = async () => {
+    // Запрашиваем разрешение на уведомления при первом клике
+    await requestNotificationPermission()
+    // Начинаем скачивание
     downloadLatestRelease()
   }
 
@@ -55,11 +58,20 @@ export default function Header({
             {/* Download Button */}
             <button
               onClick={handleUpdateClick}
-              className="p-2 rounded-md download-button hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-600 transition-all duration-200 border border-border cursor-pointer"
-              aria-label="Скачать приложение"
-              title="Скачать последнюю версию приложения"
+              disabled={isDownloading}
+              className={`p-2 rounded-md download-button transition-all duration-200 border border-border ${
+                isDownloading
+                  ? 'bg-blue-100 dark:bg-blue-900/50 cursor-wait animate-pulse'
+                  : 'hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-600 cursor-pointer'
+              }`}
+              aria-label={isDownloading ? "Скачивание..." : "Скачать приложение"}
+              title={isDownloading ? "Скачивание установщика..." : "Скачать последнюю версию приложения"}
             >
-              <Download className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <Download className={`h-5 w-5 transition-all duration-200 ${
+                isDownloading 
+                  ? 'text-blue-400 dark:text-blue-500' 
+                  : 'text-blue-600 dark:text-blue-400'
+              }`} />
             </button>
 
             {/* Admin Button - только для администраторов */}

@@ -23,7 +23,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
 
   // Проверяем, является ли сообщение собственным и не удаленным
   const isOwnMessage = message.sender_id === userId
-  const canEdit = isOwnMessage && !message.is_deleted && message.type === 'text' && message.type !== 'voice'
+  const canEdit = isOwnMessage && !message.is_deleted && message.type === 'text'
   const canDelete = isOwnMessage && !message.is_deleted
 
   // Если пользователь не может редактировать или удалять сообщение, просто возвращаем children
@@ -31,54 +31,79 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
     return <>{children}</>
   }
 
+  // Функция для вычисления оптимальной позиции меню
+  const calculateMenuPosition = (clickX: number, clickY: number) => {
+    const menuWidth = 192 // min-w-48 = 192px
+    const menuHeight = canEdit && canDelete ? 88 : 44 // высота с учетом количества элементов
+    const padding = 16 // отступ от краев экрана
+    const offset = 8 // отступ от курсора
+
+    const screenWidth = window.innerWidth
+    const screenHeight = window.innerHeight
+
+    let x = clickX
+    let y = clickY
+
+    // Интеллектуальное позиционирование по горизонтали
+    const spaceRight = screenWidth - clickX
+    const spaceLeft = clickX
+
+    if (spaceRight >= menuWidth + padding) {
+      // Есть место справа - показываем справа от курсора
+      x = clickX + offset
+    } else if (spaceLeft >= menuWidth + padding) {
+      // Места справа нет, но есть слева - показываем слева от курсора
+      x = clickX - menuWidth - offset
+    } else {
+      // Мало места с обеих сторон - центрируем с отступом
+      x = Math.max(padding, Math.min(screenWidth - menuWidth - padding, clickX - menuWidth / 2))
+    }
+
+    // Интеллектуальное позиционирование по вертикали
+    const spaceBelow = screenHeight - clickY
+    const spaceAbove = clickY
+
+    if (spaceBelow >= menuHeight + padding) {
+      // Есть место снизу - показываем ниже курсора
+      y = clickY + offset
+    } else if (spaceAbove >= menuHeight + padding) {
+      // Места снизу нет, но есть сверху - показываем выше курсора
+      y = clickY - menuHeight - offset
+    } else {
+      // Мало места сверху и снизу - размещаем с максимальным доступным пространством
+      if (spaceBelow > spaceAbove) {
+        y = Math.min(clickY + offset, screenHeight - menuHeight - padding)
+      } else {
+        y = Math.max(padding, clickY - menuHeight - offset)
+      }
+    }
+
+    // Финальные проверки границ
+    x = Math.max(padding, Math.min(x, screenWidth - menuWidth - padding))
+    y = Math.max(padding, Math.min(y, screenHeight - menuHeight - padding))
+
+    return { x, y }
+  }
+
   // Обработчик правого клика
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
 
-    const menuWidth = 192 // min-w-48 = 192px
-    const menuHeight = 100 // приблизительная высота меню
-
-    let x = e.clientX
-    let y = e.clientY
-
-    // Проверяем, не выходит ли меню за границы экрана
-    const screenWidth = window.innerWidth
-    const screenHeight = window.innerHeight
-
-    // Если меню выходит справа, перемещаем его левее
-    if (x + menuWidth > screenWidth) {
-      x = screenWidth - menuWidth - 10
-    }
-
-    // Если меню выходит снизу, показываем его выше клика
-    if (y + menuHeight > screenHeight) {
-      y = y - menuHeight - 10
-    } else {
-      // Если есть место снизу, показываем меню ниже клика
-      y = y + 10
-    }
-
-    // Если меню слишком высоко, показываем его ниже
-    if (y < 0) {
-      y = 10
-    }
-
-    // Если меню слишком слева, показываем его правее
-    if (x < 0) {
-      x = 10
-    }
-
-    setMenuPosition({ x, y })
+    const position = calculateMenuPosition(e.clientX, e.clientY)
+    setMenuPosition(position)
     setIsOpen(true)
   }
 
   // Обработчик долгого нажатия для мобильных устройств
-  const handleTouchStart = () => {
+  const handleTouchStart = (e: React.TouchEvent) => {
     const timer = setTimeout(() => {
-      setIsOpen(true)
-      // Для мобильных устройств показываем меню в центре
-      setMenuPosition({ x: 50, y: 50 })
+      const touch = e.touches[0]
+      if (touch) {
+        const position = calculateMenuPosition(touch.clientX, touch.clientY)
+        setMenuPosition(position)
+        setIsOpen(true)
+      }
     }, 500)
 
     const handleTouchEnd = () => {
@@ -93,7 +118,7 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
     setIsOpen(false)
   }
 
-  // Обработчик клика вне меню
+  // Обработчик клика вне меню и предотвращение скроллинга
   useEffect(() => {
     const handleClickOutside = (event: Event) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -101,14 +126,31 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
       }
     }
 
+    // Предотвращение скроллинга при открытом меню
+    const preventScroll = (e: Event) => {
+      e.preventDefault()
+    }
+
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside)
       document.addEventListener('touchstart', handleClickOutside)
+      
+      // Блокируем скролл колесиком мыши и touch события
+      document.addEventListener('wheel', preventScroll, { passive: false })
+      document.addEventListener('touchmove', preventScroll, { passive: false })
+      
+      // Добавляем стили для предотвращения скроллинга
+      document.body.style.overflow = 'hidden'
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('touchstart', handleClickOutside)
+      document.removeEventListener('wheel', preventScroll)
+      document.removeEventListener('touchmove', preventScroll)
+      
+      // Восстанавливаем возможность скроллинга
+      document.body.style.overflow = ''
     }
   }, [isOpen])
 

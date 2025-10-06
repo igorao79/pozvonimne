@@ -355,11 +355,11 @@ export const VoiceMessageInput: React.FC<VoiceMessageInputProps> = ({
             )}
           </button>
 
-          <div className="flex-1">
-            <div className="text-sm font-medium">
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium truncate">
               {getButtonText()}
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-muted-foreground truncate">
               {getSubText()}
             </div>
             {recordingState === 'recording' && (
