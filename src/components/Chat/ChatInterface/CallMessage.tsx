@@ -63,23 +63,40 @@ export const CallMessage: React.FC<CallMessageProps> = ({ message }) => {
     }
   }, [isCurrentActiveCall, currentCallStartTime, callDurationSeconds])
   
-  // Эффект для принудительного обновления если звонок завершен, но сообщение не обновилось
+  // Эффект для принудительного обновления "зависших" активных звонков
   useEffect(() => {
-    if (isCallEndedButNotUpdated) {
-      console.log('📞 CallMessage: Звонок завершен, но сообщение не обновлено - ждем обновления')
+    if (callStatus === 'active') {
+      // Проверяем время с момента начала звонка
+      const callAge = callStartTime ? Date.now() - new Date(callStartTime).getTime() : 0
+      const TWO_HOURS = 2 * 60 * 60 * 1000 // 2 часа в миллисекундах
       
-      // Принудительное обновление через 5 секунд, если база данных не обновила сообщение
-      const forceUpdateTimeout = setTimeout(() => {
-        console.log('📞 CallMessage: Сообщение все еще не обновлено через 5 сек - возможно проблема с БД')
-        // Логируем проблему, но не принимаем радикальных мер
-        // В будущем можно добавить уведомление пользователя
-      }, 5000)
+      // Если звонок активен больше 2 часов и не является текущим звонком - это "зависший" звонок
+      if (callAge > TWO_HOURS && !isCurrentActiveCall) {
+        console.warn('📞 CallMessage: Обнаружен зависший активный звонок:', {
+          messageId: message.id.slice(0, 8),
+          age: Math.round(callAge / 1000 / 60) + ' минут',
+          callStartTime
+        })
+        
+        // Можно добавить API вызов для обновления статуса
+        // Но лучше полагаться на серверную очистку через cleanup_stale_active_calls()
+      }
       
-      return () => {
-        clearTimeout(forceUpdateTimeout)
+      // Если звонок завершен (не является текущим активным), но сообщение не обновилось
+      if (isCallEndedButNotUpdated) {
+        console.log('📞 CallMessage: Звонок завершен, но сообщение не обновлено - ждем обновления')
+        
+        // Принудительное обновление через 5 секунд, если база данных не обновила сообщение
+        const forceUpdateTimeout = setTimeout(() => {
+          console.log('📞 CallMessage: Сообщение все еще не обновлено через 5 сек - возможно проблема с БД')
+        }, 5000)
+        
+        return () => {
+          clearTimeout(forceUpdateTimeout)
+        }
       }
     }
-  }, [isCallEndedButNotUpdated])
+  }, [callStatus, callStartTime, isCurrentActiveCall, isCallEndedButNotUpdated, message.id])
   
   // Логирование для отладки
   useEffect(() => {
@@ -140,6 +157,11 @@ export const CallMessage: React.FC<CallMessageProps> = ({ message }) => {
 
   // Определяем текст и стиль сообщения в зависимости от статуса
   const getCallMessageContent = () => {
+    // Проверяем не является ли звонок "зависшим"
+    const callAge = callStartTime ? Date.now() - new Date(callStartTime).getTime() : 0
+    const TWO_HOURS = 2 * 60 * 60 * 1000
+    const isStaleCall = callAge > TWO_HOURS && !isCurrentActiveCall
+    
     switch (callStatus) {
       case 'started':
         return {
@@ -149,6 +171,17 @@ export const CallMessage: React.FC<CallMessageProps> = ({ message }) => {
           showDuration: false
         }
       case 'active':
+        // Если звонок "завис" (старше 2 часов)
+        if (isStaleCall) {
+          const estimatedDuration = Math.floor(callAge / 1000)
+          return {
+            text: `Звонок был прерван`,
+            icon: X,
+            className: 'text-orange-600 dark:text-orange-400',
+            showDuration: false,
+            animated: false
+          }
+        }
         // Если звонок завершился, но сообщение еще не обновлено
         if (isCallEndedButNotUpdated) {
           return {

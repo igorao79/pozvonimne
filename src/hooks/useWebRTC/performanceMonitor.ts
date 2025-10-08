@@ -102,7 +102,9 @@ class WebRTCPerformanceMonitor {
       console.warn(`⚠️ Performance Warning: Too many active resources (${this.metrics.activeResourcesCount})`)
     }
 
-    if (timeSinceLastCleanup > 300000) { // 5 минут
+    // Предупреждение только если прошло больше 30 минут (было 5 минут)
+    // Во время долгих звонков это нормально
+    if (timeSinceLastCleanup > 1800000) { // 30 минут
       console.warn(`⚠️ Performance Warning: No cleanup for ${Math.round(timeSinceLastCleanup / 1000)}s`)
     }
 

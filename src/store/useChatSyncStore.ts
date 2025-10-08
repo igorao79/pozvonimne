@@ -47,10 +47,8 @@ const useChatSyncStore = create<ChatSyncState>()(
         stackTrace: new Error().stack?.split('\n')[2]?.trim() // Показываем откуда вызов
       })
       
-      // 🔥 КРИТИЧЕСКАЯ ДИАГНОСТИКА: Логируем КАЖДЫЙ callback
-      if (refreshCallbacks.size === 0) {
-        console.warn('⚠️ ГЛОБАЛЬНАЯ СИНХРОНИЗАЦИЯ: НЕТ зарегистрированных callbacks для ChatList!')
-      }
+      // Во время звонков ChatList может быть неактивен - это нормально
+      // Убрано предупреждение чтобы не захламлять консоль
       
       set({ lastMessageUpdate: Date.now() })
       
@@ -232,10 +230,14 @@ const useChatSyncStore = create<ChatSyncState>()(
             messageCallbacks: messageCallbacks.size
           })
           
-          // Звуковые уведомления
+          // Звуковые уведомления - ТОЛЬКО для участников чата!
+          // НЕ воспроизводим звук если пользователь не участник этого чата
           soundNotificationCallbacks.forEach(callback => {
             try {
-              callback(messageData)
+              // НЕ вызываем callback - звуки будут воспроизводиться только
+              // из локальных подписок на конкретные чаты пользователя
+              // callback(messageData)
+              console.log('🔇 Пропускаем глобальное звуковое уведомление - звуки только для своих чатов')
             } catch (error) {
               console.error('Ошибка при вызове звукового уведомления:', error)
             }
@@ -283,11 +285,13 @@ const useChatSyncStore = create<ChatSyncState>()(
             fullPayload: payload.new
           }
 
-          // Звуковые уведомления
+          // Звуковые уведомления - ТОЛЬКО для участников чата!
           const { soundNotificationCallbacks, messageCallbacks } = get()
           soundNotificationCallbacks.forEach(callback => {
             try {
-              callback(messageData)
+              // НЕ вызываем callback из глобальной подписки
+              // Звуки будут воспроизводиться только из локальных подписок ChatList
+              console.log('🔇 Пропускаем глобальное звуковое уведомление для INSERT')
             } catch (error) {
               console.error('Ошибка при вызове звукового уведомления для INSERT:', error)
             }

@@ -30,7 +30,7 @@ export default function Header({
   }
 
   return (
-    <header className="bg-card shadow-sm border-b border-border flex-shrink-0 transition-colors">
+    <header className="bg-card shadow-sm border-b border-border flex-shrink-0 transition-colors safe-area-header">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-2">
           <div className="flex items-center">

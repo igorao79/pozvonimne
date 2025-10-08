@@ -98,7 +98,8 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
   
   useChatListRealtime({
     userId,
-    onChatUpdate: handleChatUpdate
+    onChatUpdate: handleChatUpdate,
+    chats // Передаем список чатов для фильтрации звуковых уведомлений
   })
   
   // 🔥 ГЛОБАЛЬНЫЙ STORE: useChatListRealtime теперь использует глобальную синхронизацию!

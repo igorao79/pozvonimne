@@ -1,11 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Enable static export for Electron
-  output: process.env.ELECTRON_BUILD ? 'export' : undefined,
+  // Enable static export for Electron and Capacitor
+  output: (process.env.ELECTRON_BUILD || process.env.CAPACITOR_BUILD) ? 'export' : undefined,
 
-  // For Electron, we need to disable image optimization
-  images: process.env.ELECTRON_BUILD ? {
+  // For Electron and Capacitor, we need to disable image optimization
+  images: (process.env.ELECTRON_BUILD || process.env.CAPACITOR_BUILD) ? {
     unoptimized: true,
   } : {
     formats: ['image/webp', 'image/avif'],

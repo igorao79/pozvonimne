@@ -158,22 +158,18 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                 </span>
                 <TypingDots size="sm" />
               </div>
-            ) : chat.last_message ? (
+            ) : chat.last_message || chat.last_message_type ? (
               <p className="text-xs text-muted-foreground truncate">
                 {chat.last_message_sender_name && chat.type === 'group' && (
                   <span className="text-muted-foreground/70">{chat.last_message_sender_name}: </span>
                 )}
                 {chat.last_message_type === 'voice'
                   ? 'Голосовое сообщение'
-                  : truncateText(chat.last_message, 35)
-                }
-              </p>
-            ) : chat.last_message_type === 'voice' ? (
-              <p className="text-xs text-muted-foreground truncate">
-                {chat.last_message_sender_name && chat.type === 'group' && (
-                  <span className="text-muted-foreground/70">{chat.last_message_sender_name}: </span>
-                )}
-                Голосовое сообщение
+                  : chat.last_message_type === 'call'
+                  ? '📞 Звонок'
+                  : chat.last_message 
+                  ? truncateText(chat.last_message, 35)
+                  : ''}
               </p>
             ) : null}
           </div>

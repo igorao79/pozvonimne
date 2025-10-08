@@ -93,13 +93,14 @@ export const useSimpleChatRealtime = ({
         }
       )
       .subscribe((status) => {
-        console.log('📡 [SimpleChatRealtime] Статус подписки:', status)
         if (status === 'SUBSCRIBED') {
           console.log('✅ [SimpleChatRealtime] Успешно подписались на чат:', chatId.slice(0, 8))
         } else if (status === 'CLOSED') {
-          console.warn('⚠️ [SimpleChatRealtime] Подписка закрыта для чата:', chatId.slice(0, 8))
+          // Подписка закрыта - это нормально при переключении чатов или звонках
+          console.log('📡 [SimpleChatRealtime] Подписка закрыта для чата:', chatId.slice(0, 8))
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ [SimpleChatRealtime] Ошибка канала для чата:', chatId.slice(0, 8))
+          // Только критические ошибки в консоль
+          console.log('⚠️ [SimpleChatRealtime] Ошибка канала для чата:', chatId.slice(0, 8))
         }
       })
 

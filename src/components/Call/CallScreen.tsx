@@ -10,6 +10,8 @@ import CallControls from './CallControls'
 import AudioDiagnostics from './AudioDiagnostics'
 import ConnectionStatus from './ConnectionStatus'
 import { ScreenSharingWindow, AudioCallInterface } from './CallScreen/'
+import { setupAudioElement, setupMobileAudio, unlockAudio } from '@/utils/mobileAudioFix'
+import { Capacitor } from '@capacitor/core'
 
 const CallScreen = () => {
   const localAudioRef = useRef<HTMLAudioElement>(null)
@@ -100,11 +102,22 @@ const CallScreen = () => {
       console.log('Setting remote stream to audio element:', {
         streamId: remoteStream.id,
         audioTracks: remoteStream.getAudioTracks().length,
-        audioElement: remoteAudioRef.current
+        audioElement: remoteAudioRef.current,
+        isMobile: Capacitor.isNativePlatform()
       })
+
+      // Настройка для мобильных устройств
+      if (Capacitor.isNativePlatform()) {
+        setupMobileAudio()
+        setupAudioElement(remoteAudioRef.current)
+        unlockAudio() // Разблокировка аудио контекста
+      }
 
       remoteAudioRef.current.srcObject = remoteStream
       remoteAudioRef.current.muted = false
+      remoteAudioRef.current.autoplay = true
+      // @ts-ignore - playsInline существует в мобильных браузерах
+      remoteAudioRef.current.playsInline = true // Критично для iOS/Android
       if (remoteAudioRef.current.volume !== undefined) {
         remoteAudioRef.current.volume = 1.0
       }
@@ -119,13 +132,19 @@ const CallScreen = () => {
             console.error('Remote audio playback failed:', error)
             if (error.name === 'NotAllowedError') {
               console.log('Autoplay blocked, waiting for user interaction...')
-              const startAudio = () => {
+              const startAudio = async () => {
                 if (remoteAudioRef.current) {
+                  // Повторная разблокировка для мобильных
+                  if (Capacitor.isNativePlatform()) {
+                    await unlockAudio()
+                  }
                   remoteAudioRef.current.play().catch(console.error)
                   document.removeEventListener('click', startAudio)
+                  document.removeEventListener('touchstart', startAudio)
                 }
               }
               document.addEventListener('click', startAudio)
+              document.addEventListener('touchstart', startAudio) // Для мобильных
             }
           })
       }

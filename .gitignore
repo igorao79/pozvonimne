@@ -55,3 +55,17 @@ scripts/test-update-server.js
 scripts/check-update-config.js
 dev-app-update.yml
 build/installer.nsh
+
+# Capacitor
+.capacitor
+ios/App/Pods
+ios/App/Podfile.lock
+ios/App/App.xcworkspace
+android/.gradle
+android/build
+android/app/build
+android/.idea
+android/local.properties
+android/gradle.properties
+*.keystore
+*.jks

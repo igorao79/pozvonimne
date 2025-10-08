@@ -69,6 +69,16 @@ body {
   /* Optimize rendering for Electron */
   transform: translateZ(0);
   backface-visibility: hidden;
+  /* Safe area только для боковых сторон - верх будет под статус баром */
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Safe area для header - добавляем отступ + немного места */
+.safe-area-header {
+  padding-top: max(env(safe-area-inset-top), 24px);
+  background: transparent;
 }
 
 /* Optimize theme transitions */

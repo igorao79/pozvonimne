@@ -176,9 +176,9 @@ const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
       unreadSeparatorTimerRef.current = null
     }
 
-    // Используем информацию из пропса ИЛИ проверяем сообщения (исключая системные сообщения о звонках)
+    // Используем информацию из пропса ИЛИ проверяем сообщения
     const hasUnread = hasUnreadMessages || messages.some(message =>
-      message.sender_id !== userId && !message.read_at && message.type !== 'call'
+      message.sender_id !== userId && !message.read_at
     )
 
     // Запоминаем состояние непрочитанных для этого чата
@@ -367,11 +367,11 @@ const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
           // Логирование отключено для предотвращения лишних рендеров
           // console.log('📅 MessagesArea rendering:', uniqueMessages.length, 'messages')
 
-          // Находим индекс первого непрочитанного сообщения (не от текущего пользователя, исключая системные сообщения о звонках)
+          // Находим индекс первого непрочитанного сообщения (не от текущего пользователя)
           let firstUnreadIndex = -1
           for (let i = 0; i < uniqueMessages.length; i++) {
             const message = uniqueMessages[i]
-            if (message.sender_id !== userId && !message.read_at && message.type !== 'call') {
+            if (message.sender_id !== userId && !message.read_at) {
               firstUnreadIndex = i
               break
             }

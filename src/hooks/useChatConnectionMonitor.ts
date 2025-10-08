@@ -107,7 +107,8 @@ export const useChatConnectionMonitor = ({
           }
         }, 5000)
       } else {
-        console.warn('⚠️ ChatConnectionMonitor: No channel available for ping')
+        // Канал недоступен - это нормально во время звонков или переключения чатов
+        // Убрано предупреждение для уменьшения шума в консоли
         healthRef.current.consecutiveFailures++
       }
     } catch (error) {
@@ -152,9 +153,10 @@ export const useChatConnectionMonitor = ({
       sendPing()
     }
     
-    // Критическое состояние - соединение мертво (только после 15 минут и 3+ ошибок)
-    if (timeSinceLastMessage > CRITICAL_INACTIVE_TIME && health.consecutiveFailures >= 3) {
-      console.warn('💀 ChatConnectionMonitor: Connection appears dead after 15 minutes, triggering recovery')
+    // Критическое состояние - соединение мертво (только после 15 минут и 5+ ошибок)
+    // Увеличено до 5 ошибок чтобы избежать ложных срабатываний во время звонков
+    if (timeSinceLastMessage > CRITICAL_INACTIVE_TIME && health.consecutiveFailures >= 5) {
+      console.warn('💀 ChatConnectionMonitor: Connection appears dead, triggering recovery')
       health.isHealthy = false
       health.connectionScore = 0
       onConnectionIssue?.()
