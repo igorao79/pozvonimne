@@ -318,6 +318,26 @@ const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
     )
   }
 
+  // Показываем лоадер если загружаются сообщения
+  if (messages.length === 0 && (loading || isSwitchingChat)) {
+    return (
+      <div className="flex-1 overflow-y-auto p-4 chat-pattern-bg">
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center bg-card/80 backdrop-blur-sm rounded-lg p-6 border border-border/50">
+            {/* Анимированные три точки как в сообщениях */}
+            <div className="flex justify-center items-center space-x-1 mb-4">
+              <div className="animate-bounce [animation-delay:-0.3s] w-3 h-3 bg-primary rounded-full"></div>
+              <div className="animate-bounce [animation-delay:-0.15s] w-3 h-3 bg-primary rounded-full"></div>
+              <div className="animate-bounce w-3 h-3 bg-primary rounded-full"></div>
+            </div>
+            <p className="text-muted-foreground mb-2">Загрузка сообщений...</p>
+            <p className="text-sm text-muted-foreground/70">Подождите немного</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Показываем плашку "Сообщений пока нет" только если:
   // 1. Нет сообщений
   // 2. Не переключаемся между чатами

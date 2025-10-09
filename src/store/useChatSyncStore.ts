@@ -230,16 +230,16 @@ const useChatSyncStore = create<ChatSyncState>()(
             messageCallbacks: messageCallbacks.size
           })
           
-          // Звуковые уведомления - ТОЛЬКО для участников чата!
-          // НЕ воспроизводим звук если пользователь не участник этого чата
+          // Звуковые уведомления для всех зарегистрированных callback'ов
+          console.log('🔊 ГЛОБАЛЬНОЕ УВЕДОМЛЕНИЕ: Вызываем звуковые callback:', {
+            totalCallbacks: soundNotificationCallbacks.size
+          })
           soundNotificationCallbacks.forEach(callback => {
             try {
-              // НЕ вызываем callback - звуки будут воспроизводиться только
-              // из локальных подписок на конкретные чаты пользователя
-              // callback(messageData)
-              console.log('🔇 Пропускаем глобальное звуковое уведомление - звуки только для своих чатов')
+              console.log('🔊 ГЛОБАЛЬНОЕ УВЕДОМЛЕНИЕ: Вызываем звуковой callback')
+              callback(messageData)
             } catch (error) {
-              console.error('Ошибка при вызове звукового уведомления:', error)
+              console.error('🔇 Ошибка при вызове звукового уведомления:', error)
             }
           })
           

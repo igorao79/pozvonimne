@@ -90,65 +90,172 @@ export const useSoundNotifications = () => {
         globalSoundCache.isLoading = true
 
         try {
-          console.log('🔊 Пробуем загрузить настоящий звук из Supabase storage...')
+          console.log('🔊 Пробуем загрузить настоящий звук из Supabase storage bucket "sounds"...')
+          
+          let audioUrl: string | null = null
+          let loadMethod = 'unknown'
 
-          // Пробуем получить публичный URL
-          const { data: publicUrlData } = supabase.storage
-            .from('sounds')
-            .getPublicUrl('message.wav')
+          // 1. Сначала пробуем прямой URL (самый надежный способ)
+          // Получаем базовый URL через API getPublicUrl
+          const { data: tempUrlData } = supabase.storage.from('sounds').getPublicUrl('temp')
+          const baseUrl = tempUrlData?.publicUrl?.replace('/storage/v1/object/public/sounds/temp', '') || 'https://uasoayoovlureephzkns.supabase.co'
+          const directUrl = `${baseUrl}/storage/v1/object/public/sounds/message.wav`
+          console.log('🔊 Пробуем прямой URL:', directUrl)
+          console.log('🔊 Извлечённый базовый URL:', baseUrl)
+          
+          try {
+            const directResponse = await fetch(directUrl, { method: 'HEAD' })
+            console.log('🔊 Проверка прямого URL:', {
+              status: directResponse.status,
+              statusText: directResponse.statusText,
+              contentType: directResponse.headers.get('content-type')
+            })
+            
+            if (directResponse.ok) {
+              audioUrl = directUrl
+              loadMethod = 'direct URL'
+              console.log('✅ Прямой URL работает!')
+            }
+          } catch (directError) {
+            console.log('⚠️ Прямой URL не работает:', directError)
+          }
 
-          console.log('🔊 Public URL result:', publicUrlData)
-          let audioUrl = publicUrlData?.publicUrl
-
-          // Если публичный URL не работает, пробуем signed URL
+          // 2. Если прямой URL не работает, пробуем API getPublicUrl
           if (!audioUrl) {
-            console.log('🔊 Пробуем получить signed URL...')
+            console.log('🔊 Пробуем API getPublicUrl...')
+            const { data: publicUrlData } = supabase.storage
+              .from('sounds')
+              .getPublicUrl('message.wav')
+
+            console.log('🔊 API Public URL result:', publicUrlData)
+            
+            if (publicUrlData?.publicUrl) {
+              audioUrl = publicUrlData.publicUrl
+              loadMethod = 'API public URL'
+              console.log('✅ Получен API публичный URL:', audioUrl.substring(0, 80) + '...')
+            }
+          }
+
+          // 3. Попытка через signed URL
+          if (!audioUrl) {
+            console.log('🔊 Пробуем signed URL...')
             const { data: signedData, error: signedError } = await supabase.storage
               .from('sounds')
               .createSignedUrl('message.wav', 3600)
 
             console.log('🔊 Signed URL result:', { signedData, signedError })
-
-            if (signedError) {
-              console.warn('⚠️ Ошибка получения signed URL, продолжаем использовать fallback')
-              globalSoundCache.isLoading = false
-              return
+            
+            if (signedData?.signedUrl) {
+              audioUrl = signedData.signedUrl
+              loadMethod = 'signed URL'
+              console.log('✅ Получен signed URL:', audioUrl.substring(0, 80) + '...')
             }
-
-            audioUrl = signedData?.signedUrl
           }
 
+          // 4. Последний шанс - фиксированный URL (который точно работает)
+          if (!audioUrl) {
+            console.log('🔊 Последняя попытка - фиксированный URL...')
+            const fixedUrl = 'https://uasoayoovlureephzkns.supabase.co/storage/v1/object/public/sounds/message.wav'
+            
+            try {
+              const fixedResponse = await fetch(fixedUrl, { method: 'HEAD' })
+              if (fixedResponse.ok) {
+                audioUrl = fixedUrl
+                loadMethod = 'fixed URL'
+                console.log('✅ Фиксированный URL работает!')
+              } else {
+                console.error('❌ Даже фиксированный URL не работает:', fixedResponse.status)
+              }
+            } catch (fixedError) {
+              console.error('❌ Ошибка фиксированного URL:', fixedError)
+            }
+          }
+
+          if (!audioUrl) {
+            console.error('❌ Исчерпаны все способы получения URL звукового файла')
+            globalSoundCache.isLoading = false
+            return
+          }
+
+          console.log(`🔊 Используем ${loadMethod} для загрузки звука:`, audioUrl.substring(0, 80) + '...')
+
           if (audioUrl) {
-            console.log('🔊 Создаем настоящий Audio элемент с URL:', audioUrl)
+            console.log('🔊 Создаем настоящий Audio элемент с URL:', audioUrl.substring(0, 50) + '...')
             const audio = new Audio(audioUrl)
             audio.preload = 'auto'
-            audio.volume = 0.7
+            audio.volume = 1.0 // Максимальная громкость
+            
+            console.log('🔊 Настройки Audio элемента:', {
+              src: audioUrl.substring(0, 80),
+              volume: audio.volume,
+              muted: audio.muted,
+              preload: audio.preload
+            })
+
+            // Детальная диагностика загрузки
+            let loadTimeout = setTimeout(() => {
+              console.warn('⚠️ Таймаут загрузки звука (5 сек), возможно файл недоступен')
+              globalSoundCache.isLoading = false
+            }, 5000)
 
             // Проверяем, что файл действительно загрузился
             audio.addEventListener('canplaythrough', () => {
-              console.log('🔊 Настоящий звуковой файл уведомлений загружен из Supabase')
+              console.log('✅ Настоящий звуковой файл загружен успешно из Supabase!')
+              clearTimeout(loadTimeout)
+
+              // Успешная загрузка - заменяем fallback на настоящий звук
+              globalSoundCache.audioElement = audio
+              globalSoundCache.soundUrl = audioUrl
+              globalSoundCache.isLoaded = true
+              globalSoundCache.isLoading = false
+              
+              console.log('🔊 КРИТИЧЕСКАЯ ДИАГНОСТИКА: Глобальный кэш обновлен:', {
+                'globalSoundCache.audioElement': globalSoundCache.audioElement ? 'УСТАНОВЛЕН' : 'НЕТ',
+                'globalSoundCache.soundUrl': globalSoundCache.soundUrl,
+                'globalSoundCache.isLoaded': globalSoundCache.isLoaded,
+                'audio.src': audio.src,
+                'audio.readyState': audio.readyState
+              })
+
+              // Обновляем состояние компонента - заменяем fallback на настоящий звук
+              setState(prev => ({
+                ...prev,
+                audioElement: audio, // Заменяем fallback на настоящий звук
+                soundUrl: audioUrl,
+                soundLoaded: true
+              }))
+              
+              console.log('🔊 Состояние обновлено: fallback заменен на настоящий звук')
+
+              console.log('🔊 Настоящий звуковой файл готов для использования и закэширован')
+            })
+
+            audio.addEventListener('loadstart', () => {
+              console.log('🔄 Началась загрузка звукового файла...')
+            })
+
+            audio.addEventListener('progress', () => {
+              console.log('📊 Загрузка звукового файла в процессе...')
             })
 
             audio.addEventListener('error', (e) => {
-              console.warn('⚠️ Ошибка загрузки настоящего аудио файла:', e)
+              console.warn('❌ Ошибка загрузки настоящего аудио файла:', {
+                error: e,
+                url: audioUrl.substring(0, 50) + '...',
+                networkState: audio.networkState,
+                readyState: audio.readyState,
+                errorCode: audio.error?.code,
+                errorMessage: audio.error?.message
+              })
+              clearTimeout(loadTimeout)
               globalSoundCache.isLoading = false
             })
 
-            // Успешная загрузка - заменяем fallback на настоящий звук
-            globalSoundCache.audioElement = audio
-            globalSoundCache.soundUrl = audioUrl
-            globalSoundCache.isLoaded = true
-            globalSoundCache.isLoading = false
-
-            // Обновляем состояние компонента
-            setState(prev => ({
-              ...prev,
-              audioElement: audio,
-              soundUrl: audioUrl,
-              soundLoaded: true
-            }))
-
-            console.log('🔊 Настоящий звуковой файл готов для использования и закэширован')
+            audio.addEventListener('abort', () => {
+              console.warn('⚠️ Загрузка звукового файла была прервана')
+              clearTimeout(loadTimeout)
+              globalSoundCache.isLoading = false
+            })
           } else {
             console.warn('⚠️ Не удалось получить URL настоящего звукового файла')
             globalSoundCache.isLoading = false
@@ -202,11 +309,17 @@ export const useSoundNotifications = () => {
         globalSoundCache.fallbackAudio = mockAudio as HTMLAudioElement
       }
 
-      setState(prev => ({
-        ...prev,
-        audioElement: mockAudio as HTMLAudioElement,
-        soundUrl: 'fallback-web-audio'
-      }))
+      // НЕ перезаписываем состояние, если настоящий звук уже загружен
+      if (!globalSoundCache.isLoaded) {
+        setState(prev => ({
+          ...prev,
+          audioElement: mockAudio as HTMLAudioElement,
+          soundUrl: 'fallback-web-audio'
+        }))
+        console.log('🔊 Fallback звук установлен в состояние (настоящий звук ещё не загружен)')
+      } else {
+        console.log('🔊 Fallback звук НЕ установлен в состояние (настоящий звук уже загружен)')
+      }
 
       console.log('🔊 Использован fallback звук через Web Audio API')
       console.log('🔊 Fallback звук готов для использования')
@@ -269,52 +382,93 @@ export const useSoundNotifications = () => {
     const callStack = new Error().stack?.split('\n').slice(1, 4).map(line => line.trim()).join(' -> ')
     console.log('🔊🔥 ЗВУК: playNotificationSound вызван! Стек вызовов:', callStack)
     
-    const { audioElement } = state
+    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Приоритетно используем настоящий звук из кэша
+    console.log('🔊 Диагностика звукового кэша:', {
+      'globalSoundCache.audioElement': globalSoundCache.audioElement ? 'есть' : 'нет',
+      'globalSoundCache.isLoaded': globalSoundCache.isLoaded,
+      'globalSoundCache.soundUrl': globalSoundCache.soundUrl ? globalSoundCache.soundUrl.substring(0, 50) + '...' : 'нет',
+      'state.audioElement': state.audioElement ? 'есть' : 'нет',
+      'state.soundLoaded': state.soundLoaded
+    })
+    
+    let audioElement = globalSoundCache.audioElement // Настоящий звук из Supabase
+    let soundSource = 'Supabase audio file'
+    
+    // Если настоящий звук не загружен, используем fallback
+    if (!audioElement && state.audioElement) {
+      audioElement = state.audioElement
+      soundSource = 'fallback Web Audio API'
+    }
     
     if (!audioElement) {
-      console.warn('🔇 Звуковой файл не загружен')
+      console.warn('🔇 Ни настоящий, ни fallback звук не доступны')
       return false
     }
+
+    console.log('🔊 Используем звук:', soundSource)
 
     try {
       // Сброс на начало для возможности повторного воспроизведения
       audioElement.currentTime = 0
+      
+      console.log('🔊 Попытка воспроизведения:', {
+        soundSource,
+        currentTime: audioElement.currentTime,
+        volume: audioElement.volume || 'N/A',
+        muted: audioElement.muted || 'N/A', 
+        readyState: audioElement.readyState || 'N/A',
+        paused: audioElement.paused || 'N/A'
+      })
+      
       await audioElement.play()
-      console.log('🔊 Звуковое уведомление воспроизведено')
+      console.log('🔊✅ Звуковое уведомление УСПЕШНО воспроизведено из:', soundSource)
       return true
     } catch (error) {
       // Обрабатываем различные типы ошибок
       if (error instanceof Error) {
+        console.error('🔇 Ошибка воспроизведения', soundSource + ':', {
+          errorName: error.name,
+          errorMessage: error.message,
+          audioElement: audioElement ? 'есть' : 'нет'
+        })
+        
         if (error.name === 'NotAllowedError') {
-          console.warn('🔇 Воспроизведение заблокировано браузером, используем fallback')
-          // Используем Web Audio API как fallback
-          try {
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-            
-            // Пытаемся активировать контекст
-            if (audioContext.state === 'suspended') {
-              await audioContext.resume()
+          console.warn('🔇 Воспроизведение заблокировано браузером')
+          
+          // Используем Web Audio API как fallback ТОЛЬКО если это не настоящий Supabase звук
+          if (soundSource !== 'Supabase audio file') {
+            console.log('🔊 Пробуем fallback через Web Audio API...')
+            try {
+              const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+              
+              // Пытаемся активировать контекст
+              if (audioContext.state === 'suspended') {
+                await audioContext.resume()
+              }
+              
+              // Создаем простой звуковой сигнал
+              const oscillator = audioContext.createOscillator()
+              const gainNode = audioContext.createGain()
+              
+              oscillator.connect(gainNode)
+              gainNode.connect(audioContext.destination)
+              
+              oscillator.frequency.value = 800
+              gainNode.gain.setValueAtTime(0, audioContext.currentTime)
+              gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1)
+              gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
+              
+              oscillator.start(audioContext.currentTime)
+              oscillator.stop(audioContext.currentTime + 0.5)
+              
+              console.log('🔊 Fallback звуковое уведомление воспроизведено')
+              return true
+            } catch (fallbackError) {
+              console.warn('🔇 Fallback звук тоже не работает:', fallbackError)
+              return false
             }
-            
-            // Создаем простой звуковой сигнал
-            const oscillator = audioContext.createOscillator()
-            const gainNode = audioContext.createGain()
-            
-            oscillator.connect(gainNode)
-            gainNode.connect(audioContext.destination)
-            
-            oscillator.frequency.value = 800
-            gainNode.gain.setValueAtTime(0, audioContext.currentTime)
-            gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.1)
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
-            
-            oscillator.start(audioContext.currentTime)
-            oscillator.stop(audioContext.currentTime + 0.5)
-            
-            console.log('🔊 Fallback звуковое уведомление воспроизведено')
-            return true
-          } catch (fallbackError) {
-            console.warn('🔇 Fallback звук тоже не работает:', fallbackError)
+          } else {
+            console.warn('🔇 Supabase звук заблокирован браузером, не используем fallback')
             return false
           }
         } else if (error.name === 'NotSupportedError') {
@@ -399,11 +553,41 @@ export const useSoundNotifications = () => {
     return success
   }, [playNotificationSound])
 
+  // Функция для форсированной загрузки звука из Supabase
+  const forceLoadSoundFromSupabase = useCallback(async () => {
+    console.log('🔊 Форсированная загрузка звука из Supabase...')
+
+    // Сбрасываем кэш
+    globalSoundCache.isLoaded = false
+    globalSoundCache.isLoading = false
+    globalSoundCache.audioElement = null
+    globalSoundCache.soundUrl = null
+
+    // Обновляем состояние
+    setState(prev => ({
+      ...prev,
+      soundLoaded: false,
+      audioElement: globalSoundCache.fallbackAudio,
+      soundUrl: 'fallback-web-audio'
+    }))
+
+    // Ждем немного и пытаемся загрузить снова
+    setTimeout(() => {
+      if (state.userHasInteracted) {
+        console.log('🔊 Повторная попытка загрузки после сброса кэша')
+        // Это вызовет useEffect для загрузки
+      }
+    }, 100)
+
+    return true
+  }, [state.userHasInteracted])
+
   return {
     setCurrentChat,
     setUserInteraction,
     maybePlayNotification,
     testSound,
+    forceLoadSoundFromSupabase,
     isTabVisible: state.isTabVisible,
     currentChatId: state.currentChatId,
     soundLoaded: state.soundLoaded,

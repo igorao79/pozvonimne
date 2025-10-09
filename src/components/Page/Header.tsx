@@ -52,14 +52,14 @@ export default function Header({
               Позвони.мне
             </h1>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center justify-end space-x-3">
             <AnimatedThemeToggler />
 
             {/* Download Button */}
             <button
               onClick={handleUpdateClick}
               disabled={isDownloading}
-              className={`p-2 rounded-md download-button transition-all duration-200 border border-border ${
+              className={`p-2 rounded-md download-button transition-all duration-200 border border-border h-9 ${
                 isDownloading
                   ? 'bg-blue-100 dark:bg-blue-900/50 cursor-wait animate-pulse'
                   : 'hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-600 cursor-pointer'
@@ -78,7 +78,7 @@ export default function Header({
             {isAdmin && (
               <button
                 onClick={onAdminClick}
-                className="p-2 rounded-md admin-button hover:bg-yellow-100 dark:hover:bg-yellow-900/30 hover:ring-2 hover:ring-yellow-300 dark:hover:ring-yellow-600 transition-all duration-200 border border-border cursor-pointer"
+                className="p-2 rounded-md admin-button hover:bg-yellow-100 dark:hover:bg-yellow-900/30 hover:ring-2 hover:ring-yellow-300 dark:hover:ring-yellow-600 transition-all duration-200 border border-border cursor-pointer h-9"
                 aria-label="Открыть админку"
                 title="Административная панель"
               >
@@ -87,14 +87,14 @@ export default function Header({
             )}
             <button
               onClick={onProfileClick}
-              className="p-2 rounded-md profile-button hover:bg-secondary/80 hover:ring-2 hover:ring-secondary/60 dark:hover:bg-gray-600 dark:hover:ring-gray-300 transition-all duration-200 border border-border cursor-pointer"
+              className="p-2 rounded-md profile-button hover:bg-secondary/80 hover:ring-2 hover:ring-secondary/60 dark:hover:bg-gray-600 dark:hover:ring-gray-300 transition-all duration-200 border border-border cursor-pointer h-9"
               aria-label="Открыть профиль"
             >
               <User className="h-5 w-5 text-foreground" />
             </button>
             <button
               onClick={onSignOut}
-              className="text-sm logout-button text-primary hover:text-primary/80 hover:bg-primary/10 hover:ring-1 hover:ring-primary/30 dark:hover:bg-gray-600 dark:hover:ring-gray-300 transition-all duration-200 px-3 py-1 rounded cursor-pointer"
+              className="text-sm logout-button text-primary hover:text-primary/80 hover:bg-primary/10 hover:ring-1 hover:ring-primary/30 dark:hover:bg-gray-600 dark:hover:ring-gray-300 transition-all duration-200 px-3 py-2 rounded cursor-pointer h-9"
             >
               Выйти
             </button>
