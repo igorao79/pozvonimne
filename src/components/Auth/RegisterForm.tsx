@@ -23,6 +23,8 @@ const RegisterForm = ({ onRegister, isLoading }: RegisterFormProps) => {
   const [displayNameValid, setDisplayNameValid] = useState(false)
   const [displayNameAvailable, setDisplayNameAvailable] = useState<boolean | null>(null)
   const [checkingDisplayName, setCheckingDisplayName] = useState(false)
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null)
+  const [checkingEmail, setCheckingEmail] = useState(false)
 
   const emailRef = useRef<HTMLInputElement>(null)
   const displayNameRef = useRef<HTMLInputElement>(null)
@@ -66,6 +68,39 @@ const RegisterForm = ({ onRegister, isLoading }: RegisterFormProps) => {
       setEmailValid(false)
     }
   }
+
+  // Проверка уникальности email
+  useEffect(() => {
+    if (!email || !validateEmail(email)) {
+      setEmailAvailable(null)
+      return
+    }
+
+    const checkEmail = async () => {
+      try {
+        setCheckingEmail(true)
+        // Используем RPC функцию для проверки доступности email
+        const { data, error } = await supabase.rpc('check_email_availability', {
+          check_email: email
+        })
+
+        if (error) {
+          console.error('Error checking email availability:', error)
+          setEmailAvailable(false) // В случае ошибки считаем занятым
+        } else {
+          setEmailAvailable(data) // data будет true если email свободен, false если занят
+        }
+      } catch (err) {
+        console.error('Error checking email:', err)
+        setEmailAvailable(false) // В случае ошибки считаем занятым
+      } finally {
+        setCheckingEmail(false)
+      }
+    }
+
+    const timeoutId = setTimeout(checkEmail, 500)
+    return () => clearTimeout(timeoutId)
+  }, [email, supabase])
 
   const handleDisplayNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -185,6 +220,15 @@ const RegisterForm = ({ onRegister, isLoading }: RegisterFormProps) => {
     setConfirmPasswordError(!confirmPasswordValid)
     setDisplayNameError(!displayNameValid)
 
+    // Проверяем доступность email
+    if (emailValid && emailAvailable === false) {
+      return
+    }
+
+    if (emailValid && emailAvailable === null) {
+      return
+    }
+
     // Проверяем доступность display_name
     if (displayNameValid && displayNameAvailable === false) {
       return
@@ -195,7 +239,7 @@ const RegisterForm = ({ onRegister, isLoading }: RegisterFormProps) => {
     }
 
     // Если все проверки пройдены
-    if (emailValid && passwordValid && confirmPasswordValid && displayNameValid && displayNameAvailable === true) {
+    if (emailValid && passwordValid && confirmPasswordValid && displayNameValid && displayNameAvailable === true && emailAvailable === true) {
       onRegister(email, password, displayName)
     }
   }
@@ -206,7 +250,7 @@ const RegisterForm = ({ onRegister, isLoading }: RegisterFormProps) => {
         <label htmlFor="email" className="block text-sm font-medium text-foreground">
           Email адрес
         </label>
-        <div className="mt-1">
+        <div className="mt-1 relative">
           <input
             ref={emailRef}
             id="email"
@@ -217,12 +261,36 @@ const RegisterForm = ({ onRegister, isLoading }: RegisterFormProps) => {
             value={email}
             onChange={handleEmailChange}
             onBlur={handleEmailBlur}
-            className={`appearance-none block w-full px-3 py-2 border-4 rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none sm:text-sm transition-all duration-200 ${
-              emailError ? '!border-red-600' :
-              emailValid ? '!border-green-600' : '!border-gray-300'
+            className={`appearance-none block w-full px-3 py-2 pr-20 border-4 rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none sm:text-sm transition-all duration-200 ${
+              emailError || (emailValid && emailAvailable === false) ? '!border-red-600' :
+              emailValid && emailAvailable === true ? '!border-green-600' : '!border-gray-300'
             }`}
             placeholder="Введите ваш email"
           />
+          {email && validateEmail(email) && (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs flex items-center">
+              {checkingEmail ? (
+                <div className="flex items-center text-muted-foreground">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b border-current mr-1"></div>
+                  Проверка...
+                </div>
+              ) : emailAvailable === true ? (
+                <div className="flex items-center text-green-600 dark:text-green-400">
+                  <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Свободен
+                </div>
+              ) : emailAvailable === false ? (
+                <div className="flex items-center text-destructive">
+                  <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Занят
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
 
@@ -325,7 +393,7 @@ const RegisterForm = ({ onRegister, isLoading }: RegisterFormProps) => {
       <div>
         <button
           type="submit"
-          disabled={isLoading || !email || !displayName || !password || !confirmPassword || emailError || passwordError || confirmPasswordError || displayNameError || displayNameAvailable === false || (displayName.length >= 3 && displayNameAvailable === null)}
+          disabled={isLoading || !email || !displayName || !password || !confirmPassword || emailError || passwordError || confirmPasswordError || displayNameError || emailAvailable === false || displayNameAvailable === false || (validateEmail(email) && emailAvailable === null) || (displayName.length >= 3 && displayNameAvailable === null)}
           className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? (

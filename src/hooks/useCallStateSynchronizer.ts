@@ -194,7 +194,9 @@ export const useCallStateSynchronizer = ({ isAuthenticated, userId }: UseCallSta
       return () => {
         // Убираем обработчик при размонтировании
         try {
-          existingChannel.off('broadcast', { event: 'call_state_sync' }, handleSync)
+          if (existingChannel && typeof existingChannel.off === 'function') {
+            existingChannel.off('broadcast', { event: 'call_state_sync' }, handleSync)
+          }
         } catch (error) {
           console.warn('🔄 CallStateSynchronizer: Error removing sync handler:', error)
         }

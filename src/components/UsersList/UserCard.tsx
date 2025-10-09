@@ -11,7 +11,7 @@ interface UserCardProps {
   user: User
   isInCall: boolean
   callingUserId: string | null
-  formatLastSeen: (lastSignInAt: string | null | undefined, status?: string) => string
+  formatLastSeen: (lastSignInAt: string | null | undefined, status?: string) => string | null
   onCallUser: (targetUserId: string, targetUsername: string, displayName: string) => void
   onShowProfile: (userId: string) => void
 }
@@ -47,17 +47,34 @@ const UserCard = ({ user, isInCall, callingUserId, formatLastSeen, onCallUser, o
             <p className="font-medium text-foreground group-hover:text-primary transition-colors truncate">
               {user.display_name || user.username}
             </p>
-            {user.last_seen && (
-              <p className={`text-xs ${
-                formatLastSeen(user.last_seen, user.status) === 'онлайн' && 'text-green-600 dark:text-green-400'
-                  ? 'text-green-500 font-medium'
-                  : 'text-muted-foreground'
-              }`}>
-                ● {formatLastSeen(user.last_seen, user.status) === 'онлайн'
-                  ? 'онлайн'
-                  : `не в сети`}
-              </p>
-            )}
+            {/* Показываем статус или лоадер */}
+            {(() => {
+              const statusText = formatLastSeen(user.last_seen, user.status)
+
+              if (statusText === null) {
+                // Показываем лоадер для неизвестного статуса
+                return (
+                  <div className="flex items-center space-x-1">
+                    <div className="animate-spin rounded-full h-3 w-3 border border-muted-foreground/30 border-t-muted-foreground"></div>
+                    <span className="text-xs text-muted-foreground">загрузка...</span>
+                  </div>
+                )
+              }
+
+              if (statusText) {
+                return (
+                  <p className={`text-xs ${
+                    statusText === 'онлайн'
+                      ? 'text-green-500 font-medium'
+                      : 'text-muted-foreground'
+                  }`}>
+                    ● {statusText === 'онлайн' ? 'онлайн' : `не в сети`}
+                  </p>
+                )
+              }
+
+              return null
+            })()}
           </button>
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import useSupabaseStore from '@/store/useSupabaseStore'
 import useCallStore from '@/store/useCallStore'
+import { resilientChannelManager } from '@/utils/resilientChannelManager'
 
 export function useAuth() {
   const { supabase } = useSupabaseStore()
@@ -36,6 +37,8 @@ export function useAuth() {
             console.log('📧 Email не подтвержден, требуется подтверждение')
           }
         } else if (event === 'SIGNED_OUT') {
+          // Очищаем все каналы при выходе
+          resilientChannelManager.shutdown()
           resetAll()
         }
       }
@@ -110,6 +113,9 @@ export function useAuth() {
 
   const handleSignOut = async () => {
     try {
+      // Сначала очищаем все каналы
+      resilientChannelManager.shutdown()
+
       await supabase.auth.signOut()
 
       // Очищаем настройки rememberMe при выходе

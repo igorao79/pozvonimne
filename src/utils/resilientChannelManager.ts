@@ -80,10 +80,10 @@ class ResilientChannelManager {
 
           // Создаем менеджер переподключения
           const reconnectionManager = createReconnectionManager(
-            () => {
+            async () => {
               console.log(`🔄 [ResilientChannel] Reconnecting channel: ${channelName}`)
               // Используем метод класса вместо рекурсивного вызова локальной функции
-              this.recreateChannel(channelName)
+              await this.recreateChannel(channelName)
             },
             maxReconnectAttempts,
             reconnectDelay
@@ -166,7 +166,21 @@ class ResilientChannelManager {
   }
 
   // Безопасное пересоздание канала без рекурсии
-  private recreateChannel(channelName: string) {
+  private async recreateChannel(channelName: string) {
+    // Проверяем, что пользователь все еще аутентифицирован
+    try {
+      const { data: { user } } = await this.supabase.auth.getUser()
+      if (!user) {
+        console.log(`🚪 [ResilientChannel] Skipping recreation - user not authenticated: ${channelName}`)
+        // Удаляем канал из списка, чтобы не пытаться пересоздать его снова
+        this.channels.delete(channelName)
+        return
+      }
+    } catch (error) {
+      console.warn(`⚠️ [ResilientChannel] Error checking auth status, skipping recreation: ${channelName}`)
+      return
+    }
+
     const channelState = this.channels.get(channelName)
     if (!channelState) {
       console.warn(`⚠️ [ResilientChannel] Cannot recreate - channel not found: ${channelName}`)

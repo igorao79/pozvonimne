@@ -49,7 +49,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
   // 🔥 ВОЗВРАЩАЕМ ГЛОБАЛЬНУЮ СИСТЕМУ: Прямые подписки вызывали CHANNEL_ERROR, глобальный store работает!
   
   // Импортируем хук звуковых уведомлений для тестирования
-  const { testSound, forceLoadSoundFromSupabase, soundLoaded } = useSoundNotifications()
+  const { testSound, soundLoaded } = useSoundNotifications()
 
   // 🔥 ДЕБАУНСИНГ: useRef для хранения таймаута
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -490,21 +490,6 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
                 <Volume2 className="w-4 h-4" />
               </button>
               
-              {/* Кнопка перезагрузки звука из Supabase */}
-              <button
-                onClick={() => {
-                  console.log('🔄 Перезагрузка звука из Supabase по клику пользователя')
-                  forceLoadSoundFromSupabase()
-                }}
-                className={`w-4 h-4 flex items-center justify-center transition-colors ${
-                  soundLoaded 
-                    ? 'text-green-500 hover:text-green-600' 
-                    : 'text-orange-500 hover:text-orange-600'
-                }`}
-                title={soundLoaded ? 'Звук загружен из Supabase (перезагрузить)' : 'Перезагрузить звук из Supabase'}
-              >
-                <RefreshCw className="w-4 h-4" />
-              </button>
 
             </div>
           </div>

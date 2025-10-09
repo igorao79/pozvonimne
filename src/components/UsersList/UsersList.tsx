@@ -23,10 +23,11 @@ const UsersList = () => {
   const [selectedUserProfile, setSelectedUserProfile] = useState<string | null>(null)
 
   // Функция для форматирования статуса последнего входа
-  const formatLastSeen = (lastSignInAt: string | null | undefined, status?: string) => {
+  const formatLastSeen = (lastSignInAt: string | null | undefined, status?: string): string | null => {
     console.log('🔍 formatLastSeen:', { lastSignInAt, status })
 
-    if (!lastSignInAt) return 'Неизвестно'
+    // Вместо "Неизвестно" показываем null - будет показан лоадер
+    if (!lastSignInAt) return null
 
     const lastSignIn = new Date(lastSignInAt)
     const now = new Date()
@@ -116,16 +117,6 @@ const UsersList = () => {
       }
 
       setError(errorMessage)
-
-      // Очистка канала только в случае ошибки
-      if (callChannel) {
-        try {
-          console.log('🧹 Cleaning up call channel due to error')
-          callChannel.unsubscribe()
-        } catch (cleanupErr) {
-          console.warn('Error cleaning up call channel:', cleanupErr)
-        }
-      }
     } finally {
       setCallingUserId(null)
       setIsLoading(false)
@@ -152,7 +143,7 @@ const UsersList = () => {
             Пользователи приложения ({allUsers.length})
           </h2>
           <button
-            onClick={refreshUsers}
+            onClick={() => refreshUsers()}
             className="text-primary hover:text-primary/80 text-sm transition-colors"
           >
             <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
