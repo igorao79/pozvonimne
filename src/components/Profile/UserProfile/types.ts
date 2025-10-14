@@ -48,6 +48,11 @@ export interface PremiumSettingsSectionProps {
   isPremium: boolean
 }
 
+export interface DeleteAccountSectionProps {
+  loading: boolean
+  onError: (error: string) => void
+  onSuccess: (message: string) => void
+}
 
 
 

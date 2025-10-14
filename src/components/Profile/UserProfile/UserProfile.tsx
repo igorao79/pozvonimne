@@ -14,6 +14,7 @@ import EmailSection from './EmailSection'
 import PasswordResetSection from './PasswordResetSection'
 import DonationSection from './DonationSection'
 import PremiumSettingsSection from './PremiumSettingsSection'
+import DeleteAccountSection from './DeleteAccountSection'
 import { UserProfileProps } from './types'
 
 const UserProfile = ({ onClose }: UserProfileProps) => {
@@ -115,6 +116,14 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
             <PasswordResetSection
               loading={loading}
               onPasswordReset={handlePasswordReset}
+            />
+          </div>
+
+          <div className="animate-in slide-in-from-bottom-2 duration-300 delay-600">
+            <DeleteAccountSection
+              loading={loading}
+              onError={setError}
+              onSuccess={setSuccess}
             />
           </div>
         </div>

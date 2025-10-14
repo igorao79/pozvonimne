@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
+import { unlockAudio, setupMobileAudio, isMobileDevice } from '@/utils/mobileAudioFix'
 
 const DialPad = () => {
   const [inputUsername, setInputUsername] = useState('')
@@ -22,6 +23,19 @@ const DialPad = () => {
     if (!inputUsername.trim()) {
       setError('Введите никнейм пользователя')
       return
+    }
+
+    // КРИТИЧНО: Разблокируем аудио контекст при пользовательском взаимодействии
+    if (isMobileDevice()) {
+      console.log('📱 Mobile device detected, unlocking audio context before call...')
+      try {
+        setupMobileAudio()
+        await unlockAudio()
+        console.log('✅ Audio context unlocked successfully')
+      } catch (audioErr) {
+        console.error('❌ Failed to unlock audio context:', audioErr)
+        // Продолжаем даже при ошибке разблокировки
+      }
     }
 
     setIsLoading(true)

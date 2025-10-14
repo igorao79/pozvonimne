@@ -462,7 +462,7 @@ const useChatSyncStore = create<ChatSyncState>()(
             set({ keepAliveInterval })
 
           } else if (status === 'CHANNEL_ERROR') {
-            console.error('❌ Критическая ошибка WebSocket:', err)
+            console.error('❌ Критическая ошибка WebSocket:', err || 'Неизвестная ошибка')
             // При критических ошибках WebSocket - временно отключаем realtime
             console.log('🚫 Отключаем realtime из-за критических ошибок сети')
             set({ isGlobalSyncActive: false, isNetworkError: true })

@@ -59,12 +59,14 @@ export async function middleware(request: NextRequest) {
     const token_hash = request.nextUrl.searchParams.get('token_hash')
     const type = request.nextUrl.searchParams.get('type')
     
-    console.log('🔄 Middleware: Processing callback', {
-      pathname: request.nextUrl.pathname,
-      token_hash: token_hash?.slice(0, 8) + '...',
-      type,
-      origin: request.nextUrl.origin
-    })
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 Middleware: Processing callback', {
+        pathname: request.nextUrl.pathname,
+        token_hash: token_hash?.slice(0, 8) + '...',
+        type,
+        origin: request.nextUrl.origin
+      })
+    }
     
     // Если это подтверждение регистрации, перенаправляем на нашу страницу
     if (type === 'signup' && token_hash) {
@@ -73,7 +75,9 @@ export async function middleware(request: NextRequest) {
       confirmUrl.searchParams.set('token_hash', token_hash)
       confirmUrl.searchParams.set('type', type)
       
-      console.log('🔄 Middleware: Redirecting to', confirmUrl.toString())
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Middleware: Redirecting to', confirmUrl.toString())
+      }
       return NextResponse.redirect(confirmUrl)
     }
   }

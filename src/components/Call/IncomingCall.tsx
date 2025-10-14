@@ -5,6 +5,7 @@ import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
 import { sendCallAcceptedSignal, sendCallRejectedSignal } from '@/utils/callSignaling'
 import { useRingtone } from '@/hooks/useRingtone'
+import { unlockAudio, setupMobileAudio, isMobileDevice } from '@/utils/mobileAudioFix'
 
 interface CallerInfo {
   id: string
@@ -82,6 +83,20 @@ const IncomingCall = () => {
 
       // Останавливаем рингтон
       stopRingtone()
+
+      // КРИТИЧНО: Разблокируем аудио контекст при пользовательском взаимодействии
+      // Это должно быть сделано ДО начала звонка
+      if (isMobileDevice()) {
+        console.log('📱 Mobile device detected, unlocking audio context...')
+        try {
+          setupMobileAudio()
+          await unlockAudio()
+          console.log('✅ Audio context unlocked successfully')
+        } catch (audioErr) {
+          console.error('❌ Failed to unlock audio context:', audioErr)
+          // Продолжаем даже при ошибке разблокировки
+        }
+      }
 
       // Пытаемся остановить любые системные звуки
       try {

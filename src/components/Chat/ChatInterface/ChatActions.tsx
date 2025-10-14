@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import useCallStore from '@/store/useCallStore'
 import { sendIncomingCallSignal, sendCallCancelledSignal } from '@/utils/callSignaling'
 import { Chat } from './types'
+import { unlockAudio, setupMobileAudio, isMobileDevice } from '@/utils/mobileAudioFix'
 
 interface UseChatActionsProps {
   chat: Chat
@@ -30,6 +31,19 @@ export const useChatActions = ({ chat, onError }: UseChatActionsProps) => {
     if (isCallInitiating) {
       console.log('❌ HandleCall: Звонок уже инициируется')
       return
+    }
+
+    // КРИТИЧНО: Разблокируем аудио контекст при пользовательском взаимодействии (нажатии кнопки звонка)
+    if (isMobileDevice()) {
+      console.log('📱 Mobile device detected, unlocking audio context before call...')
+      try {
+        setupMobileAudio()
+        await unlockAudio()
+        console.log('✅ Audio context unlocked successfully')
+      } catch (audioErr) {
+        console.error('❌ Failed to unlock audio context:', audioErr)
+        // Продолжаем даже при ошибке разблокировки
+      }
     }
 
     if (chat.type === 'private' && chat.other_participant_id && userId) {

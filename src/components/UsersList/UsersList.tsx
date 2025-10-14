@@ -11,6 +11,7 @@ import ErrorState from './ErrorState'
 import EmptyState from './EmptyState'
 import CurrentUserCard from './CurrentUserCard'
 import UserCard from './UserCard'
+import { unlockAudio, setupMobileAudio, isMobileDevice } from '@/utils/mobileAudioFix'
 
 interface BroadcastPayload {
   payload: any
@@ -77,6 +78,19 @@ const UsersList = () => {
     if (!userId) {
       setError('Ошибка: пользователь не авторизован')
       return
+    }
+
+    // КРИТИЧНО: Разблокируем аудио контекст при пользовательском взаимодействии (нажатии кнопки звонка)
+    if (isMobileDevice()) {
+      console.log('📱 Mobile device detected, unlocking audio context before call...')
+      try {
+        setupMobileAudio()
+        await unlockAudio()
+        console.log('✅ Audio context unlocked successfully')
+      } catch (audioErr) {
+        console.error('❌ Failed to unlock audio context:', audioErr)
+        // Продолжаем даже при ошибке разблокировки
+      }
     }
 
     setCallingUserId(targetUserId)

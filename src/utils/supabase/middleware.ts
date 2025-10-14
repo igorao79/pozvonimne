@@ -35,15 +35,39 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
-  ) {
+  // Список публичных путей, не требующих авторизации
+  const publicPaths = [
+    '/login',
+    '/auth',
+    '/auth/callback',
+    '/auth/confirm',
+    '/auth/reset-password'
+  ]
+
+  const isPublicPath = publicPaths.some(path => 
+    request.nextUrl.pathname.startsWith(path)
+  )
+
+  if (!user && !isPublicPath) {
     // no user, potentially respond by redirecting the user to the login page
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔒 Middleware: No user found, redirecting to auth', {
+        pathname: request.nextUrl.pathname,
+        isPublicPath
+      })
+    }
     const url = request.nextUrl.clone()
     url.pathname = '/auth'
     return NextResponse.redirect(url)
+  }
+
+  // Логируем успешную проверку только в development
+  if (user && process.env.NODE_ENV === 'development') {
+    console.log('✅ Middleware: User authenticated', {
+      userId: user.id,
+      email: user.email,
+      emailConfirmed: !!user.email_confirmed_at
+    })
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're

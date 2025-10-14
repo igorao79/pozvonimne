@@ -34,6 +34,8 @@ const EmailConfirmationContent = () => {
           return
         }
 
+        console.log('🔐 Attempting to verify email with token_hash:', token_hash?.substring(0, 10) + '...')
+        
         // Подтверждаем email через Supabase
         const { data, error } = await supabase.auth.verifyOtp({
           token_hash,
@@ -41,7 +43,7 @@ const EmailConfirmationContent = () => {
         })
 
         if (error) {
-          console.error('Email confirmation error:', error)
+          console.error('❌ Email confirmation error:', error)
           
           if (error.message.includes('expired')) {
             setState('expired')
@@ -53,16 +55,41 @@ const EmailConfirmationContent = () => {
           return
         }
 
+        console.log('✅ Email verification response:', {
+          hasUser: !!data.user,
+          hasSession: !!data.session,
+          userId: data.user?.id,
+          emailConfirmed: data.user?.email_confirmed_at
+        })
+
         if (data.user) {
+          // ВАЖНО: Явно устанавливаем сессию если её нет
+          if (data.session) {
+            console.log('✅ Session automatically created by verifyOtp')
+          } else {
+            console.log('⚠️ No session created, user will need to login')
+          }
+
           setState('success')
-          setMessage('Email успешно подтвержден! Теперь вы можете войти в свой аккаунт.')
+          setMessage('Email успешно подтвержден! Вы автоматически войдете в систему...')
+          
+          // Даем время на установку сессии перед редиректом
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
+          // Проверяем что сессия установлена перед редиректом
+          const { data: { session } } = await supabase.auth.getSession()
+          console.log('🔍 Session check before redirect:', {
+            hasSession: !!session,
+            userId: session?.user?.id
+          })
           
           // Запускаем обратный отсчет для редиректа
           const timer = setInterval(() => {
             setCountdown((prev) => {
               if (prev <= 1) {
                 clearInterval(timer)
-                router.push('/')
+                // Принудительно обновляем страницу чтобы middleware проверил сессию
+                window.location.href = '/'
                 return 0
               }
               return prev - 1

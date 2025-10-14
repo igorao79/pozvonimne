@@ -1,35 +1,19 @@
 'use client'
 
-import { useState, useEffect, forwardRef, useImperativeHandle, useCallback, useRef } from 'react'
+import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback, useRef } from 'react'
 import useSupabaseStore from '@/store/useSupabaseStore'
 import useChatSyncStore from '@/store/useChatSyncStore'
 import useCallStore from '@/store/useCallStore'
 import ChatListItem from './ChatListItem'
+import PinnedChatsList from './PinnedChatsList'
+import ChatContextMenu from './ChatContextMenu'
+import { usePinnedChats } from '@/hooks/usePinnedChats'
 import { RandomFact } from '@/components/ui/random-fact'
 import { UserCounter } from '@/components/ui/user-counter'
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
 import { useChatListRealtime } from '@/hooks/useChatListRealtime' // 🔥 ПРЯМАЯ ПОДПИСКА
 import { Volume2, RefreshCw } from 'lucide-react'
-
-interface Chat {
-  id: string
-  type: 'private' | 'group'
-  name: string
-  avatar_url?: string
-  last_message?: string
-  last_message_at?: string
-  last_message_sender_id?: string
-  last_message_sender_name?: string
-  unread_count: number
-  other_participant_id?: string
-  other_participant_name?: string
-  other_participant_avatar?: string
-  other_participant_is_creator?: boolean
-  other_participant_status?: string
-  other_participant_last_seen?: string
-  created_at: string
-  updated_at?: string
-}
+import { Chat } from '@/types/chat'
 
 interface ChatListProps {
   onChatSelect: (chat: Chat) => void
@@ -44,8 +28,18 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
   const [error, setError] = useState<string | null>(null)
   const [currentTime, setCurrentTime] = useState<number>(Date.now())
   const [updateTrigger, setUpdateTrigger] = useState(0)
+  
+  // Состояние для контекстного меню
+  const [contextMenu, setContextMenu] = useState<{
+    chatId: string
+    chatName: string
+    position: { x: number; y: number }
+  } | null>(null)
+  
   const { userId } = useCallStore()
   const { supabase } = useSupabaseStore()
+  const { isPinned, pinnedChats } = usePinnedChats()
+  
   // 🔥 ВОЗВРАЩАЕМ ГЛОБАЛЬНУЮ СИСТЕМУ: Прямые подписки вызывали CHANNEL_ERROR, глобальный store работает!
   
   // Импортируем хук звуковых уведомлений для тестирования
@@ -112,6 +106,58 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       return timeB - timeA // Новые сверху
     })
   }
+
+  // Разделяем чаты на закрепленные и обычные
+  const { pinnedChatsData, regularChatsData } = React.useMemo(() => {
+    const pinned: Chat[] = []
+    const regular: Chat[] = []
+    
+    chats.forEach(chat => {
+      if (isPinned(chat.id)) {
+        pinned.push(chat)
+      } else {
+        regular.push(chat)
+      }
+    })
+    
+    // 📌 Сортируем закрепленные чаты по порядку в pinnedChats массиве
+    const sortedPinned = pinnedChats
+      .map(pinnedId => pinned.find(chat => chat.id === pinnedId))
+      .filter((chat): chat is Chat => chat !== undefined)
+    
+    return {
+      pinnedChatsData: sortedPinned,
+      regularChatsData: sortChatsByLastMessage(regular)
+    }
+  }, [chats, isPinned, pinnedChats]) // 🔥 ДОБАВИЛИ pinnedChats в зависимости!
+
+  // Обработчики контекстного меню
+  const handleContextMenu = useCallback((chatId: string, chatName: string, position: { x: number; y: number }) => {
+    setContextMenu({ chatId, chatName, position })
+  }, [])
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
+
+  const handleSelectChatFromContext = useCallback(() => {
+    if (contextMenu) {
+      const chat = chats.find(c => c.id === contextMenu.chatId)
+      if (chat) {
+        onChatSelect(chat)
+      }
+    }
+  }, [contextMenu, chats, onChatSelect])
+
+  // 📌 ДИАГНОСТИКА: Логируем изменения закрепленных чатов для отладки реалтайм обновлений
+  useEffect(() => {
+    console.log('📌 РЕАЛТАЙМ ОБНОВЛЕНИЕ: Закрепленные чаты изменились', {
+      pinnedCount: pinnedChats.length,
+      pinnedIds: pinnedChats.map(id => id.slice(0, 8)),
+      totalChats: chats.length,
+      timestamp: new Date().toLocaleTimeString()
+    })
+  }, [pinnedChats, chats.length])
 
   // Загрузка чатов с опциональным лоадером
   const loadChats = useCallback(async (showLoader = false) => {
@@ -506,7 +552,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       </div>
 
       {/* Список чатов */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1">
         {error && (
           <div className="p-4">
             <div className="bg-destructive/10 border border-destructive rounded-lg p-3">
@@ -538,8 +584,19 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
           </div>
         ) : (
           <>
+            {/* Закрепленные чаты */}
+            <PinnedChatsList
+              chats={chats} // Передаем все чаты, фильтрация происходит внутри компонента
+              selectedChatId={selectedChatId}
+              onChatSelect={onChatSelect}
+              formatLastMessageTime={formatLastMessageTime}
+              truncateText={truncateText}
+              onContextMenu={handleContextMenu}
+            />
+
+            {/* Обычные чаты */}
             <div className="divide-y divide-gray-100">
-              {chats.map((chat) => (
+              {regularChatsData.map((chat) => (
                 <ChatListItem
                   key={chat.id}
                   chat={chat}
@@ -547,9 +604,22 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
                   isSelected={selectedChatId === chat.id}
                   formatLastMessageTime={formatLastMessageTime}
                   truncateText={truncateText}
+                  onContextMenu={handleContextMenu}
                 />
               ))}
             </div>
+
+            {/* Контекстное меню */}
+            {contextMenu && (
+              <ChatContextMenu
+                chatId={contextMenu.chatId}
+                chatName={contextMenu.chatName}
+                position={contextMenu.position}
+                onClose={handleCloseContextMenu}
+                onSelectChat={handleSelectChatFromContext}
+              />
+            )}
+
             {/* RandomFact и UserCounter только на мобильных устройствах */}
             <div className="md:hidden">
               <div className="mobile-chatlist-random-fact">
