@@ -45,8 +45,9 @@ export const useProfileData = (userId: string | null) => {
           return
         }
 
-        // Используем display_name из user_profiles, если он есть, иначе из user metadata
-        const finalDisplayName = profileData.display_name || currentDisplayName
+        // ИСПРАВЛЕНИЕ: Приоритизируем user_metadata как источник истины!
+        // user_metadata содержит то что пользователь ввел при регистрации
+        const finalDisplayName = currentDisplayName || profileData.display_name
 
         setUsername(finalDisplayName)
         setDisplayName(finalDisplayName)

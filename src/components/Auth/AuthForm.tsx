@@ -74,6 +74,12 @@ const AuthForm = () => {
     setIsLoading(true)
     setError(null)
     
+    console.log('🔍 [DEBUG] Начинаем регистрацию с данными:', {
+      email,
+      displayName,
+      hasPassword: !!password
+    })
+    
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -84,6 +90,13 @@ const AuthForm = () => {
           },
           emailRedirectTo: getRedirectUrl('/auth/callback')
         }
+      })
+      
+      console.log('🔍 [DEBUG] Результат signUp:', {
+        hasUser: !!data.user,
+        hasSession: !!data.session,
+        user_metadata: data.user?.user_metadata,
+        display_name_sent: displayName
       })
 
       if (error) {
@@ -109,6 +122,26 @@ const AuthForm = () => {
         
         if (isEmailConfirmed) {
           // Email уже подтвержден (автоподтверждение в Supabase)
+          
+          // Создаем профиль пользователя через RPC функцию
+          try {
+            console.log('🔍 [DEBUG] Создаем профиль в AuthForm с displayName:', displayName)
+            
+            const { error: profileError } = await supabase.rpc('create_profile_after_registration', {
+              user_display_name: displayName
+            })
+            
+            if (profileError) {
+              console.error('⚠️ Ошибка создания профиля в AuthForm:', profileError)
+              // Не блокируем авторизацию из-за ошибки профиля
+            } else {
+              console.log('✅ Профиль пользователя успешно создан в AuthForm с именем:', displayName)
+            }
+          } catch (profileErr) {
+            console.error('⚠️ Исключение при создании профиля:', profileErr)
+            // Не блокируем авторизацию
+          }
+          
           setUser(data.user)
           setUserId(data.user.id)
           setAuthenticated(true)

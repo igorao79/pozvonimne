@@ -71,10 +71,69 @@ const EmailConfirmationContent = () => {
           }
 
           setState('success')
+          setMessage('Email успешно подтвержден! Создаем профиль...')
+          
+          // Создаем профиль пользователя
+          try {
+            // Детальное логирование user_metadata для отладки
+            console.log('🔍 [DEBUG] User metadata в confirm:', {
+              user_metadata: data.user.user_metadata,
+              app_metadata: data.user.app_metadata,
+              email: data.user.email,
+              id: data.user.id
+            })
+            
+            // ИСПРАВЛЕНИЕ: НЕ используем email как fallback, чтобы избежать проблемы с display_name
+            const displayName = data.user.user_metadata?.display_name
+            
+            if (!displayName) {
+              console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: display_name отсутствует в user_metadata!', {
+                user_id: data.user.id,
+                email: data.user.email,
+                user_metadata: data.user.user_metadata
+              })
+              
+              // Используем временное имя, пользователь сможет изменить его в профиле
+              const tempDisplayName = `user_${data.user.id.slice(0, 8)}`
+              console.warn(`⚠️ Используем временное имя: ${tempDisplayName}`)
+              
+              // Создаем профиль с временным именем
+              const { error: profileError } = await supabase.rpc('create_profile_after_registration', {
+                user_display_name: tempDisplayName
+              })
+              
+              if (profileError) {
+                console.error('⚠️ Ошибка создания профиля с временным именем:', profileError)
+              } else {
+                console.log('✅ Профиль создан с временным именем:', tempDisplayName)
+              }
+              
+              setMessage('Email подтвержден! Пожалуйста, установите свое имя в профиле.')
+              setTimeout(() => {
+                router.replace('/')
+              }, 2000)
+              return
+            }
+            
+            console.log('🔍 [DEBUG] Выбранное displayName для профиля:', displayName)
+            
+            const { error: profileError } = await supabase.rpc('create_profile_after_registration', {
+              user_display_name: displayName
+            })
+            
+            if (profileError) {
+              console.error('⚠️ Ошибка создания профиля в confirm:', profileError)
+            } else {
+              console.log('✅ Профиль создан в confirm для:', data.user.email, 'с именем:', displayName)
+            }
+          } catch (profileErr) {
+            console.error('⚠️ Исключение при создании профиля в confirm:', profileErr)
+          }
+          
           setMessage('Email успешно подтвержден! Вы автоматически войдете в систему...')
           
           // Даем время на установку сессии перед редиректом
-          await new Promise(resolve => setTimeout(resolve, 1000))
+          await new Promise(resolve => setTimeout(resolve, 1500))
           
           // Проверяем что сессия установлена перед редиректом
           const { data: { session } } = await supabase.auth.getSession()

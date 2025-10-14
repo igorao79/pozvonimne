@@ -39,6 +39,62 @@ const AuthCallbackContent = () => {
           }
 
           if (data.user) {
+            // Проверяем и создаем профиль пользователя если нужно
+            try {
+              // Детальное логирование user_metadata для отладки
+              console.log('🔍 [DEBUG] User metadata в callback:', {
+                user_metadata: data.user.user_metadata,
+                email: data.user.email,
+                id: data.user.id
+              })
+              
+              // ИСПРАВЛЕНИЕ: НЕ используем email как fallback, чтобы избежать проблемы с display_name
+              const displayName = data.user.user_metadata?.display_name
+              
+              if (!displayName) {
+                console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: display_name отсутствует в user_metadata!', {
+                  user_id: data.user.id,
+                  email: data.user.email,
+                  user_metadata: data.user.user_metadata
+                })
+                
+                // Используем временное имя, пользователь сможет изменить его в профиле
+                const tempDisplayName = `user_${data.user.id.slice(0, 8)}`
+                console.warn(`⚠️ Используем временное имя: ${tempDisplayName}`)
+                
+                // Создаем профиль с временным именем
+                const { error: profileError } = await supabase.rpc('create_profile_after_registration', {
+                  user_display_name: tempDisplayName
+                })
+                
+                if (profileError) {
+                  console.error('⚠️ Ошибка создания профиля с временным именем:', profileError)
+                } else {
+                  console.log('✅ Профиль создан с временным именем:', tempDisplayName)
+                }
+                
+                // Перенаправляем на главную, пользователь сможет изменить имя в профиле
+                router.replace('/')
+                return
+              }
+              
+              console.log('🔍 [DEBUG] Выбранное displayName в callback:', displayName)
+              
+              const { error: profileError } = await supabase.rpc('create_profile_after_registration', {
+                user_display_name: displayName
+              })
+              
+              if (profileError) {
+                console.error('⚠️ Ошибка создания профиля в callback:', profileError)
+                // Не блокируем перенаправление из-за ошибки профиля
+              } else {
+                console.log('✅ Профиль создан в callback для:', data.user.email, 'с именем:', displayName)
+              }
+            } catch (profileErr) {
+              console.error('⚠️ Исключение при создании профиля в callback:', profileErr)
+              // Не блокируем перенаправление
+            }
+            
             // Успешная аутентификация - перенаправляем на главную
             router.replace('/?confirmed=true')
             return
