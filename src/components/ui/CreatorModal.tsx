@@ -21,18 +21,18 @@ const CreatorModal = ({ isOpen, onClose }: CreatorModalProps) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl animate-fade-in-up">
+      <div className="bg-card rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-border animate-fade-in-up">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Star className="w-6 h-6 text-yellow-500 fill-current" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-semibold text-foreground">
               Создатель приложения
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 p-0 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center transition-colors"
+            className="h-8 w-8 p-0 rounded-full hover:bg-muted flex items-center justify-center transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -61,16 +61,16 @@ const CreatorModal = ({ isOpen, onClose }: CreatorModalProps) => {
                 </div>
               )}
             </div>
-            <h3 className="font-medium text-gray-900 dark:text-white mb-1">
+            <h3 className="font-medium text-foreground mb-1">
               {creatorUser?.display_name || creatorUser?.username || 'Igor Goreckiy'}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               igoraor79@gmail.com
             </p>
           </div>
 
           {/* App Info */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 text-center">
+          <div className="bg-muted/50 rounded-xl p-4 text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
               <div className="w-8 h-8 rounded-lg overflow-hidden">
                 <img
@@ -82,11 +82,11 @@ const CreatorModal = ({ isOpen, onClose }: CreatorModalProps) => {
                   onMouseDown={(e) => e.preventDefault()}
                 />
               </div>
-              <span className="font-semibold text-gray-900 dark:text-white">
+              <span className="font-semibold text-foreground">
                 Позвони.мне
               </span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+            <p className="text-sm text-muted-foreground leading-relaxed">
               Современное приложение для голосовых и видеозвонков с мгновенными сообщениями
             </p>
           </div>
@@ -95,19 +95,19 @@ const CreatorModal = ({ isOpen, onClose }: CreatorModalProps) => {
           <div className="grid grid-cols-3 gap-3 text-center">
             <div className="flex flex-col items-center gap-1">
               <Code className="w-5 h-5 text-blue-500" />
-              <span className="text-xs text-gray-600 dark:text-gray-400">
+              <span className="text-xs text-muted-foreground">
                 Разработка
               </span>
             </div>
             <div className="flex flex-col items-center gap-1">
               <Heart className="w-5 h-5 text-red-500" />
-              <span className="text-xs text-gray-600 dark:text-gray-400">
+              <span className="text-xs text-muted-foreground">
                 С любовью
               </span>
             </div>
             <div className="flex flex-col items-center gap-1">
               <Coffee className="w-5 h-5 text-amber-600" />
-              <span className="text-xs text-gray-600 dark:text-gray-400">
+              <span className="text-xs text-muted-foreground">
                 И чай
               </span>
             </div>
@@ -115,8 +115,8 @@ const CreatorModal = ({ isOpen, onClose }: CreatorModalProps) => {
 
           {/* Thank you message */}
           <div className="text-center pt-2">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Спасибо, что пользуетесь нашим приложением! 
+            <p className="text-sm text-muted-foreground">
+              Спасибо, что пользуетесь нашим приложением!
             </p>
           </div>
         </div>

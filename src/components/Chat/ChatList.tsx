@@ -507,7 +507,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden chatlist-mobile-pattern">
+    <div className="h-full flex flex-col chatlist-mobile-pattern">
       {/* Ультракомпактный заголовок */}
       <div className="px-2 py-1 border-b border-border bg-card flex-shrink-0">
         <div className="flex items-center justify-between min-h-[32px]">
@@ -552,7 +552,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       </div>
 
       {/* Список чатов */}
-      <div className="flex-1">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide md:scrollbar-default">
         {error && (
           <div className="p-4">
             <div className="bg-destructive/10 border border-destructive rounded-lg p-3">

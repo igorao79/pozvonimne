@@ -17,6 +17,7 @@ interface UserProfile {
 
 export const useUsers = () => {
   const [users, setUsers] = useState<UserProfile[]>([])
+  const [totalUsersCount, setTotalUsersCount] = useState(0) // Общее количество всех пользователей
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,6 +46,13 @@ export const useUsers = () => {
         setUsers([])
         return
       }
+
+      // Получаем общее количество пользователей (как в UserCounter)
+      const { count: totalCount } = await supabase
+        .from('user_profiles')
+        .select('*', { count: 'exact', head: true })
+      
+      setTotalUsersCount(totalCount || 0)
 
       // Пробуем получить реальных пользователей через RPC функцию
       const { data, error } = await supabase.rpc('get_users_with_profiles')
@@ -301,7 +309,7 @@ export const useUsers = () => {
 
   // БЕЗ POLLING - только realtime обновления через глобальный store
 
-  return { users, loading, error, refreshUsers, forceUpdateInactiveUsers }
+  return { users, totalUsersCount, loading, error, refreshUsers, forceUpdateInactiveUsers }
 }
 
 export default useUsers

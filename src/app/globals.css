@@ -221,6 +221,16 @@ video {
   background: #94a3b8;
 }
 
+/* Hide scrollbar on mobile devices */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
 /* Focus styles for accessibility - disabled for auth forms */
 button:focus-visible,
 input:focus-visible {

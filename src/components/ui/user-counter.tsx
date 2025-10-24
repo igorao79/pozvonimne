@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import useSupabaseStore from '@/store/useSupabaseStore'
 import useCallStore from '@/store/useCallStore'
+import useUsers from '@/hooks/useUsers'
 
 // Dynamic import для анимированного компонента (избегаем SSR проблем)
 const UserCounterAnimated = dynamic(() => import('./UserCounterAnimated').then(mod => mod.UserCounterAnimated), {
@@ -84,8 +85,8 @@ export const UserCounter = () => {
   }, [])
 
   return (
-    <div className="mt-6 bg-card/80 backdrop-blur-sm rounded-lg border border-border/50 w-full min-h-[160px] sm:min-h-[200px] max-w-sm sm:max-w-md mx-auto
-                    p-2 sm:p-3 md:p-4 lg:p-4
+    <div className="mt-4 sm:mt-6 bg-card/80 backdrop-blur-sm rounded-lg border border-border/50 w-full min-h-[120px] sm:min-h-[160px] md:min-h-[200px] max-w-xs sm:max-w-sm md:max-w-md mx-auto
+                    p-2 sm:p-3 md:p-4
                     transition-all duration-300 ease-in-out
                     cursor-default select-none
                     mobile-chatlist-random-fact
@@ -93,13 +94,13 @@ export const UserCounter = () => {
       
       <div className="flex flex-col h-full">
         <div className="flex-1 flex flex-col justify-center w-full">
-          <h4 className={`text-xs sm:text-sm font-medium text-foreground mb-2 transition-all duration-1000 ${
+          <h4 className={`text-xs sm:text-sm text-center flex items-center justify-center font-medium text-foreground mb-1 sm:mb-2 transition-all duration-1000 ${
             isInitialLoad ? 'blur-sm' : 'blur-none'
           }`}>
             Нашим сервисом пользуется:
           </h4>
 
-          <div className="flex items-center justify-center px-2 min-h-[80px] sm:min-h-[100px] relative">
+          <div className="flex items-center justify-center px-1 sm:px-2 min-h-[60px] sm:min-h-[80px] md:min-h-[100px] relative">
             <div className={`w-full transition-all duration-1000 ${
               isInitialLoad ? 'blur-md opacity-60' : 'blur-none opacity-100'
             }`}>

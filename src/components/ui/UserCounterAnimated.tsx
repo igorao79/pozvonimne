@@ -148,8 +148,8 @@ export const UserCounterAnimated = ({
         let attempts = 0
         do {
           // Уменьшенный радиус для мобильных устройств
-          finalX = gsap.utils.random(-80, 80)
-          finalY = gsap.utils.random(-60, 60)
+          finalX = gsap.utils.random(-60, 60)
+          finalY = gsap.utils.random(-45, 45)
           attempts++
           // Проверяем, не слишком ли близко к занятым позициям
           const tooClose = occupiedPositions.some(pos =>
@@ -178,8 +178,8 @@ export const UserCounterAnimated = ({
         allStars.forEach((star, index) => {
           // Создаем бесконечную анимацию движения
           gsap.to(star, {
-            x: `+=${gsap.utils.random(-60, 60)}`,
-            y: `+=${gsap.utils.random(-50, 50)}`,
+            x: `+=${gsap.utils.random(-40, 40)}`,
+            y: `+=${gsap.utils.random(-35, 35)}`,
             rotation: `+=${gsap.utils.random(-200, 200)}`,
             duration: gsap.utils.random(4, 8),
             ease: "power1.inOut",
@@ -204,18 +204,18 @@ export const UserCounterAnimated = ({
       >
         {[0, 1, 2, 3].map(index => (
           index % 2 === 0 ? (
-            <Star 
+            <Star
               key={`left-${index}`}
-              className="text-foreground dark:text-white w-4 h-4 absolute"
+              className="text-foreground dark:text-white w-3 h-3 sm:w-4 sm:h-4 absolute"
               style={{
                 transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
                 opacity: 0
               }}
             />
           ) : (
-            <Sparkles 
+            <Sparkles
               key={`left-${index}`}
-              className="text-foreground dark:text-white w-4 h-4 absolute"
+              className="text-foreground dark:text-white w-3 h-3 sm:w-4 sm:h-4 absolute"
               style={{
                 transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
                 opacity: 0
@@ -234,7 +234,7 @@ export const UserCounterAnimated = ({
           index % 2 === 0 ? (
             <Star 
               key={`right-${index}`}
-              className="text-foreground dark:text-white w-4 h-4 absolute"
+              className="text-foreground dark:text-white w-3 h-3 sm:w-4 sm:h-4 absolute"
               style={{
                 transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
                 opacity: 0
@@ -243,7 +243,7 @@ export const UserCounterAnimated = ({
           ) : (
             <Sparkles 
               key={`right-${index}`}
-              className="text-foreground dark:text-white w-4 h-4 absolute"
+              className="text-foreground dark:text-white w-3 h-3 sm:w-4 sm:h-4 absolute"
               style={{
                 transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
                 opacity: 0
@@ -262,7 +262,7 @@ export const UserCounterAnimated = ({
           index % 2 === 0 ? (
             <Star 
               key={`center-${index}`}
-              className="text-foreground dark:text-yellow-300 w-4 h-4 absolute"
+              className="text-foreground dark:text-yellow-300 w-3 h-3 sm:w-4 sm:h-4 absolute"
               style={{
                 transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
                 opacity: 0
@@ -271,7 +271,7 @@ export const UserCounterAnimated = ({
           ) : (
             <Sparkles 
               key={`center-${index}`}
-              className="text-foreground dark:text-yellow-300 w-4 h-4 absolute"
+              className="text-foreground dark:text-yellow-300 w-3 h-3 sm:w-4 sm:h-4 absolute"
               style={{
                 transform: `translate(${getStarPosition(index).x}px, ${getStarPosition(index).y}px) rotate(${getStarPosition(index).rotation}deg)`,
                 opacity: 0
@@ -285,7 +285,7 @@ export const UserCounterAnimated = ({
       <div className="flex flex-col items-center justify-center relative z-10">
         <span
           ref={numberRef}
-          className="text-2xl sm:text-3xl md:text-4xl font-bold text-green-500 transition-colors duration-500 mb-1 sm:mb-2"
+          className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-green-500 transition-colors duration-500 mb-1 sm:mb-2"
         >
           {userCount}
         </span>

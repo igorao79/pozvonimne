@@ -76,7 +76,7 @@ export const RandomFact = () => {
         </div>
 
         <div className="flex-1 flex flex-col justify-center w-full">
-          <h4 className={`text-xs sm:text-sm font-medium text-foreground mb-2 transition-all duration-1000 ${
+          <h4 className={`text-xs sm:text-sm text-center flex items-center justify-center font-medium text-foreground mb-2 transition-all duration-1000 ${
             isInitialLoad ? 'blur-sm' : 'blur-none'
           }`}>
             Интересный факт

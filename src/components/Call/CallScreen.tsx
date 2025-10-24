@@ -10,8 +10,9 @@ import CallControls from './CallControls'
 import AudioDiagnostics from './AudioDiagnostics'
 import ConnectionStatus from './ConnectionStatus'
 import { ScreenSharingWindow, AudioCallInterface } from './CallScreen/'
-import { setupAudioElement, setupMobileAudio, unlockAudio, forcePlayAudio, isMobileDevice } from '@/utils/mobileAudioFix'
+import { setupAudioElement, setupMobileAudio, unlockAudio, forcePlayAudio, isMobileDevice, diagnoseAudioIssues, setSpeakerOutput } from '@/utils/mobileAudioFix'
 import { Capacitor } from '@capacitor/core'
+import { getUserInfoFromCache } from '@/components/Profile/UserProfile/hooks/useProfileData'
 
 const CallScreen = () => {
   const localAudioRef = useRef<HTMLAudioElement>(null)
@@ -112,7 +113,13 @@ const CallScreen = () => {
         console.log('📱 Detected mobile device, applying mobile-specific audio setup')
         setupMobileAudio()
         setupAudioElement(remoteAudioRef.current)
-        unlockAudio() // Разблокировка аудио контекста
+        
+        // Немедленная попытка разблокировки аудио контекста
+        unlockAudio().then(() => {
+          console.log('📱 Audio context unlocked during stream setup')
+        }).catch(err => {
+          console.warn('📱 Audio context unlock failed:', err)
+        })
       }
 
       remoteAudioRef.current.srcObject = remoteStream
@@ -124,36 +131,75 @@ const CallScreen = () => {
         remoteAudioRef.current.volume = 1.0
       }
 
-      const playPromise = remoteAudioRef.current.play()
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
+      // Попытка немедленного воспроизведения
+      const attemptPlay = async () => {
+        try {
+          if (remoteAudioRef.current) {
+            await remoteAudioRef.current.play()
             console.log('✅ Remote audio playback started successfully')
-          })
-          .catch((error) => {
-            console.error('❌ Remote audio playback failed:', error)
-            if (error.name === 'NotAllowedError') {
-              console.log('🔒 Autoplay blocked, waiting for user interaction...')
-              const startAudio = async () => {
-                if (remoteAudioRef.current) {
-                  console.log('👆 User interaction detected, starting audio...')
-                  
-                  // Используем новую функцию принудительного воспроизведения для мобильных
-                  if (isMobileDevice()) {
-                    await forcePlayAudio(remoteAudioRef.current)
-                  } else {
-                    await remoteAudioRef.current.play()
-                  }
-                  
-                  document.removeEventListener('click', startAudio)
-                  document.removeEventListener('touchstart', startAudio)
+          }
+        } catch (error: any) {
+          console.error('❌ Remote audio playback failed:', error)
+          
+          if (error.name === 'NotAllowedError' || error.name === 'NotSupportedError') {
+            console.log('🔒 Autoplay blocked, setting up user interaction handlers...')
+            
+            // Создаем более агрессивные обработчики взаимодействий
+            let audioStarted = false
+            
+            const startAudio = async (eventType?: string) => {
+              if (audioStarted || !remoteAudioRef.current) return
+              
+              console.log('👆 User interaction detected:', eventType, 'starting audio...')
+              
+              try {
+                // Сначала разблокируем аудио контекст
+                await unlockAudio()
+                
+                // Затем принудительно запускаем аудио
+                if (isMobileDevice()) {
+                  await forcePlayAudio(remoteAudioRef.current)
+                } else {
+                  await remoteAudioRef.current.play()
                 }
+                
+                audioStarted = true
+                console.log('✅ Audio successfully started after user interaction')
+                
+                // Убираем все обработчики после успешного запуска
+                document.removeEventListener('click', clickHandler)
+                document.removeEventListener('touchstart', touchStartHandler)
+                document.removeEventListener('touchend', touchEndHandler)
+                document.removeEventListener('keydown', keyHandler)
+                
+              } catch (playError) {
+                console.error('❌ Failed to start audio even after user interaction:', playError)
               }
-              document.addEventListener('click', startAudio, { once: true })
-              document.addEventListener('touchstart', startAudio, { once: true }) // Для мобильных
             }
-          })
+            
+            // Создаем обработчики для разных типов взаимодействий
+            const clickHandler = () => startAudio('click')
+            const touchStartHandler = () => startAudio('touchstart')
+            const touchEndHandler = () => startAudio('touchend')
+            const keyHandler = () => startAudio('keydown')
+            
+            // Добавляем множественные обработчики для гарантированного срабатывания
+            document.addEventListener('click', clickHandler, { passive: true })
+            document.addEventListener('touchstart', touchStartHandler, { passive: true })
+            document.addEventListener('touchend', touchEndHandler, { passive: true })
+            document.addEventListener('keydown', keyHandler, { passive: true })
+            
+            // Дополнительный обработчик специально для CallScreen
+            const callScreenElement = document.querySelector('[class*="CallScreen"]') || document.body
+            callScreenElement.addEventListener('click', clickHandler, { passive: true })
+            
+            console.log('🎯 Added multiple user interaction handlers for audio unlock')
+          }
+        }
       }
+
+      // Небольшая задержка перед попыткой воспроизведения
+      setTimeout(attemptPlay, 100)
     } else {
       console.log('⚠️ Remote audio setup skipped:', {
         hasAudioElement: !!remoteAudioRef.current,
@@ -181,7 +227,7 @@ const CallScreen = () => {
     }
   }, [userId, targetUserId, supabase])
 
-  // Load remote user info
+  // Load remote user info with caching
   useEffect(() => {
     const loadRemoteUserInfo = async () => {
       if (!targetUserId) return
@@ -189,24 +235,17 @@ const CallScreen = () => {
       try {
         console.log('Loading remote user info for:', targetUserId)
 
-        const { data: profileData, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('username, display_name, avatar_url')
-          .eq('id', targetUserId)
-          .single()
+        // Используем кэшированную функцию для мгновенной загрузки
+        const userInfo = await getUserInfoFromCache(targetUserId)
 
-        if (profileError && profileError.code !== 'PGRST116') {
-          console.error('Error getting user profile:', profileError)
-        }
+        console.log('Remote user info loaded:', {
+          displayName: userInfo.displayName,
+          avatarUrl: userInfo.avatarUrl,
+          fromCache: userInfo.fromCache
+        })
 
-        const displayName = profileData?.display_name ||
-                            profileData?.username ||
-                            `Пользователь ${targetUserId?.slice(0, 8)}...`
-        const avatarUrl = profileData?.avatar_url || ''
-
-        console.log('Remote user info loaded:', { displayName, avatarUrl })
-        setRemoteUserName(displayName)
-        setRemoteUserAvatar(avatarUrl)
+        setRemoteUserName(userInfo.displayName)
+        setRemoteUserAvatar(userInfo.avatarUrl)
       } catch (err) {
         console.error('Error loading remote user info:', err)
         setRemoteUserName(`Пользователь ${targetUserId?.slice(0, 8)}...`)
@@ -215,7 +254,7 @@ const CallScreen = () => {
     }
 
     loadRemoteUserInfo()
-  }, [targetUserId, supabase])
+  }, [targetUserId])
 
   // Send mic status changes
   useEffect(() => {
@@ -566,41 +605,88 @@ const CallScreen = () => {
           controls={false}
           muted={false}
           style={{ display: 'none' }}
-          onLoadedData={() => {
+          onLoadedData={async () => {
             console.log('📱 Remote audio loaded data')
+            
+            // Запускаем диагностику при загрузке аудио
+            if (process.env.NODE_ENV === 'development') {
+              setTimeout(() => {
+                diagnoseAudioIssues(remoteAudioRef.current || undefined)
+              }, 1000)
+            }
+            
             // Дополнительная попытка воспроизведения для мобильных
             if (isMobileDevice() && remoteAudioRef.current) {
-              remoteAudioRef.current.play().catch(err => {
+              try {
+                // Для Android - сразу настраиваем выход на динамик
+                if (remoteAudioRef.current) {
+                  await setSpeakerOutput(remoteAudioRef.current)
+                }
+                
+                await remoteAudioRef.current.play()
+                console.log('✅ Audio started on loadedData')
+              } catch (err: any) {
                 console.log('📱 Play after loadedData failed:', err.name)
-              })
+              }
             }
           }}
-          onCanPlay={() => {
+          onCanPlay={async () => {
             console.log('📱 Remote audio can play')
             if (remoteAudioRef.current) {
-              remoteAudioRef.current.play()
-                .then(() => {
-                  console.log('✅ Remote audio auto-play successful')
-                })
-                .catch((error) => {
-                  console.log('❌ Remote audio auto-play failed:', error.name)
-                  const startAudioOnClick = async () => {
-                    if (remoteAudioRef.current) {
-                      console.log('👆 Attempting to start audio on user interaction')
-                      
-                      if (isMobileDevice()) {
-                        await forcePlayAudio(remoteAudioRef.current)
-                      } else {
-                        await remoteAudioRef.current.play()
-                      }
-                      
-                      document.removeEventListener('click', startAudioOnClick)
-                      document.removeEventListener('touchstart', startAudioOnClick)
+              try {
+                // Убеждаемся в правильных настройках перед воспроизведением
+                if (isMobileDevice()) {
+                  await setSpeakerOutput(remoteAudioRef.current)
+                }
+                
+                await remoteAudioRef.current.play()
+                console.log('✅ Remote audio auto-play successful')
+              } catch (error: any) {
+                console.log('❌ Remote audio auto-play failed:', error.name)
+                
+                // Более агрессивная обработка ошибок автовоспроизведения
+                let audioUnlocked = false
+                
+                const startAudioOnClick = async () => {
+                  if (audioUnlocked || !remoteAudioRef.current) return
+                  
+                  console.log('👆 Attempting to start audio on user interaction')
+                  
+                  try {
+                    audioUnlocked = true
+                    
+                    if (isMobileDevice()) {
+                      await forcePlayAudio(remoteAudioRef.current)
+                    } else {
+                      await remoteAudioRef.current.play()
                     }
+                    
+                    console.log('✅ Audio started successfully after user interaction')
+                  } catch (playError) {
+                    console.error('❌ Failed to start audio even with user interaction:', playError)
+                    audioUnlocked = false
+                  } finally {
+                    // Убираем обработчики
+                    document.removeEventListener('click', startAudioOnClick)
+                    document.removeEventListener('touchstart', startAudioOnClick)
+                    document.removeEventListener('touchend', startAudioOnClick)
                   }
-                  document.addEventListener('click', startAudioOnClick, { once: true })
-                  document.addEventListener('touchstart', startAudioOnClick, { once: true })
-                })
+                }
+                
+                // Добавляем обработчики для различных типов взаимодействий
+                document.addEventListener('click', startAudioOnClick, { passive: true })
+                document.addEventListener('touchstart', startAudioOnClick, { passive: true })
+                document.addEventListener('touchend', startAudioOnClick, { passive: true })
+              }
+            }
+          }}
+          onCanPlayThrough={() => {
+            console.log('📱 Remote audio can play through')
+            // Дополнительная попытка воспроизведения когда весь трек готов
+            if (isMobileDevice() && remoteAudioRef.current?.paused) {
+              remoteAudioRef.current.play().catch(err => {
+                console.log('📱 CanPlayThrough play attempt failed:', err.name)
+              })
             }
           }}
           onPlay={() => {
@@ -611,12 +697,40 @@ const CallScreen = () => {
           }}
           onError={(e) => {
             console.error('❌ Remote audio error:', e)
+            
+            // Расширенная диагностика ошибок
+            if (remoteAudioRef.current) {
+              const target = e.target as HTMLAudioElement
+              console.error('Audio error details:', {
+                error: target?.error,
+                networkState: remoteAudioRef.current.networkState,
+                readyState: remoteAudioRef.current.readyState,
+                paused: remoteAudioRef.current.paused,
+                srcObject: !!remoteAudioRef.current.srcObject
+              })
+            }
+            
             // Попытка восстановления при ошибке на мобильных
             if (isMobileDevice() && remoteAudioRef.current?.srcObject) {
               setTimeout(async () => {
                 if (remoteAudioRef.current) {
                   console.log('🔄 Attempting to recover from audio error')
-                  await forcePlayAudio(remoteAudioRef.current)
+                  
+                  try {
+                    // Сначала сбрасываем и переустанавливаем поток
+                    const currentStream = remoteAudioRef.current.srcObject
+                    remoteAudioRef.current.srcObject = null
+                    
+                    await new Promise(resolve => setTimeout(resolve, 500))
+                    
+                    remoteAudioRef.current.srcObject = currentStream
+                    await setSpeakerOutput(remoteAudioRef.current)
+                    await forcePlayAudio(remoteAudioRef.current)
+                    
+                    console.log('✅ Audio recovery successful')
+                  } catch (recoveryError) {
+                    console.error('❌ Audio recovery failed:', recoveryError)
+                  }
                 }
               }, 1000)
             }
@@ -681,12 +795,12 @@ const CallScreen = () => {
         {/* Controls - positioned based on screen size */}
         <div className={`${
           isMobile ? 'fixed' : 'absolute'
-        } bottom-0 left-0 right-0 p-6 z-1 ${
+        } bottom-0 left-0 right-0 p-6 md:p-2 z-1 ${
           theme === 'dark'
             ? 'bg-black/50 backdrop-blur-md border-t border-white/20'
             : 'bg-white/40 backdrop-blur-md border-t border-white/30'
         }`}>
-          <div className="flex flex-col items-center space-y-4">
+          <div className="flex flex-col items-center space-y-4 md:space-y-2">
             <CallControls
               isStreamHidden={isStreamHidden}
               onToggleStreamVisibility={toggleStreamVisibility}

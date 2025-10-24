@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import { sendCallAcceptedSignal, sendCallRejectedSignal } from '@/utils/callSignaling'
 import { useRingtone } from '@/hooks/useRingtone'
 import { unlockAudio, setupMobileAudio, isMobileDevice } from '@/utils/mobileAudioFix'
+import { getUserInfoFromCache } from '@/components/Profile/UserProfile/hooks/useProfileData'
 
 interface CallerInfo {
   id: string
@@ -47,7 +48,7 @@ const IncomingCall = () => {
     }
   }, [])
 
-  // Загружаем информацию о звонящем при изменении callerId
+  // Загружаем информацию о звонящем при изменении callerId с кэшированием
   useEffect(() => {
     const fetchCallerInfo = async () => {
       if (!callerId) {
@@ -56,18 +57,22 @@ const IncomingCall = () => {
       }
 
       try {
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('id, username, display_name, avatar_url')
-          .eq('id', callerId)
-          .single()
+        // Используем кэшированную функцию для мгновенной загрузки
+        const userInfo = await getUserInfoFromCache(callerId)
 
-        if (error) {
-          console.warn('Error fetching caller info:', error)
-          setCallerInfo(null)
-        } else {
-          setCallerInfo(data)
-        }
+        setCallerInfo({
+          id: callerId,
+          username: userInfo.displayName,
+          display_name: userInfo.displayName,
+          avatar_url: userInfo.avatarUrl
+        })
+
+        console.log('Caller info loaded:', {
+          callerId,
+          displayName: userInfo.displayName,
+          avatarUrl: userInfo.avatarUrl,
+          fromCache: userInfo.fromCache
+        })
       } catch (err) {
         console.warn('Error fetching caller info:', err)
         setCallerInfo(null)
@@ -75,7 +80,7 @@ const IncomingCall = () => {
     }
 
     fetchCallerInfo()
-  }, [callerId, supabase])
+  }, [callerId])
 
   const handleAccept = async () => {
     try {

@@ -23,6 +23,16 @@ interface SoundCache {
   isInitialized: boolean // Флаг, что инициализация уже прошла
 }
 
+// Кэш для звука завершения звонка
+interface EndCallSoundCache {
+  audioElement: HTMLAudioElement | null
+  soundUrl: string | null
+  isLoading: boolean
+  isLoaded: boolean
+  promise: Promise<void> | null
+  isInitialized: boolean
+}
+
 const globalSoundCache: SoundCache = {
   audioElement: null,
   soundUrl: null,
@@ -30,6 +40,15 @@ const globalSoundCache: SoundCache = {
   isLoaded: false,
   promise: null,
   fallbackAudio: null,
+  isInitialized: false
+}
+
+const globalEndCallSoundCache: EndCallSoundCache = {
+  audioElement: null,
+  soundUrl: null,
+  isLoading: false,
+  isLoaded: false,
+  promise: null,
   isInitialized: false
 }
 
@@ -77,7 +96,10 @@ export const useSoundNotifications = () => {
       ...prev,
       userHasInteracted: true
     }))
-    
+
+    // Загружаем звук завершения звонка
+    loadEndCallSound()
+
     console.log('🔊✅ Звуковые уведомления ПРИНУДИТЕЛЬНО АКТИВИРОВАНЫ за:', Math.round(performance.now() - initStartTime), 'мс')
   }, [])
 
@@ -488,6 +510,7 @@ export const useSoundNotifications = () => {
     chatId: string
     senderId: string
     content: string
+    fullPayload?: any
   }) => {
     const callStack = new Error().stack?.split('\n').slice(1, 4).map(line => line.trim()).join(' -> ')
     console.log('🔊🔥 УВЕДОМЛЕНИЕ: maybePlayNotification вызван!', {
@@ -502,6 +525,16 @@ export const useSoundNotifications = () => {
     // Проверяем, что сообщение не от нас
     if (messageData.senderId === userId) {
       console.log('🚫 Сообщение от нас самих - уведомление не нужно')
+      return false
+    }
+
+    // Проверяем, является ли это сообщением звонка (системное сообщение)
+    const metadata = messageData.fullPayload?.metadata
+    if (metadata && metadata.status && ['started', 'active', 'ended', 'missed', 'rejected'].includes(metadata.status)) {
+      console.log('🚫 Это сообщение звонка - звуковое уведомление не нужно', {
+        status: metadata.status,
+        chatId: messageData.chatId?.slice(0, 8)
+      })
       return false
     }
 
@@ -582,12 +615,104 @@ export const useSoundNotifications = () => {
     return true
   }, [state.userHasInteracted])
 
+  // Загрузка звука завершения звонка
+  const loadEndCallSound = useCallback(async () => {
+    if (globalEndCallSoundCache.isInitialized) return
+    globalEndCallSoundCache.isInitialized = true
+
+    console.log('🔊 Загружаем звук завершения звонка...')
+
+    const endCallUrl = 'https://uasoayoovlureephzkns.supabase.co/storage/v1/object/public/sounds/endcall.mp3'
+
+    try {
+      const audio = new Audio(endCallUrl)
+      audio.preload = 'auto'
+      audio.volume = 0.8 // Чуть тише, чем уведомления
+
+      // Ждем загрузки
+      await new Promise((resolve, reject) => {
+        audio.addEventListener('canplaythrough', () => {
+          console.log('✅ Звук завершения звонка загружен успешно!')
+          globalEndCallSoundCache.audioElement = audio
+          globalEndCallSoundCache.soundUrl = endCallUrl
+          globalEndCallSoundCache.isLoaded = true
+          resolve(void 0)
+        })
+
+        audio.addEventListener('error', (e) => {
+          console.warn('❌ Ошибка загрузки звука завершения звонка:', e)
+          reject(e)
+        })
+
+        // Таймаут 10 секунд
+        setTimeout(() => reject(new Error('Timeout')), 10000)
+      })
+    } catch (error) {
+      console.warn('❌ Не удалось загрузить звук завершения звонка:', error)
+      // Создаем fallback звук для завершения звонка
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const createEndCallBeep = () => {
+        const oscillator = audioContext.createOscillator()
+        const gainNode = audioContext.createGain()
+
+        oscillator.connect(gainNode)
+        gainNode.connect(audioContext.destination)
+
+        oscillator.frequency.value = 600 // Низкая частота для завершения
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime)
+        gainNode.gain.linearRampToValueAtTime(0.4, audioContext.currentTime + 0.1)
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8)
+
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.8)
+      }
+
+      const mockAudio = {
+        play: async () => {
+          if (audioContext.state === 'suspended') {
+            await audioContext.resume()
+          }
+          createEndCallBeep()
+          return Promise.resolve()
+        }
+      } as HTMLAudioElement
+
+      globalEndCallSoundCache.audioElement = mockAudio
+      globalEndCallSoundCache.soundUrl = 'fallback-end-call'
+      globalEndCallSoundCache.isLoaded = true
+      console.log('🔊 Использован fallback звук для завершения звонка')
+    }
+  }, [])
+
+  // Функция для воспроизведения звука завершения звонка
+  const playEndCallSound = useCallback(async () => {
+    console.log('🔊 Воспроизведение звука завершения звонка')
+
+    if (!globalEndCallSoundCache.audioElement) {
+      console.warn('🔇 Звук завершения звонка не загружен')
+      return false
+    }
+
+    try {
+      // Сброс на начало для возможности повторного воспроизведения
+      globalEndCallSoundCache.audioElement.currentTime = 0
+
+      await globalEndCallSoundCache.audioElement.play()
+      console.log('🔊✅ Звук завершения звонка воспроизведен успешно')
+      return true
+    } catch (error) {
+      console.error('🔇 Ошибка воспроизведения звука завершения звонка:', error)
+      return false
+    }
+  }, [])
+
   return {
     setCurrentChat,
     setUserInteraction,
     maybePlayNotification,
     testSound,
     forceLoadSoundFromSupabase,
+    playEndCallSound,
     isTabVisible: state.isTabVisible,
     currentChatId: state.currentChatId,
     soundLoaded: state.soundLoaded,

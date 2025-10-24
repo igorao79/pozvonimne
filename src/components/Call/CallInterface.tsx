@@ -11,6 +11,8 @@ import { ChatInterface } from '../Chat'
 import { CreateChatModal } from '../Chat'
 import { RandomFact } from '@/components/ui/random-fact'
 import { UserCounter } from '@/components/ui/user-counter'
+import { useSoundNotifications } from '@/hooks/useSoundNotifications'
+import { useCallMessages } from '@/hooks/useCallMessages'
 
 interface Chat {
   id: string
@@ -47,6 +49,12 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
 
   // Initialize WebRTC
   useWebRTC()
+
+  // Звуковые уведомления для звонков
+  const { playEndCallSound } = useSoundNotifications()
+
+  // Глобальный хук для создания сообщений о звонках (работает всегда)
+  useCallMessages({ chatId: undefined, userId: userId || undefined })
 
   // Определение мобильного устройства
   const [isMobile, setIsMobile] = useState(false)
@@ -134,6 +142,12 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
     // Обработка завершения активного звонка
     if (prev.isCallActive && !current.isCallActive && !current.isInCall && callDurationSeconds > 0) {
       console.log('📞 Active call ended with duration:', callDurationSeconds)
+
+      // Воспроизводим звук завершения звонка
+      setTimeout(() => {
+        playEndCallSound()
+      }, 500) // Небольшая задержка, чтобы звук не пересекался с голосом
+
       if (otherUserId) {
         setTimeout(() => handleCallEnded(otherUserId, callDurationSeconds), 1000)
       }

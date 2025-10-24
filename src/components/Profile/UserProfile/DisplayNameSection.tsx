@@ -85,6 +85,14 @@ const DisplayNameSection = ({
             className={getInputClasses()}
             disabled={loading}
           />
+
+          {/* Анимированный лоадер полностью перекрывает инпут */}
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-md border border-muted-foreground/30" style={{ zIndex: 10 }}>
+              <div className="w-full max-w-[calc(100%-1rem)] h-3 bg-gradient-to-r from-muted-foreground/40 via-muted-foreground/60 to-muted-foreground/40 rounded-full animate-pulse"></div>
+            </div>
+          )}
+
           {getStatusIcon()}
         </div>
         <button

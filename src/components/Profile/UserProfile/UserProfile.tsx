@@ -35,7 +35,8 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
     setAvatarUrl,
     setNewDisplayName,
     setError,
-    setSuccess
+    setSuccess,
+    invalidateCache
   } = useProfileData(userId)
 
   const { displayNameAvailable, checkingDisplayName } = useDisplayNameValidation(newDisplayName, displayName)
@@ -46,7 +47,8 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
     setAvatarUrl,
     setLoading,
     setError,
-    setSuccess
+    setSuccess,
+    invalidateCache
   )
 
   const { handleDisplayNameUpdate, handlePasswordReset } = useProfileActions(
@@ -56,7 +58,8 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
     setUsername,
     setLoading,
     setError,
-    setSuccess
+    setSuccess,
+    invalidateCache
   )
 
   const { isPremium } = usePremiumStatus(userId)

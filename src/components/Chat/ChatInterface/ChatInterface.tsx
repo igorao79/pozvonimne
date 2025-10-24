@@ -19,7 +19,6 @@ import { useChatScroll } from '@/hooks/useChatScroll'
 import { useChatFocus } from '@/hooks/useChatFocus'
 import { useChatActions } from './ChatActions'
 import { useMessageActions } from '@/hooks/useMessageActions'
-import { useCallMessages } from '@/hooks/useCallMessages'
 
 
 const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterfaceProps) => {
@@ -39,7 +38,7 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
   })
 
   const { userId: rawUserId, isInCall: storeIsInCall } = useCallStore()
-  const { users } = useUsers()
+  const { users, totalUsersCount } = useUsers()
   const { supabase } = useSupabaseStore()
   const { refreshChatList } = useChatSyncStore()
 
@@ -115,8 +114,8 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
   // Хуки для работы с сообщениями
   const { editMessage, deleteMessage } = useMessageActions()
 
-  // Хук для создания сообщений о звонках
-  useCallMessages({ chatId: chat.id, userId })
+  // Хук для создания сообщений о звонках (перенесен в CallInterface для глобальной работы)
+  // useCallMessages({ chatId: chat.id, userId })
 
   // Настраиваем realtime подписки (используем простую версию для отладки)
   useSimpleChatRealtime({
@@ -257,32 +256,32 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
 
   // Получение статуса пользователя
   const getUserStatus = useCallback((userId?: string) => {
-    if (!userId) return 'Неизвестно'
+    if (!userId) return null // Возвращаем null для показа лоадера
 
-    // Если список пользователей пустой и идет загрузка, показываем "Загрузка..."
+    // Если список пользователей пустой и идет загрузка, показываем лоадер
     if (users.length === 0 && loading) {
-      return 'Загрузка...'
+      return null // Лоадер вместо "Загрузка..."
     }
 
-    // Если список пользователей пустой, но загрузка завершена, показываем "Неизвестно"
+    // Если список пользователей пустой, но загрузка завершена, показываем лоадер
     if (users.length === 0 && !loading) {
-      return 'Неизвестно'
+      return null // Лоадер вместо "Неизвестно"
     }
 
     const user = users.find(u => u.id === userId)
     if (!user) {
-      console.log('⚠️ Пользователь не найден в списке из', users.length, 'пользователей')
-      return 'Неизвестно'
+      console.log('⚠️ Пользователь не найден в фильтрованном списке из', users.length, 'пользователей (всего в базе:', totalUsersCount, ')')
+      return null // Лоадер вместо "Неизвестно"
     }
 
     // Возвращаем статус напрямую из базы данных (теперь обновляется в realtime)
     return user.status === 'online' ? 'онлайн' : 'оффлайн'
-  }, [users, loading])
+  }, [users, totalUsersCount, loading])
 
   // Эффект для обработки случаев, когда список пользователей пустой после звонка
   useEffect(() => {
     if (users.length === 0 && !loading) {
-      console.log('⚠️ ChatInterface: Список пользователей пустой после загрузки, ждем восстановления realtime подписок')
+      console.log('⚠️ ChatInterface: Фильтрованный список пользователей пустой после загрузки (всего в базе:', totalUsersCount, '), ждем восстановления realtime подписок')
       // Ждем еще немного, возможно realtime подписки еще восстанавливаются
       const timeoutId = setTimeout(() => {
         console.log('🔄 ChatInterface: Таймаут ожидания пользователей истек, пробуем принудительную перезагрузку')

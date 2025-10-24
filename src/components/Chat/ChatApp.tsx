@@ -17,14 +17,14 @@ interface Chat {
   last_message_at?: string
   last_message_sender_id?: string
   last_message_sender_name?: string
-  unread_count: number
+  unread_count?: number
   other_participant_id?: string
   other_participant_name?: string
   other_participant_avatar?: string
   other_participant_is_creator?: boolean
   other_participant_status?: string
   other_participant_last_seen?: string
-  created_at: string
+  created_at?: string
   updated_at?: string
 }
 
@@ -279,7 +279,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
       {/* Мобильная версия - ChatList всегда смонтирован для получения уведомлений */}
       <div className="flex-1 md:hidden overflow-hidden">
         {/* ChatList всегда смонтирован, но скрыт когда пользователь в чате */}
-        <div className={`${selectedChat ? 'hidden' : 'block'} bg-card h-full overflow-hidden`}>
+        <div className={`${selectedChat ? 'hidden' : 'block'} bg-card h-full`}>
           <ChatList
             ref={chatListRef}
             onChatSelect={handleChatSelect}
@@ -295,7 +295,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
             chat={selectedChat}
             onBack={handleBackToList}
             isInCall={isInCall}
-            hasUnreadMessages={selectedChat.unread_count > 0}
+            hasUnreadMessages={(selectedChat.unread_count || 0) > 0}
           />
         )}
       </div>
@@ -321,7 +321,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
               chat={selectedChat}
               onBack={handleBackToList}
               isInCall={isInCall}
-              hasUnreadMessages={selectedChat.unread_count > 0}
+              hasUnreadMessages={(selectedChat.unread_count || 0) > 0}
             />
           ) : (
             <div className="h-full flex items-center justify-center p-4 chat-pattern-bg">

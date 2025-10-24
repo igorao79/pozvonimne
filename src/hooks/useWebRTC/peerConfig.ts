@@ -71,22 +71,77 @@ export const getChannelConfig = (): RTCDataChannelInit => ({
   maxRetransmits: 30
 })
 
+// Импорт мобильных утилит
+import { isMobileDevice, isIOSDevice, isAndroidDevice } from '@/utils/mobileAudioFix'
+
 // Получить конфигурацию аудио потока
-export const getAudioConstraints = () => ({
-  video: false,
-  audio: {
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true,
-    googEchoCancellation: true,
-    googAutoGainControl: true,
-    googNoiseSuppression: true,
-    googHighpassFilter: true,
-    googTypingNoiseDetection: true,
-    sampleRate: 48000, // Высокое качество звука
-    sampleSize: 16,
-    channelCount: 1, // Моно для экономии трафика
-    latency: 0.01, // Минимальная задержка
-    volume: 1.0
+export const getAudioConstraints = () => {
+  const baseConstraints = {
+    video: false,
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    } as any // Используем any для Google-специфичных свойств
   }
-})
+
+  // Если это мобильное устройство, используем специализированные настройки
+  if (isMobileDevice()) {
+    console.log('📱 Using mobile-optimized audio constraints')
+    
+    if (isAndroidDevice()) {
+      // Android-специфичные настройки
+      baseConstraints.audio = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        // Android Chrome specific (не все браузеры поддерживают)
+        googEchoCancellation: true,
+        googAutoGainControl: true,
+        googNoiseSuppression: true,
+        googHighpassFilter: true,
+        googTypingNoiseDetection: false, // Может вызывать проблемы на Android
+        sampleRate: 48000,
+        sampleSize: 16,
+        channelCount: 1, // Моно для стабильности
+      }
+    } else if (isIOSDevice()) {
+      // iOS-специфичные настройки (более консервативные)
+      baseConstraints.audio = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: { ideal: 48000, min: 44100 },
+        channelCount: 1,
+        // Избегаем Google-специфичных настроек на iOS
+      }
+    } else {
+      // Общие мобильные настройки
+      baseConstraints.audio = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 48000,
+        channelCount: 1,
+      }
+    }
+  } else {
+    // Настройки для десктопа (оригинальные, более агрессивные)
+    baseConstraints.audio = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      googEchoCancellation: true,
+      googAutoGainControl: true,
+      googNoiseSuppression: true,
+      googHighpassFilter: true,
+      googTypingNoiseDetection: true,
+      sampleRate: 48000, // Высокое качество звука
+      sampleSize: 16,
+      channelCount: 1, // Моно для экономии трафика
+    }
+  }
+
+  console.log('🎧 Audio constraints configured:', baseConstraints)
+  return baseConstraints
+}

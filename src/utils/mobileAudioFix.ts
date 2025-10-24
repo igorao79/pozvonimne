@@ -280,10 +280,211 @@ export const forcePlayAudio = async (audioElement: HTMLAudioElement) => {
       audioElement.muted = false;
       audioElement.volume = 1.0;
       
+      // Переключаем на динамик если это Android
+      if (isAndroidDevice()) {
+        await setSpeakerOutput(audioElement);
+      }
+      
       await audioElement.play();
       console.log('📱 Audio element playing successfully');
     }
   } catch (error) {
     console.error('📱 Failed to force play audio:', error);
   }
+};
+
+/**
+ * Переключение аудио выхода на динамик (для Android)
+ */
+export const setSpeakerOutput = async (audioElement: HTMLAudioElement) => {
+  if (!isAndroidDevice()) {
+    console.log('📱 Speaker output switching is Android-specific');
+    return;
+  }
+
+  console.log('📱 Attempting to set audio output to speaker...');
+
+  try {
+    // Проверяем поддержку setSinkId
+    if (typeof (audioElement as any).setSinkId === 'function') {
+      // Получаем список доступных аудиоустройств
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+      
+      console.log('📱 Available audio outputs:', audioOutputs.map(d => ({
+        deviceId: d.deviceId,
+        label: d.label,
+        groupId: d.groupId
+      })));
+
+      // Ищем устройство с "speaker" в названии или используем default
+      let speakerDevice = audioOutputs.find(device => 
+        device.label.toLowerCase().includes('speaker') ||
+        device.label.toLowerCase().includes('динамик') ||
+        device.deviceId === 'default'
+      );
+
+      if (!speakerDevice && audioOutputs.length > 0) {
+        speakerDevice = audioOutputs[0]; // Используем первое доступное устройство
+      }
+
+      if (speakerDevice) {
+        await (audioElement as any).setSinkId(speakerDevice.deviceId);
+        console.log('📱 Audio output set to:', speakerDevice.label || speakerDevice.deviceId);
+      } else {
+        await (audioElement as any).setSinkId('default');
+        console.log('📱 Audio output set to default device');
+      }
+    } else {
+      console.warn('📱 setSinkId not supported on this device');
+    }
+  } catch (error) {
+    console.error('📱 Failed to set speaker output:', error);
+  }
+};
+
+/**
+ * Диагностика аудио проблем
+ */
+export const diagnoseAudioIssues = async (audioElement?: HTMLAudioElement) => {
+  console.log('🔍 Starting audio diagnostics...');
+  
+  const diagnostics = {
+    deviceType: isMobileDevice() ? 'mobile' : 'desktop',
+    platform: Capacitor.getPlatform(),
+    isNative: Capacitor.isNativePlatform(),
+    userAgent: navigator.userAgent,
+    audioContext: null as any,
+    permissions: {} as any,
+    devices: [] as any[],
+    audioElement: null as any,
+    mediaCapabilities: {} as any
+  };
+
+  try {
+    // Проверяем AudioContext
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioContextClass) {
+      const testContext = new AudioContextClass();
+      diagnostics.audioContext = {
+        supported: true,
+        state: testContext.state,
+        sampleRate: testContext.sampleRate,
+        baseLatency: testContext.baseLatency,
+        outputLatency: testContext.outputLatency
+      };
+      testContext.close();
+    } else {
+      diagnostics.audioContext = { supported: false };
+    }
+
+    // Проверяем разрешения
+    try {
+      const micPermission = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      diagnostics.permissions.microphone = micPermission.state;
+    } catch (e) {
+      diagnostics.permissions.microphone = 'unavailable';
+    }
+
+    // Проверяем доступные устройства
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      diagnostics.devices = devices.map(device => ({
+        kind: device.kind,
+        label: device.label,
+        deviceId: device.deviceId.slice(0, 10) + '...', // Частично скрываем ID
+        groupId: device.groupId
+      }));
+    } catch (e) {
+      console.warn('🔍 Could not enumerate devices:', e);
+    }
+
+    // Проверяем аудио элемент
+    if (audioElement) {
+      diagnostics.audioElement = {
+        hasSource: !!audioElement.srcObject,
+        paused: audioElement.paused,
+        muted: audioElement.muted,
+        volume: audioElement.volume,
+        readyState: audioElement.readyState,
+        networkState: audioElement.networkState,
+        autoplay: audioElement.autoplay,
+        // @ts-ignore
+        playsInline: audioElement.playsInline
+      };
+
+      if (audioElement.srcObject instanceof MediaStream) {
+        const stream = audioElement.srcObject as MediaStream;
+        const audioTracks = stream.getAudioTracks();
+        diagnostics.audioElement.streamInfo = {
+          streamId: stream.id,
+          active: stream.active,
+          audioTracksCount: audioTracks.length,
+          audioTracks: audioTracks.map(track => ({
+            id: track.id,
+            kind: track.kind,
+            label: track.label,
+            enabled: track.enabled,
+            muted: track.muted,
+            readyState: track.readyState,
+            settings: track.getSettings()
+          }))
+        };
+      }
+    }
+
+    // Проверяем возможности воспроизведения медиа
+    if (navigator.mediaCapabilities) {
+      try {
+        const audioConfig = {
+          type: 'media-source' as const,
+          audio: {
+            contentType: 'audio/opus',
+            channels: '2',
+            bitrate: 128000,
+            samplerate: 48000
+          }
+        };
+        const audioSupport = await navigator.mediaCapabilities.decodingInfo(audioConfig);
+        diagnostics.mediaCapabilities.opus = audioSupport;
+      } catch (e) {
+        console.warn('🔍 Media capabilities check failed:', e);
+      }
+    }
+
+  } catch (error) {
+    console.error('🔍 Diagnostics error:', error);
+  }
+
+  console.log('🔍 Audio diagnostics completed:', diagnostics);
+  return diagnostics;
+};
+
+/**
+ * Получение рекомендаций по исправлению аудио проблем
+ */
+export const getAudioTroubleshootingSteps = () => {
+  const steps = [];
+  
+  if (isMobileDevice()) {
+    steps.push('📱 Убедитесь, что разрешен доступ к микрофону в настройках браузера');
+    steps.push('📱 Проверьте, что громкость устройства не на минимуме');
+    steps.push('📱 Убедитесь, что к телефону не подключены Bluetooth наушники');
+    
+    if (isIOSDevice()) {
+      steps.push('🍎 На iOS: переключите рингтон/бесшумный режим');
+      steps.push('🍎 Попробуйте открыть приложение в Safari вместо Chrome');
+    }
+    
+    if (isAndroidDevice()) {
+      steps.push('🤖 На Android: проверьте настройки Do Not Disturb');
+      steps.push('🤖 Попробуйте очистить кеш браузера');
+    }
+  }
+  
+  steps.push('🔄 Перезагрузите браузер/приложение');
+  steps.push('🔄 Попробуйте использовать другой браузер');
+  steps.push('📞 Проверьте интернет-соединение');
+  
+  return steps;
 };

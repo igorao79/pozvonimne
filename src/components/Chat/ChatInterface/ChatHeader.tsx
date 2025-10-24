@@ -12,7 +12,7 @@ interface ChatHeaderProps {
   onBack: () => void
   onCall?: () => void
   onCancel?: () => void
-  userStatus?: string
+  userStatus?: string | null
   isInCall?: boolean
   typingUsers?: string[]
   currentUserId?: string
@@ -283,10 +283,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                     {userStatus}
                   </p>
                 ) : (
-                  // Нет статуса
-                  <p className="text-xs text-muted-foreground italic">
-                    не в сети
-                  </p>
+                  // Анимированный лоадер вместо текста - одна полоска
+                  <div className="w-12 h-3 bg-gradient-to-r from-muted-foreground/20 via-muted-foreground/40 to-muted-foreground/20 rounded-full animate-pulse"></div>
                 )}
               </div>
             )}

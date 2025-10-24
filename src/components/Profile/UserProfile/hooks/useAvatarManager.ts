@@ -7,7 +7,8 @@ export const useAvatarManager = (
   setAvatarUrl: (url: string) => void,
   setLoading: (loading: boolean) => void,
   setError: (error: string | null) => void,
-  setSuccess: (success: string | null) => void
+  setSuccess: (success: string | null) => void,
+  invalidateCache?: (userId: string) => void
 ) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
@@ -66,6 +67,11 @@ export const useAvatarManager = (
 
       setAvatarUrl(publicUrl)
       setSuccess('Аватарка обновлена!')
+
+      // Инвалидируем кэш профиля
+      if (userId && invalidateCache) {
+        invalidateCache(userId)
+      }
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -98,6 +104,11 @@ export const useAvatarManager = (
 
       setAvatarUrl('')
       setSuccess('Аватарка удалена!')
+
+      // Инвалидируем кэш профиля
+      if (userId && invalidateCache) {
+        invalidateCache(userId)
+      }
     } catch (err: any) {
       setError(err.message)
     } finally {

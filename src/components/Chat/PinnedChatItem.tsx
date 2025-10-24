@@ -185,8 +185,8 @@ export const PinnedChatItem: React.FC<PinnedChatItemProps> = ({
                 {chat.last_message_type === 'voice'
                   ? '🎵 Голосовое сообщение'
                   : chat.last_message_type === 'call'
-                  ? '📞 Звонок'
-                  : chat.last_message 
+                  ? 'Звонок'
+                  : chat.last_message
                   ? truncateText(chat.last_message, 30)
                   : ''}
               </p>

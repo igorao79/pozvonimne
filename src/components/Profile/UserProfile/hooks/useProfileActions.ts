@@ -9,10 +9,11 @@ export const useProfileActions = (
   setUsername: (name: string) => void,
   setLoading: (loading: boolean) => void,
   setError: (error: string | null) => void,
-  setSuccess: (success: string | null) => void
+  setSuccess: (success: string | null) => void,
+  invalidateCache?: (userId: string) => void
 ) => {
   const supabase = createClient()
-  const { user } = useCallStore()
+  const { user, userId } = useCallStore()
 
   const handleDisplayNameUpdate = async () => {
     if (!newDisplayName || newDisplayName === displayName) return
@@ -43,6 +44,11 @@ export const useProfileActions = (
         setDisplayName(newDisplayName)
         setUsername(newDisplayName) // Синхронизируем username с display name
         setSuccess('Имя и никнейм обновлены!')
+
+        // Инвалидируем кэш профиля
+        if (userId && invalidateCache) {
+          invalidateCache(userId)
+        }
       } else {
         throw new Error('Это имя уже занято. Выберите другое.')
       }

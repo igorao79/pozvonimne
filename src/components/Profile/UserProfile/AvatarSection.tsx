@@ -34,6 +34,20 @@ const AvatarSection = ({
     }
   }, [avatarUrl, currentAvatarUrl])
 
+  // Показываем анимацию загрузки при loading=true
+  useEffect(() => {
+    if (loading) {
+      setShowSkeleton(true)
+    } else {
+      // Небольшая задержка перед скрытием скелетона
+      const timer = setTimeout(() => {
+        setShowSkeleton(false)
+        setImageLoading(false)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [loading])
+
   const handleImageLoad = () => {
     // Небольшая задержка перед скрытием скелетона для плавности
     setTimeout(() => {
@@ -52,9 +66,14 @@ const AvatarSection = ({
       <div className="relative inline-block">
         {/* Контейнер для аватара с фиксированными размерами */}
         <div className="w-24 h-24 rounded-full overflow-hidden bg-muted mx-auto mb-4 relative">
-          {/* Скелетон с плавным появлением */}
+          {/* Анимированный лоадер заполняет ВЕСЬ круг */}
+          {loading && (
+            <div className="absolute inset-0 bg-gradient-to-r from-muted-foreground/20 via-muted-foreground/40 to-muted-foreground/20 animate-pulse rounded-full"></div>
+          )}
+
+          {/* Скелетон с плавным появлением (для загрузки изображений) */}
           <div className={`absolute inset-0 transition-all duration-500 ease-in-out ${
-            showSkeleton ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+            showSkeleton && !loading ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
           }`}>
             <Skeleton
               circle

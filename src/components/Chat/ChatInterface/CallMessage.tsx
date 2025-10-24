@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Message } from './types'
 import { Phone, PhoneCall, CheckCircle, PhoneMissed, X } from 'lucide-react'
 import useCallStore from '@/store/useCallStore'
+import { useMessageVisibility, useMessageReadTracking } from '@/hooks/useMessageVisibility'
 
 interface CallMessageProps {
   message: Message
@@ -13,7 +14,25 @@ interface CallMessageProps {
   userId?: string
 }
 
-export const CallMessage: React.FC<CallMessageProps> = ({ message }) => {
+export const CallMessage: React.FC<CallMessageProps> = ({ message, chat, userId }) => {
+  const isOwn = message.sender_id === userId
+
+  // Отслеживание видимости сообщения для пометки как прочитанное
+  const { elementRef, isVisible, hasBeenVisible } = useMessageVisibility({
+    threshold: 0.5, // 50% сообщения должно быть видно
+    rootMargin: '0px 0px -20px 0px', // Небольшой отступ снизу
+    triggerOnce: true // Пометить как прочитанное только один раз
+  })
+
+  // Пометка сообщения как прочитанного при его видимости
+  useMessageReadTracking({
+    messageId: message.id,
+    isOwn,
+    isVisible,
+    userId,
+    chatId: chat.id
+  })
+
   // Извлекаем информацию о звонке из метаданных
   const metadata = message.metadata as any
   const callStatus = metadata?.status
@@ -144,14 +163,47 @@ export const CallMessage: React.FC<CallMessageProps> = ({ message }) => {
     }
   }
 
-  // Форматируем длительность звонка
+  // Форматируем длительность звонка (синхронизировано с SQL логикой)
   const formatDuration = (seconds: number): string => {
     if (seconds < 60) {
       return `${seconds} сек`
-    } else if (seconds % 60 === 0) {
-      return `${Math.floor(seconds / 60)} мин`
+    } else if (seconds < 3600) {
+      // Минуты и секунды
+      if (seconds % 60 === 0) {
+        return `${Math.floor(seconds / 60)} мин`
+      } else {
+        return `${Math.floor(seconds / 60)} мин ${seconds % 60} сек`
+      }
     } else {
-      return `${Math.floor(seconds / 60)} мин ${seconds % 60} сек`
+      // Часы и минуты
+      const hours = Math.floor(seconds / 3600)
+      const minutes = Math.floor((seconds % 3600) / 60)
+      const remainingSeconds = seconds % 60
+
+      let hourText = ''
+      if (hours === 1) hourText = '1 час'
+      else if (hours === 2) hourText = '2 часа'
+      else if (hours === 3) hourText = '3 часа'
+      else if (hours === 4) hourText = '4 часа'
+      else hourText = `${hours} часов`
+
+      if (seconds % 3600 === 0) {
+        // Ровно часы
+        return hourText
+      } else {
+        // Часы + минуты/секунды
+        let result = hourText + ' '
+
+        if (remainingSeconds === 0) {
+          // Только минуты
+          result += `${minutes} мин`
+        } else {
+          // Минуты и секунды
+          result += `${minutes} мин ${remainingSeconds} сек`
+        }
+
+        return result
+      }
     }
   }
 
@@ -235,7 +287,7 @@ export const CallMessage: React.FC<CallMessageProps> = ({ message }) => {
   const IconComponent = icon
 
   return (
-    <div className="flex justify-center my-2 px-4">
+    <div ref={elementRef} className="flex justify-center my-2 px-4">
       <div className={`flex items-center space-x-2 bg-muted/50 rounded-lg px-3 py-2 max-w-xs transition-all duration-200 ${
         animated ? 'ring-2 ring-green-500/20 bg-green-50/50 dark:bg-green-900/20' : ''
       }`}>
