@@ -76,16 +76,12 @@ export const initializePeer = async (
 
     setLocalStream(stream)
 
-    // Диагностируем кодеки для отладки проблем
-    console.log('🔍 Running codec compatibility check...')
-    await diagnoseCodecCompatibility()
-
-    // Создаем оптимизированную конфигурацию peer для решения проблем компьютер→телефон
+    // Создаем peer connection с базовой конфигурацией
     const peerConfig: SimplePeerConfig = {
       initiator: isInitiator,
       trickle: true,
       stream,
-      config: getOptimizedPeerConfig(), // Используем оптимизированную конфигурацию
+      config: getPeerConfig(), // Базовая конфигурация без оптимизаций
       offerOptions: getOfferOptions(),
       answerOptions: getAnswerOptions(),
       allowHalfTrickle: true,
@@ -115,14 +111,8 @@ export const initializePeer = async (
       // Регистрируем успешное соединение
       performanceMonitor.recordConnectionSuccess(userId || 'unknown')
 
-      // Устанавливаем совместимые кодеки для решения проблем компьютер→телефон
-      console.log('🎯 Setting compatible codecs after peer connection...')
-      try {
-        await setCompatibleCodecPreferences(peer)
-        console.log('🎯 Compatible codecs successfully set')
-      } catch (error) {
-        console.warn('🎯 Failed to set compatible codecs:', error)
-      }
+      // НЕ устанавливаем кодеки - пусть браузер сам договаривается!
+      console.log('🔥 Letting browser negotiate codecs automatically')
 
       // Сбрасываем счетчик переподключений при успешном соединении
       resetReconnectionCounter(peerRefs)

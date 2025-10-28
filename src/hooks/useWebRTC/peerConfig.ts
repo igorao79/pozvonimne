@@ -74,80 +74,19 @@ export const getChannelConfig = (): RTCDataChannelInit => ({
 // Импорт мобильных утилит
 import { isMobileDevice, isIOSDevice, isAndroidDevice } from '@/utils/mobileAudioFix'
 
-// Получить оптимизированную конфигурацию аудио для решения проблемы компьютер→телефон
+// РАДИКАЛЬНОЕ РЕШЕНИЕ: Минимум ограничений, браузер сам выбирает настройки
 export const getAudioConstraints = () => {
-  // На основе анализа Stack Overflow и WebRTC документации
-  // Проблема: Android Chrome имеет проблемы с некоторыми audio constraints
-  // Решение: Использовать минимальные, совместимые настройки
-
-  const baseConstraints = {
+  console.log('🔥 RADICAL SOLUTION: Using absolute minimal constraints')
+  
+  // САМЫЕ ПРОСТЫЕ настройки - просто audio: true
+  // Браузер сам выберет лучшие параметры
+  const absoluteMinimal = {
     video: false,
-    audio: {
-      // Минимальные настройки для максимальной совместимости
-      echoCancellation: false,  // ВЫКЛЮЧАЕМ - может вызывать проблемы на Android
-      noiseSuppression: false,  // ВЫКЛЮЧАЕМ - может блокировать звук
-      autoGainControl: false,   // ВЫКЛЮЧАЕМ - может искажать звук на мобильных
-
-      // Базовые параметры без Google-специфичных настроек
-      sampleRate: 44100,        // Более совместимая частота
-      sampleSize: 16,
-      channelCount: 1,
-
-      // Дополнительные параметры для совместимости
-      latency: 0.01,            // Минимальная задержка
-      volume: 1.0
-    } as any
+    audio: true  // ВСЁ! Никаких дополнительных параметров!
   }
 
-  // Для мобильных устройств используем еще более консервативные настройки
-  if (isMobileDevice()) {
-    console.log('📱 Using ultra-conservative mobile audio settings')
-
-    if (isAndroidDevice()) {
-      // Android Chrome часто имеет проблемы с echoCancellation
-      // Используем минимальные настройки
-      baseConstraints.audio = {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-        sampleRate: 44100,
-        sampleSize: 16,
-        channelCount: 1,
-        latency: 0.01,
-        volume: 1.0
-        // Полностью убираем goog* параметры - они часто вызывают проблемы
-      }
-    } else if (isIOSDevice()) {
-      // iOS Safari более стабилен, но тоже используем минимальные настройки
-      baseConstraints.audio = {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-        sampleRate: { ideal: 44100, min: 22050 },
-        sampleSize: 16,
-        channelCount: 1,
-        latency: 0.01,
-        volume: 1.0
-      }
-    }
-  } else {
-    // Для десктопа тоже отключаем проблемные параметры
-    console.log('🖥️ Using conservative desktop audio settings')
-    baseConstraints.audio = {
-      echoCancellation: false,    // Отключаем для совместимости
-      noiseSuppression: false,    // Отключаем для совместимости
-      autoGainControl: false,     // Отключаем для совместимости
-      sampleRate: 44100,
-      sampleSize: 16,
-      channelCount: 1,
-      latency: 0.01,
-      volume: 1.0
-      // Без goog* параметров для совместимости с мобильными
-    }
-  }
-
-  console.log('🎧 Conservative audio constraints for maximum compatibility:', baseConstraints)
-  return baseConstraints
+  console.log('🔥 Constraints:', absoluteMinimal)
+  return absoluteMinimal
 }
 
 // Новая функция для диагностики кодеков и совместимости
