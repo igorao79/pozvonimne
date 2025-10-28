@@ -682,66 +682,149 @@ export const diagnoseDesktopToMobileAudioIssues = async () => {
 };
 
 /**
+ * Радикальное исправление проблем звука - полная перезагрузка настроек
+ */
+export const radicalAudioFix = async () => {
+  console.log('🔥 Радикальное исправление проблем звука (полная перезагрузка)...');
+
+  const fixes = [];
+
+  try {
+    // 1. Полностью останавливаем все существующие аудио контексты
+    if (window.AudioContext || (window as any).webkitAudioContext) {
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const contexts = (window as any).__webrtcAudioContexts || [];
+        contexts.forEach((ctx: any) => {
+          if (ctx && ctx.state !== 'closed') {
+            ctx.close();
+          }
+        });
+        (window as any).__webrtcAudioContexts = [];
+        fixes.push('✅ Старые AudioContext остановлены');
+      } catch (e) {
+        fixes.push('⚠️ Не удалось остановить старые контексты');
+      }
+    }
+
+    // 2. Создаем новый чистый аудио контекст
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioContext = new AudioContextClass();
+      (window as any).__webrtcAudioContext = audioContext;
+
+      // Разблокируем его
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+      fixes.push('✅ Новый AudioContext создан и разблокирован');
+    } catch (e) {
+      fixes.push('❌ Не удалось создать AudioContext');
+    }
+
+    // 3. Тестируем микрофон с МИНИМАЛЬНЫМИ настройками
+    try {
+      // Проверяем разрешения
+      const permission = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      if (permission.state !== 'granted') {
+        fixes.push('⚠️ Нет разрешения на микрофон - предоставьте доступ');
+      }
+
+      // Пробуем получить доступ с минимальными настройками
+      const minimalConstraints = {
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          sampleRate: 22050,  // Минимальная частота для совместимости
+          sampleSize: 16,
+          channelCount: 1
+        }
+      };
+
+      const testStream = await navigator.mediaDevices.getUserMedia(minimalConstraints);
+
+      // Проверяем, что трек активен
+      const audioTracks = testStream.getAudioTracks();
+      if (audioTracks.length > 0) {
+        const track = audioTracks[0];
+        if (track.enabled && track.readyState === 'live') {
+          fixes.push('✅ Микрофон работает с минимальными настройками');
+        } else {
+          fixes.push('⚠️ Микрофон трек неактивен');
+        }
+      }
+
+      // Закрываем тестовый поток
+      testStream.getTracks().forEach(track => track.stop());
+
+    } catch (micError) {
+      fixes.push(`❌ Критическая ошибка микрофона: ${micError instanceof Error ? micError.message : 'Unknown error'}`);
+    }
+
+    // 4. Специальные действия для Android
+    if (isAndroidDevice()) {
+      fixes.push('🤖 Android: отключены проблемные настройки echoCancellation');
+      fixes.push('🤖 Android: отключены Google-специфичные параметры');
+    }
+
+    fixes.push('🎯 Результат: настройки сброшены, попробуйте новый звонок');
+
+  } catch (error) {
+    fixes.push(`❌ Критическая ошибка: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+
+  console.log('🔥 Результат радикального исправления:', fixes);
+  return fixes;
+};
+
+/**
  * Автоматическое исправление проблем звука компьютер→телефон
  */
 export const autoFixDesktopToMobileAudio = async () => {
   console.log('🔧 Автоматическое исправление проблем звука...');
-  
+
   const fixes = [];
-  
+
   try {
-    // 1. Разблокируем AudioContext
-    await unlockAudio();
-    fixes.push('✅ AudioContext разблокирован');
-    
-    // 2. Проверяем и исправляем настройки микрофона
+    // Сначала пробуем радикальное исправление
+    const radicalFixes = await radicalAudioFix();
+    fixes.push(...radicalFixes);
+
+    // Затем проверяем с текущими настройками
     try {
       const constraints = {
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000,
+          echoCancellation: false,  // Отключаем проблемные настройки
+          noiseSuppression: false,
+          autoGainControl: false,
+          sampleRate: 44100,
           channelCount: 1,
-          // Избегаем проблемных параметров
-          googTypingNoiseDetection: false
+          latency: 0.01,
+          volume: 1.0
         }
       };
-      
+
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      fixes.push('✅ Микрофон настроен с совместимыми параметрами');
-      
-      // Проверяем трек
+      fixes.push('✅ Текущие настройки микрофона совместимы');
+
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length > 0 && audioTracks[0].enabled) {
         fixes.push('✅ Аудио трек активен и готов к передаче');
       }
-      
-      // Закрываем тестовый поток
+
       stream.getTracks().forEach(track => track.stop());
-      
+
     } catch (micError) {
-      fixes.push(`❌ Проблема с микрофоном: ${micError instanceof Error ? micError.message : 'Unknown error'}`);
+      fixes.push(`❌ Проблема с настройками: ${micError instanceof Error ? micError.message : 'Unknown error'}`);
     }
-    
-    // 3. Для мобильных устройств - специальные настройки
-    if (isMobileDevice()) {
-      await setupMobileAudio();
-      fixes.push('✅ Применены мобильные оптимизации');
-      
-      if (isAndroidDevice()) {
-        fixes.push('✅ Применены настройки для Android');
-      } else if (isIOSDevice()) {
-        fixes.push('✅ Применены настройки для iOS');
-      }
-    }
-    
+
     fixes.push('🎯 Рекомендация: перезапустите звонок для применения исправлений');
-    
+
   } catch (error) {
     fixes.push(`❌ Ошибка автоисправления: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-  
+
   console.log('🔧 Результат автоисправления:', fixes);
   return fixes;
 };

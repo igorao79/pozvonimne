@@ -74,66 +74,80 @@ export const getChannelConfig = (): RTCDataChannelInit => ({
 // Импорт мобильных утилит
 import { isMobileDevice, isIOSDevice, isAndroidDevice } from '@/utils/mobileAudioFix'
 
-// Получить унифицированную конфигурацию аудио потока для максимальной совместимости
+// Получить оптимизированную конфигурацию аудио для решения проблемы компьютер→телефон
 export const getAudioConstraints = () => {
-  // Унифицированные настройки для всех платформ 
-  // Это исправляет проблему передачи звука компьютер → телефон
-  const unifiedConstraints = {
+  // На основе анализа Stack Overflow и WebRTC документации
+  // Проблема: Android Chrome имеет проблемы с некоторыми audio constraints
+  // Решение: Использовать минимальные, совместимые настройки
+
+  const baseConstraints = {
     video: false,
     audio: {
-      // Базовые стандартные настройки WebRTC
-      echoCancellation: true,
-      noiseSuppression: true, 
-      autoGainControl: true,
-      
-      // Унифицированные параметры для совместимости всех устройств
-      sampleRate: 48000, // Стандартная частота дискретизации
-      sampleSize: 16,     // Стандартный размер выборки
-      channelCount: 1,    // Моно для стабильности и совместимости
-      
-      // Избегаем Google-специфичных параметров для лучшей совместимости
-      // googTypingNoiseDetection может блокировать передачу на мобильные
-      latency: 0.02, // Минимальная задержка (20ms)
+      // Минимальные настройки для максимальной совместимости
+      echoCancellation: false,  // ВЫКЛЮЧАЕМ - может вызывать проблемы на Android
+      noiseSuppression: false,  // ВЫКЛЮЧАЕМ - может блокировать звук
+      autoGainControl: false,   // ВЫКЛЮЧАЕМ - может искажать звук на мобильных
+
+      // Базовые параметры без Google-специфичных настроек
+      sampleRate: 44100,        // Более совместимая частота
+      sampleSize: 16,
+      channelCount: 1,
+
+      // Дополнительные параметры для совместимости
+      latency: 0.01,            // Минимальная задержка
+      volume: 1.0
     } as any
   }
 
-  // Платформо-специфичные дополнения (без нарушения совместимости)
+  // Для мобильных устройств используем еще более консервативные настройки
   if (isMobileDevice()) {
-    console.log('📱 Applying mobile-compatible audio constraints')
-    
+    console.log('📱 Using ultra-conservative mobile audio settings')
+
     if (isAndroidDevice()) {
-      // Android: добавляем только безопасные Google-параметры
-      Object.assign(unifiedConstraints.audio, {
-        googEchoCancellation: true,
-        googAutoGainControl: true, 
-        googNoiseSuppression: true,
-        // НЕ используем googTypingNoiseDetection - может блокировать звук
-      })
+      // Android Chrome часто имеет проблемы с echoCancellation
+      // Используем минимальные настройки
+      baseConstraints.audio = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        sampleRate: 44100,
+        sampleSize: 16,
+        channelCount: 1,
+        latency: 0.01,
+        volume: 1.0
+        // Полностью убираем goog* параметры - они часто вызывают проблемы
+      }
     } else if (isIOSDevice()) {
-      // iOS: минимальные изменения для стабильности
-      unifiedConstraints.audio.sampleRate = { ideal: 48000, min: 44100 }
+      // iOS Safari более стабилен, но тоже используем минимальные настройки
+      baseConstraints.audio = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        sampleRate: { ideal: 44100, min: 22050 },
+        sampleSize: 16,
+        channelCount: 1,
+        latency: 0.01,
+        volume: 1.0
+      }
     }
-    
-    // Дополнительные настройки для мобильных
-    Object.assign(unifiedConstraints.audio, {
-      volume: 1.0,
-      deviceId: 'default', // Используем устройство по умолчанию
-    })
   } else {
-    console.log('🖥️ Applying desktop-compatible audio constraints')
-    
-    // Десктоп: используем только совместимые параметры
-    Object.assign(unifiedConstraints.audio, {
-      googEchoCancellation: true,
-      googAutoGainControl: true,
-      googNoiseSuppression: true,
-      // НЕ используем googTypingNoiseDetection для совместимости с мобильными
-      googHighpassFilter: true,
-    })
+    // Для десктопа тоже отключаем проблемные параметры
+    console.log('🖥️ Using conservative desktop audio settings')
+    baseConstraints.audio = {
+      echoCancellation: false,    // Отключаем для совместимости
+      noiseSuppression: false,    // Отключаем для совместимости
+      autoGainControl: false,     // Отключаем для совместимости
+      sampleRate: 44100,
+      sampleSize: 16,
+      channelCount: 1,
+      latency: 0.01,
+      volume: 1.0
+      // Без goog* параметров для совместимости с мобильными
+    }
   }
 
-  console.log('🎧 Unified audio constraints for cross-platform compatibility:', unifiedConstraints)
-  return unifiedConstraints
+  console.log('🎧 Conservative audio constraints for maximum compatibility:', baseConstraints)
+  return baseConstraints
 }
 
 // Новая функция для диагностики кодеков и совместимости
