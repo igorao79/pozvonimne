@@ -571,7 +571,7 @@ export const diagnoseDesktopToMobileAudioIssues = async () => {
     } catch (constraintError) {
       report.audio.constraints = {
         success: false,
-        error: constraintError.message
+        error: constraintError instanceof Error ? constraintError.message : 'Unknown error'
       };
     }
     
@@ -674,7 +674,7 @@ export const diagnoseDesktopToMobileAudioIssues = async () => {
     
   } catch (error) {
     console.error('Ошибка при диагностике:', error);
-    report.recommendations.push(`❌ Ошибка диагностики: ${error.message}`);
+    report.recommendations.push(`❌ Ошибка диагностики: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
   
   console.log('🔧 Отчет диагностики:', report);
@@ -721,7 +721,7 @@ export const autoFixDesktopToMobileAudio = async () => {
       stream.getTracks().forEach(track => track.stop());
       
     } catch (micError) {
-      fixes.push(`❌ Проблема с микрофоном: ${micError.message}`);
+      fixes.push(`❌ Проблема с микрофоном: ${micError instanceof Error ? micError.message : 'Unknown error'}`);
     }
     
     // 3. Для мобильных устройств - специальные настройки
@@ -739,7 +739,7 @@ export const autoFixDesktopToMobileAudio = async () => {
     fixes.push('🎯 Рекомендация: перезапустите звонок для применения исправлений');
     
   } catch (error) {
-    fixes.push(`❌ Ошибка автоисправления: ${error.message}`);
+    fixes.push(`❌ Ошибка автоисправления: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
   
   console.log('🔧 Результат автоисправления:', fixes);
