@@ -13,13 +13,50 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
-        <item name="android:windowTranslucentStatus">true</item>
+        <!-- ВАЖНО: Отключаем translucent status bar для фиксации -->
+        <item name="android:windowTranslucentStatus">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/white</item>
+        <!-- Фиксируем layout чтобы статус бар не накладывался -->
+        <item name="android:fitsSystemWindows">true</item>
     </style>
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+    </style>
+
+    <!-- Xiaomi/MIUI специальная тема - максимальная фиксация -->
+    <style name="AppTheme.StatusBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
+
+        <!-- Xiaomi/MIUI критические настройки -->
+        <item name="android:windowTranslucentStatus">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@android:color/white</item>
+
+        <!-- Максимальная фиксация для MIUI -->
+        <item name="android:fitsSystemWindows">false</item>
+        <item name="android:windowContentTransitions">false</item>
+        <item name="android:windowAllowEnterTransitionOverlap">false</item>
+        <item name="android:windowAllowReturnTransitionOverlap">false</item>
+
+        <!-- Xiaomi специфично - отключаем все системные анимации -->
+        <item name="android:overScrollMode">never</item>
+        <item name="android:scrollbars">none</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowEnterAnimation">@null</item>
+        <item name="android:windowExitAnimation">@null</item>
+
+        <!-- Фиксируем window параметры -->
+        <item name="android:windowSoftInputMode">adjustPan</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowIsTranslucent">false</item>
+
+        <!-- Xiaomi/MIUI - предотвращаем любые системные overlay -->
+        <item name="android:windowShowWallpaper">false</item>
+        <item name="android:windowBackground">@android:color/white</item>
     </style>
 </resources>

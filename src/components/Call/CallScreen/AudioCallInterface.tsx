@@ -7,7 +7,6 @@ import useCallTimer from '@/hooks/useCallTimer'
 import useThemeStore from '@/store/useThemeStore'
 import { createClient } from '@/utils/supabase/client'
 import { isMobileDevice, forcePlayAudio } from '@/utils/mobileAudioFix'
-import AudioDiagnosticPanel from '../AudioDiagnosticPanel'
 
 interface AudioCallInterfaceProps {
   remoteMicMuted: boolean
@@ -279,10 +278,6 @@ const AudioCallInterface = ({
           </div>
         )}
 
-        {/* Enhanced Audio Diagnostic Panel */}
-        <div className="mt-4">
-          <AudioDiagnosticPanel />
-        </div>
       </div>
     </div>
   )

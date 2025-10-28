@@ -3,6 +3,11 @@ apply plugin: 'com.android.application'
 android {
     namespace "ru.pozvonimne.app"
     compileSdk rootProject.ext.compileSdkVersion
+
+    // Подавляем предупреждение о flatDir
+    lintOptions {
+        disable 'UsingFlatDir'
+    }
     defaultConfig {
         applicationId "ru.pozvonimne.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -25,9 +30,12 @@ android {
 }
 
 repositories {
-    flatDir{
-        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
-    }
+    // Используем только mavenCentral для лучшей совместимости и метаданных
+    mavenCentral()
+    // flatDir временно отключен для тестирования
+    // flatDir{
+    //     dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    // }
 }
 
 configurations.all {

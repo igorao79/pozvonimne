@@ -7,11 +7,13 @@ import useCallStore from '@/store/useCallStore'
 import ChatListItem from './ChatListItem'
 import PinnedChatsList from './PinnedChatsList'
 import ChatContextMenu from './ChatContextMenu'
+import ArchiveView from './ArchiveView'
 import { usePinnedChats } from '@/hooks/usePinnedChats'
 import { RandomFact } from '@/components/ui/random-fact'
 import { UserCounter } from '@/components/ui/user-counter'
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
 import { useChatListRealtime } from '@/hooks/useChatListRealtime' // 🔥 ПРЯМАЯ ПОДПИСКА
+import { useChatArchive } from '@/hooks/useChatArchive' // 🗂️ АРХИВ И УДАЛЕНИЕ
 import { Volume2, RefreshCw } from 'lucide-react'
 import { Chat } from '@/types/chat'
 
@@ -20,25 +22,33 @@ interface ChatListProps {
   onCreateNewChat: () => void
   selectedChatId?: string | undefined
   externalUpdateTrigger?: number // Внешний триггер для обновления данных
+  onContextMenu?: (chatId: string, chatName: string, position: { x: number; y: number }, isArchived: boolean) => void
 }
 
-const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat, selectedChatId, externalUpdateTrigger }, ref) => {
+const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat, selectedChatId, externalUpdateTrigger, onContextMenu }, ref) => {
   const [chats, setChats] = useState<Chat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentTime, setCurrentTime] = useState<number>(Date.now())
   const [updateTrigger, setUpdateTrigger] = useState(0)
   
+  // 🗂️ Состояние для архивированных чатов
+  const [archivedChats, setArchivedChats] = useState<Chat[]>([])
+  const [hasArchivedChats, setHasArchivedChats] = useState(false)
+  const [showArchiveView, setShowArchiveView] = useState(false)
+  
   // Состояние для контекстного меню
   const [contextMenu, setContextMenu] = useState<{
     chatId: string
     chatName: string
     position: { x: number; y: number }
+    isArchived: boolean
   } | null>(null)
   
   const { userId } = useCallStore()
   const { supabase } = useSupabaseStore()
   const { isPinned, pinnedChats } = usePinnedChats()
+  const { refreshChatList } = useChatArchive()
   
   // 🔥 ВОЗВРАЩАЕМ ГЛОБАЛЬНУЮ СИСТЕМУ: Прямые подписки вызывали CHANNEL_ERROR, глобальный store работает!
   
@@ -107,12 +117,15 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
     })
   }
 
-  // Разделяем чаты на закрепленные и обычные
+  // Разделяем чаты на закрепленные и обычные (исключаем архивированные)
   const { pinnedChatsData, regularChatsData } = React.useMemo(() => {
     const pinned: Chat[] = []
     const regular: Chat[] = []
     
-    chats.forEach(chat => {
+    // Фильтруем только неархивированные чаты
+    const nonArchivedChats = chats.filter(chat => !chat.is_archived)
+    
+    nonArchivedChats.forEach(chat => {
       if (isPinned(chat.id)) {
         pinned.push(chat)
       } else {
@@ -133,8 +146,17 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
 
   // Обработчики контекстного меню
   const handleContextMenu = useCallback((chatId: string, chatName: string, position: { x: number; y: number }) => {
-    setContextMenu({ chatId, chatName, position })
-  }, [])
+    // Определяем, архивирован ли этот чат
+    const chat = chats.find(c => c.id === chatId) || archivedChats.find(c => c.id === chatId)
+    const isArchived = chat?.is_archived || false
+
+    // Если есть внешний обработчик, используем его, иначе локальное состояние
+    if (onContextMenu) {
+      onContextMenu(chatId, chatName, position, isArchived)
+    } else {
+      setContextMenu({ chatId, chatName, position, isArchived })
+    }
+  }, [chats, archivedChats, onContextMenu])
 
   const handleCloseContextMenu = useCallback(() => {
     setContextMenu(null)
@@ -148,6 +170,87 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       }
     }
   }, [contextMenu, chats, onChatSelect])
+
+  // Обработчики событий архивации
+  const handleOptimisticArchiveChange = useCallback((event: CustomEvent) => {
+    const { chatId, isArchived } = event.detail
+    console.log('⚡ ChatList: Оптимистичное обновление архива:', { chatId: chatId.slice(0, 8), isArchived })
+
+    // Получаем текущее состояние
+    const currentChats = chats
+    const currentArchived = archivedChats
+
+    // Находим чат в любом списке
+    const chat = currentChats.find(c => c.id === chatId) || currentArchived.find(c => c.id === chatId)
+
+    if (!chat) {
+      console.warn('⚡ Chat: Чат не найден для оптимистичного обновления:', chatId.slice(0, 8))
+      return
+    }
+
+    if (isArchived) {
+      // Архивирование: удаляем из обычных, добавляем в архив
+      const newChats = currentChats.filter(c => c.id !== chatId)
+      const newArchived = [...currentArchived.filter(c => c.id !== chatId), { ...chat, is_archived: true }]
+
+      setChats(newChats)
+      setArchivedChats(newArchived)
+      setHasArchivedChats(newArchived.length > 0)
+    } else {
+      // Разархивирование: удаляем из архива, добавляем в обычные
+      const newArchived = currentArchived.filter(c => c.id !== chatId)
+      const newChats = [...currentChats.filter(c => c.id !== chatId), { ...chat, is_archived: false }]
+
+      setChats(newChats)
+      setArchivedChats(newArchived)
+      setHasArchivedChats(newArchived.length > 0)
+
+      // Если мы в режиме просмотра архива и архив стал пустым - вернуться к обычным чатам
+      if (showArchiveView && newArchived.length === 0) {
+        setShowArchiveView(false)
+      }
+    }
+
+  }, [chats, archivedChats, showArchiveView])
+
+  const handleRollbackArchiveChange = useCallback((event: CustomEvent) => {
+    const { chatId, isArchived } = event.detail
+    console.log('🔄 ChatList: Откат изменения архива:', { chatId: chatId.slice(0, 8), isArchived })
+
+    // Откатываем изменения - применяем обратную логику
+    setChats(prevChats => {
+      const chat = prevChats.find(c => c.id === chatId)
+      if (!chat) return prevChats
+
+      if (isArchived) {
+        // Возвращаем в обычные чаты
+        return [...prevChats, { ...chat, is_archived: false }]
+      } else {
+        // Удаляем из обычных чатов
+        return prevChats.filter(c => c.id !== chatId)
+      }
+    })
+
+    setArchivedChats(prevArchived => {
+      const chat = prevArchived.find(c => c.id === chatId) || chats.find(c => c.id === chatId)
+      if (!chat) return prevArchived
+
+      if (isArchived) {
+        // Удаляем из архива
+        return prevArchived.filter(c => c.id !== chatId)
+      } else {
+        // Возвращаем в архив
+        return [...prevArchived.filter(c => c.id !== chatId), { ...chat, is_archived: true }]
+      }
+    })
+
+    // Обновляем счетчик архивированных чатов
+    setArchivedChats(prev => {
+      setHasArchivedChats(prev.length > 0)
+      return prev
+    })
+
+  }, [chats])
 
   // 📌 ДИАГНОСТИКА: Логируем изменения закрепленных чатов для отладки реалтайм обновлений
   useEffect(() => {
@@ -182,8 +285,13 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       const syncTimestamp = Date.now()
       console.log(`🔄 СИНХРОНИЗАЦИЯ [${instanceId.current}]: Загружаем чаты с принудительным обновлением, timestamp:`, syncTimestamp)
 
-      // Простой вызов без дополнительных параметров (исправлен PGRST203)
-      const { data, error: chatsError } = await supabase.rpc('get_user_chats')
+      // Всегда загружаем все чаты (обычные + архивированные) с небольшой задержкой для БД
+      await new Promise(resolve => setTimeout(resolve, 50)) // Небольшая задержка для синхронизации
+
+      const { data, error: chatsError } = await supabase.rpc('get_user_chats', {
+        user_uuid: userId,
+        include_archived: true
+      })
 
       if (chatsError) {
         console.error(`❌ СИНХРОНИЗАЦИЯ [${instanceId.current}]: Ошибка загрузки чатов:`, chatsError)
@@ -210,6 +318,19 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
         // Добавляем timestamp для принудительного обновления
         _updateTimestamp: Date.now()
       }))
+
+      // Разделяем чаты на обычные и архивированные
+      const regularChats = newChats.filter(chat => !chat.is_archived)
+      const archivedChatsList = newChats.filter(chat => chat.is_archived)
+
+      setChats(regularChats)
+      setArchivedChats(archivedChatsList)
+      setHasArchivedChats(archivedChatsList.length > 0)
+
+      // Если мы в режиме просмотра архива, но архив пуст - вернуться к обычным чатам
+      if (showArchiveView && archivedChatsList.length === 0) {
+        setShowArchiveView(false)
+      }
 
       // 🔥 ДИАГНОСТИКА СИНХРОНИЗАЦИИ: Детальное логирование обновлений
       console.log('🔄 ChatList: Обновление списка чатов:', {
@@ -241,7 +362,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
   // Загружаем чаты при монтировании и изменении userId (с лоадером)
   useEffect(() => {
     loadChats(true)
-  }, [userId, loadChats])
+  }, [userId])
 
   // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: ДЕБАУНСЕННЫЙ loadChats при изменении updateTrigger!
   useEffect(() => {
@@ -261,7 +382,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
         clearTimeout(timeoutId)
       }
     }
-  }, [updateTrigger]) // 🔥 УБИРАЕМ loadChats из зависимостей!
+  }, [updateTrigger, loadChats])
 
   // Подписка на обновления теперь обрабатывается в ChatApp для мобильной версии
 
@@ -274,7 +395,37 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       console.log('🔄 ChatList: Внешний триггер обновления, перезагружаем чаты')
       loadChats(false)
     }
-  }, [externalUpdateTrigger])
+  }, [externalUpdateTrigger, loadChats])
+
+  // 🗂️ Слушаем события изменения архива для realtime обновления
+  useEffect(() => {
+    const handleArchiveChange = (event: CustomEvent) => {
+      const { userId: changedUserId, action } = event.detail
+      if (changedUserId === userId) {
+        console.log('🗂️ ChatList: Получено событие изменения архива:', action, '- обновляем список')
+
+        // Принудительно очищаем кэш и обновляем данные
+        setChats([])
+        setArchivedChats([])
+        setHasArchivedChats(false)
+
+        // Небольшая задержка перед загрузкой для гарантии обновления БД
+        setTimeout(() => {
+          loadChats(false)
+        }, 100)
+      }
+    }
+
+    window.addEventListener('chatArchiveChanged', handleArchiveChange as EventListener)
+    window.addEventListener('optimisticArchiveChange', handleOptimisticArchiveChange as EventListener)
+    window.addEventListener('rollbackArchiveChange', handleRollbackArchiveChange as EventListener)
+
+    return () => {
+      window.removeEventListener('chatArchiveChanged', handleArchiveChange as EventListener)
+      window.removeEventListener('optimisticArchiveChange', handleOptimisticArchiveChange as EventListener)
+      window.removeEventListener('rollbackArchiveChange', handleRollbackArchiveChange as EventListener)
+    }
+  }, [userId, loadChats, handleOptimisticArchiveChange, handleRollbackArchiveChange])
 
   // 🔥 ИСПРАВЛЕНИЕ: Менее частое обновление времени и уменьшение логов
   useEffect(() => {
@@ -353,7 +504,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
         return null
       }
     }
-  }), [chats, onChatSelect, supabase, setChats])
+  }), [chats, onChatSelect, supabase, setChats, setArchivedChats, setHasArchivedChats])
 
   // Удалили старую realtime подписку - теперь используем глобальную синхронизацию через Zustand
   /*
@@ -512,7 +663,22 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       <div className="px-2 py-1 border-b border-border bg-card flex-shrink-0">
         <div className="flex items-center justify-between min-h-[32px]">
             <div className="flex items-center space-x-2">
-            <h1 className="text-sm font-semibold text-foreground">Чаты</h1>
+            {showArchiveView ? (
+              <>
+                <button
+                  onClick={() => setShowArchiveView(false)}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Вернуться к чатам"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <h1 className="text-sm font-semibold text-foreground">Архив</h1>
+              </>
+            ) : (
+              <h1 className="text-sm font-semibold text-foreground">Чаты</h1>
+            )}
             {/* 🔥 ГЛОБАЛЬНЫЙ STORE ИНДИКАТОР: Показываем статус глобальной синхронизации */}
             <div className="flex items-center space-x-1">
               <div
@@ -552,7 +718,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       </div>
 
       {/* Список чатов */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide md:scrollbar-default">
+      <div className="flex-1 overflow-y-auto scrollbar-hide md:scrollbar-default relative">
         {error && (
           <div className="p-4">
             <div className="bg-destructive/10 border border-destructive rounded-lg p-3">
@@ -567,19 +733,23 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
           </div>
         )}
 
-        {chats.length === 0 && !error ? (
+        {(showArchiveView ? archivedChats.length === 0 : chats.length === 0 && !hasArchivedChats) && !error ? (
           <div className="px-3 py-4 text-center">
             <div className="py-6">
               <svg className="w-8 h-8 mx-auto text-muted-foreground mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              <p className="text-muted-foreground text-sm mb-2">У вас пока нет чатов</p>
-              <button
-                onClick={onCreateNewChat}
-                className="text-primary hover:text-primary/80 text-sm font-medium transition-colors"
-              >
-                Создать первый чат
-              </button>
+              <p className="text-muted-foreground text-sm mb-2">
+                {showArchiveView ? 'Архив пуст' : 'У вас пока нет чатов'}
+              </p>
+              {!showArchiveView && (
+                <button
+                  onClick={onCreateNewChat}
+                  className="text-primary hover:text-primary/80 text-sm font-medium transition-colors"
+                >
+                  Создать первый чат
+                </button>
+              )}
             </div>
           </div>
         ) : (
@@ -592,22 +762,41 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
               formatLastMessageTime={formatLastMessageTime}
               truncateText={truncateText}
               onContextMenu={handleContextMenu}
+              hasArchivedChats={hasArchivedChats}
+              archivedChatsCount={archivedChats.length}
+              onShowArchive={showArchiveView ? () => setShowArchiveView(false) : () => setShowArchiveView(true)}
+              showArchiveView={showArchiveView}
             />
 
-            {/* Обычные чаты */}
-            <div className="divide-y divide-gray-100">
-              {regularChatsData.map((chat) => (
-                <ChatListItem
-                  key={chat.id}
-                  chat={chat}
-                  onClick={() => onChatSelect(chat)}
-                  isSelected={selectedChatId === chat.id}
-                  formatLastMessageTime={formatLastMessageTime}
-                  truncateText={truncateText}
-                  onContextMenu={handleContextMenu}
-                />
-              ))}
-            </div>
+            {showArchiveView ? (
+              /* Режим просмотра архива */
+              <ArchiveView
+                archivedChats={archivedChats}
+                selectedChatId={selectedChatId}
+                onChatSelect={onChatSelect}
+                formatLastMessageTime={formatLastMessageTime}
+                truncateText={truncateText}
+                onContextMenu={handleContextMenu}
+              />
+            ) : (
+              /* Режим просмотра обычных чатов */
+              <>
+                {/* Обычные чаты */}
+                <div className="divide-y divide-gray-100">
+                  {regularChatsData.map((chat) => (
+                    <ChatListItem
+                      key={chat.id}
+                      chat={chat}
+                      onClick={() => onChatSelect(chat)}
+                      isSelected={selectedChatId === chat.id}
+                      formatLastMessageTime={formatLastMessageTime}
+                      truncateText={truncateText}
+                      onContextMenu={handleContextMenu}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
 
             {/* Контекстное меню */}
             {contextMenu && (
@@ -617,6 +806,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
                 position={contextMenu.position}
                 onClose={handleCloseContextMenu}
                 onSelectChat={handleSelectChatFromContext}
+                isArchived={contextMenu.isArchived}
               />
             )}
 

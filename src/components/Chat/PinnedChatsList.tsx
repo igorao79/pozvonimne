@@ -31,6 +31,10 @@ interface PinnedChatsListProps {
   formatLastMessageTime: (timestamp?: string) => string
   truncateText: (text: string, maxLength?: number) => string
   onContextMenu: (chatId: string, chatName: string, position: { x: number; y: number }) => void
+  hasArchivedChats?: boolean
+  archivedChatsCount?: number
+  onShowArchive?: () => void
+  showArchiveView?: boolean
 }
 
 export const PinnedChatsList: React.FC<PinnedChatsListProps> = ({
@@ -39,7 +43,11 @@ export const PinnedChatsList: React.FC<PinnedChatsListProps> = ({
   onChatSelect,
   formatLastMessageTime,
   truncateText,
-  onContextMenu
+  onContextMenu,
+  hasArchivedChats = false,
+  archivedChatsCount = 0,
+  onShowArchive,
+  showArchiveView = false
 }) => {
   const { pinnedChats, reorderPinnedChats, getPinnedChatsCount } = usePinnedChats()
 
@@ -163,6 +171,41 @@ export const PinnedChatsList: React.FC<PinnedChatsListProps> = ({
           <p className="text-xs text-muted-foreground/70 text-center">
             💡 Перетащите чтобы изменить порядок
           </p>
+        </div>
+      )}
+
+      {/* Элемент "Архив" */}
+      {((hasArchivedChats && !showArchiveView) || showArchiveView) && onShowArchive && (
+        <div className="border-t border-border">
+          <button
+            onClick={onShowArchive}
+            className="w-full px-3 py-3 hover:bg-accent/50 transition-colors text-left flex items-center space-x-3"
+          >
+            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+              {showArchiveView ? (
+                <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                </svg>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-foreground truncate">
+                  {showArchiveView ? 'Вернуться к обычным чатам' : 'Архив'}
+                </p>
+                {!showArchiveView && (
+                  <span className="text-xs text-muted-foreground">{archivedChatsCount}</span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground truncate">
+                {showArchiveView ? 'Показать все активные разговоры' : 'Архивированные чаты'}
+              </p>
+            </div>
+          </button>
         </div>
       )}
     </div>

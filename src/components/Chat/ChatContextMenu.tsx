@@ -1,8 +1,10 @@
 'use client'
 
-import React, { useEffect, useRef } from 'react'
-import { Pin, PinOff, MessageSquare, Archive } from 'lucide-react'
+import React, { useEffect, useRef, useState } from 'react'
+import { Pin, PinOff, MessageSquare, Archive, ArchiveRestore, Trash2, UserMinus } from 'lucide-react'
 import { usePinnedChats } from '@/hooks/usePinnedChats'
+import useChatActions from '@/hooks/useChatActions'
+import DeleteChatConfirmation from './DeleteChatConfirmation'
 
 interface ChatContextMenuProps {
   chatId: string
@@ -10,6 +12,7 @@ interface ChatContextMenuProps {
   position: { x: number; y: number }
   onClose: () => void
   onSelectChat?: () => void
+  isArchived?: boolean
 }
 
 export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
@@ -17,11 +20,16 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
   chatName,
   position,
   onClose,
-  onSelectChat
+  onSelectChat,
+  isArchived = false
 }) => {
   const menuRef = useRef<HTMLDivElement>(null)
   const { isPinned, pinChat, unpinChat } = usePinnedChats()
+  const { archiveChat, deleteChatForSelf, deleteChatForAll, isLoading } = useChatActions()
   const chatIsPinned = isPinned(chatId)
+  
+  // Состояние для модального окна подтверждения удаления
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
 
   // Закрываем меню при клике вне его области
   useEffect(() => {
@@ -77,46 +85,100 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
     onClose()
   }
 
-  // Определяем позицию меню чтобы оно не выходило за пределы экрана
+  // Обработчик архивации/разархивации
+  const handleArchive = async () => {
+    // Оптимистичное обновление UI
+    const wasArchived = isArchived
+    const willBeArchived = !isArchived
+
+    // Отправляем событие для мгновенного обновления UI
+    window.dispatchEvent(new CustomEvent('optimisticArchiveChange', {
+      detail: {
+        chatId,
+        isArchived: willBeArchived,
+        timestamp: Date.now()
+      }
+    }))
+
+    try {
+      const success = await archiveChat(chatId, willBeArchived)
+      if (success) {
+        console.log(`✅ Чат ${willBeArchived ? 'архивирован' : 'разархивирован'}`)
+        // Успешно - оставляем оптимистичное обновление
+      } else {
+        // В случае ошибки откатываем оптимистичное обновление
+        console.error('❌ Операция архивирования не удалась')
+        window.dispatchEvent(new CustomEvent('rollbackArchiveChange', {
+          detail: {
+            chatId,
+            isArchived: wasArchived,
+            timestamp: Date.now()
+          }
+        }))
+      }
+    } catch (error) {
+      console.error('❌ Ошибка архивации:', error)
+      // В случае ошибки откатываем оптимистичное обновление
+      window.dispatchEvent(new CustomEvent('rollbackArchiveChange', {
+        detail: {
+          chatId,
+          isArchived: wasArchived,
+          timestamp: Date.now()
+        }
+      }))
+    }
+    onClose()
+  }
+
+  // Обработчик удаления для себя
+  const handleDeleteForSelf = async () => {
+    try {
+      const success = await deleteChatForSelf(chatId)
+      if (success) {
+        console.log('✅ Чат удален для себя')
+      }
+    } catch (error) {
+      console.error('❌ Ошибка удаления для себя:', error)
+    }
+    onClose()
+  }
+
+  // Обработчик удаления для всех
+  const handleDeleteForAll = async () => {
+    try {
+      const success = await deleteChatForAll(chatId)
+      if (success) {
+        console.log('✅ Чат удален для всех')
+      }
+      setShowDeleteConfirmation(false)
+    } catch (error) {
+      console.error('❌ Ошибка удаления для всех:', error)
+    }
+    onClose()
+  }
+
+  // Позиционирование меню точно в координатах курсора
   const adjustedPosition = React.useMemo(() => {
-    const menuWidth = 200 // Предполагаемая ширина меню
-    const menuHeight = 120 // Предполагаемая высота меню
-    
-    let x = position.x
-    let y = position.y
-
-    // Проверяем не выходит ли меню за правую границу экрана
-    if (x + menuWidth > window.innerWidth) {
-      x = window.innerWidth - menuWidth - 10
-    }
-
-    // Проверяем не выходит ли меню за нижнюю границу экрана
-    if (y + menuHeight > window.innerHeight) {
-      y = window.innerHeight - menuHeight - 10
-    }
-
-    // Не даем меню выходить за левую и верхнюю границы
-    x = Math.max(10, x)
-    y = Math.max(10, y)
-
-    return { x, y }
+    return { x: position.x, y: position.y }
   }, [position])
 
   return (
     <>
       {/* Фоновая подложка для перехвата кликов */}
       <div
-        className="fixed inset-0 z-40 bg-transparent"
+        className="fixed inset-0 z-[9998] bg-transparent"
         onClick={onClose}
       />
       
       {/* Контекстное меню */}
       <div
         ref={menuRef}
-        className="fixed z-50 bg-card border border-border rounded-lg shadow-lg py-1 min-w-[180px] animate-in fade-in-0 zoom-in-95 duration-150"
+        className="fixed z-[9999] bg-card border border-border rounded-lg shadow-lg py-1 min-w-[180px] animate-in fade-in-0 zoom-in-95 duration-150"
         style={{
+          position: 'fixed',
           left: `${adjustedPosition.x}px`,
           top: `${adjustedPosition.y}px`,
+          zIndex: 9999,
         }}
       >
         {/* Заголовок меню */}
@@ -158,17 +220,62 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
           {/* Разделитель */}
           <div className="h-px bg-border/50 mx-2 my-1" />
 
-          {/* Дополнительные опции (пока заглушки) */}
+          {/* Архивировать/Разархивировать */}
           <button
-            onClick={onClose}
-            className="w-full flex items-center px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors opacity-50 cursor-not-allowed"
-            disabled
+            onClick={handleArchive}
+            disabled={isLoading}
+            className="w-full flex items-center px-3 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50"
           >
-            <Archive className="w-4 h-4 mr-2" />
-            Архивировать
+            {isArchived ? (
+              <>
+                <ArchiveRestore className="w-4 h-4 mr-2" />
+                Разархивировать
+              </>
+            ) : (
+              <>
+                <Archive className="w-4 h-4 mr-2" />
+                Архивировать
+              </>
+            )}
+          </button>
+
+          {/* Разделитель */}
+          <div className="h-px bg-border/50 mx-2 my-1" />
+
+          {/* Удалить для себя */}
+          <button
+            onClick={handleDeleteForSelf}
+            disabled={isLoading}
+            className="w-full flex items-center px-3 py-2 text-sm text-orange-600 dark:text-orange-400 hover:bg-accent transition-colors disabled:opacity-50"
+          >
+            <UserMinus className="w-4 h-4 mr-2" />
+            Удалить для себя
+          </button>
+
+          {/* Удалить для всех */}
+          <button
+            onClick={() => setShowDeleteConfirmation(true)}
+            disabled={isLoading}
+            className="w-full flex items-center px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Удалить для всех
           </button>
         </div>
       </div>
+      
+      {/* Модальное окно подтверждения удаления */}
+      {showDeleteConfirmation && (
+        <DeleteChatConfirmation
+          chatName={chatName}
+          onConfirm={handleDeleteForAll}
+          onCancel={() => {
+            setShowDeleteConfirmation(false)
+            onClose()
+          }}
+          isDeleting={isLoading}
+        />
+      )}
     </>
   )
 }

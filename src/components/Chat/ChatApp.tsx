@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import ChatList from './ChatList'
 import ChatInterface from './ChatInterface'
 import CreateChatModal from './CreateChatModal'
+import ChatContextMenu from './ChatContextMenu'
 import { RandomFact } from '@/components/ui/random-fact'
 import { UserCounter } from '@/components/ui/user-counter'
 import useChatSyncStore from '@/store/useChatSyncStore'
@@ -41,6 +42,15 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isLoading, setIsLoading] = useState(!!autoOpenChatId) // Простая логика загрузки
   const [chatsUpdateTrigger, setChatsUpdateTrigger] = useState(0) // Триггер для обновления списка чатов
+
+  // Состояние для контекстного меню чатов
+  const [contextMenu, setContextMenu] = useState<{
+    chatId: string
+    chatName: string
+    position: { x: number; y: number }
+    isArchived: boolean
+  } | null>(null)
+
   const chatListRef = useRef<any>(null)
 
   // Ref для debouncing сохранения в localStorage
@@ -50,6 +60,24 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
 
   // 🔥 УБРАНА ГЛОБАЛЬНАЯ СИСТЕМА: Теперь ChatList использует прямые подписки
   // Каждый компонент имеет свою независимую прямую подписку на изменения БД
+
+  // Обработчики контекстного меню
+  const handleContextMenu = (chatId: string, chatName: string, position: { x: number; y: number }, isArchived: boolean) => {
+    setContextMenu({ chatId, chatName, position, isArchived })
+  }
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null)
+  }
+
+  const handleSelectChatFromContext = () => {
+    if (contextMenu) {
+      // Найдем чат по ID и выберем его
+      // Это можно реализовать через callback из ChatList
+      console.log('Выбор чата из контекстного меню:', contextMenu.chatId)
+    }
+    setContextMenu(null)
+  }
 
   // Уведомляем систему звуков об изменении активного чата
   useEffect(() => {
@@ -286,6 +314,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
             onCreateNewChat={handleCreateNewChat}
             selectedChatId={undefined}
             externalUpdateTrigger={chatsUpdateTrigger}
+            onContextMenu={handleContextMenu}
           />
         </div>
 
@@ -311,6 +340,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
             onCreateNewChat={handleCreateNewChat}
             selectedChatId={selectedChat?.id}
             externalUpdateTrigger={chatsUpdateTrigger}
+            onContextMenu={handleContextMenu}
           />
         </div>
 
@@ -356,6 +386,18 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
         }}
         onChatCreated={handleChatCreated}
       />
+
+      {/* Контекстное меню */}
+      {contextMenu && (
+        <ChatContextMenu
+          chatId={contextMenu.chatId}
+          chatName={contextMenu.chatName}
+          position={contextMenu.position}
+          onClose={handleCloseContextMenu}
+          onSelectChat={handleSelectChatFromContext}
+          isArchived={contextMenu.isArchived}
+        />
+      )}
 
     </div>
   )

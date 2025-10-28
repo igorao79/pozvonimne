@@ -16,19 +16,57 @@ export default function CapacitorSetup() {
 
     const setupStatusBar = async () => {
       try {
-        // ПОКАЗЫВАЕМ статус бар
-        await StatusBar.show()
-        
-        // Делаем его прозрачным чтобы контент был под ним
-        await StatusBar.setOverlaysWebView({ overlay: true })
-        
-        // Темный стиль (светлые иконки)
-        await StatusBar.setStyle({ style: Style.Light })
-        
-        // Прозрачный фон
-        await StatusBar.setBackgroundColor({ color: '#00000000' })
-        
-        console.log('✅ StatusBar показан')
+        // iOS СПЕЦИФИЧНЫЕ настройки для предотвращения движения status bar
+        if (Capacitor.getPlatform() === 'ios') {
+          // Многократный сброс для гарантии
+          await StatusBar.hide()
+          await new Promise(resolve => setTimeout(resolve, 50))
+          await StatusBar.show()
+
+          // КРИТИЧНО: НЕ накладываем на веб-представление
+          await StatusBar.setOverlaysWebView({ overlay: false })
+
+          // Устанавливаем стиль и цвет
+          await StatusBar.setStyle({ style: Style.Light })
+          await StatusBar.setBackgroundColor({ color: '#ffffff' })
+
+          // Дополнительный сброс через 500мс (iOS иногда сбрасывает настройки)
+          setTimeout(async () => {
+            try {
+              await StatusBar.setOverlaysWebView({ overlay: false })
+              await StatusBar.setStyle({ style: Style.Light })
+              console.log('✅ iOS StatusBar дополнительно зафиксирован')
+            } catch (e) {
+              console.warn('⚠️ iOS StatusBar дополнительная настройка не удалась:', e)
+            }
+          }, 500)
+        } else {
+          // Android настройки - Xiaomi/MIUI специфично
+          await StatusBar.show()
+
+          // Xiaomi устройства часто игнорируют стандартные настройки
+          // Повторяем несколько раз для гарантии
+          await StatusBar.setOverlaysWebView({ overlay: false })
+          await new Promise(resolve => setTimeout(resolve, 50))
+          await StatusBar.setOverlaysWebView({ overlay: false }) // Повтор
+
+          await StatusBar.setBackgroundColor({ color: '#ffffff' })
+          await StatusBar.setStyle({ style: Style.Light })
+
+          // Xiaomi может сбрасывать настройки - повторяем через время
+          setTimeout(async () => {
+            try {
+              await StatusBar.setOverlaysWebView({ overlay: false })
+              await StatusBar.setBackgroundColor({ color: '#ffffff' })
+              await StatusBar.setStyle({ style: Style.Light })
+              console.log('✅ Xiaomi StatusBar дополнительно зафиксирован')
+            } catch (e) {
+              console.warn('⚠️ Xiaomi StatusBar дополнительная настройка не удалась:', e)
+            }
+          }, 1000)
+        }
+
+        console.log('✅ StatusBar настроен для предотвращения движения при скролле')
       } catch (error) {
         console.error('❌ Ошибка StatusBar:', error)
       }

@@ -19,6 +19,7 @@ export interface Chat {
   other_participant_last_seen?: string
   created_at?: string
   updated_at?: string
+  is_archived?: boolean // Чат находится в архиве
   _updateTimestamp?: number // Для принудительного обновления
 }
 

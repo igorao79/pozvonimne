@@ -25,8 +25,12 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
-    // Status bar configuration - НЕ настраиваем здесь, делаем программно
-    StatusBar: {},
+    // Status bar configuration - фиксируем программно
+    StatusBar: {
+      overlaysWebView: false, // НЕ накладываем на веб-представление
+      backgroundColor: '#ffffff', // Белый фон
+      style: 'light', // Светлые иконки
+    },
     // Splash screen configuration
     SplashScreen: {
       launchShowDuration: 2000,
@@ -42,8 +46,11 @@ const config: CapacitorConfig = {
   },
   // iOS specific configuration
   ios: {
-    contentInset: 'automatic',
+    contentInset: 'never', // Предотвращаем автоматические insets
     limitsNavigationsToAppBoundDomains: true,
+    // Дополнительные настройки для status bar
+    scrollEnabled: true,
+    allowsBackForwardNavigationGestures: false,
   },
   // Android specific configuration
   android: {
@@ -57,6 +64,18 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
     captureInput: true,
     webContentsDebuggingEnabled: false,
+    // Настройки для предотвращения движения status bar
+    backgroundColor: '#ffffff',
+    // Отключаем некоторые оптимизации, которые могут влиять на status bar
+    webContentsDebuggingEnabled: false,
+    // Xiaomi/MIUI специфичные настройки
+    // Предотвращаем любые системные overlay эффекты
+    scrollEnabled: true,
+    // Дополнительные WebView настройки для Xiaomi
+    webView: {
+      // overScrollMode не поддерживается, но другие настройки могут помочь
+      scrollEnabled: true,
+    }
   },
 };
 

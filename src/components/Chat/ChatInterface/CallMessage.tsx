@@ -165,20 +165,23 @@ export const CallMessage: React.FC<CallMessageProps> = ({ message, chat, userId 
 
   // Форматируем длительность звонка (синхронизировано с SQL логикой)
   const formatDuration = (seconds: number): string => {
-    if (seconds < 60) {
-      return `${seconds} сек`
-    } else if (seconds < 3600) {
+    // Минимальная продолжительность 1 секунда для отображения
+    const duration = Math.max(1, seconds)
+    
+    if (duration < 60) {
+      return `${duration} сек`
+    } else if (duration < 3600) {
       // Минуты и секунды
-      if (seconds % 60 === 0) {
-        return `${Math.floor(seconds / 60)} мин`
+      if (duration % 60 === 0) {
+        return `${Math.floor(duration / 60)} мин`
       } else {
-        return `${Math.floor(seconds / 60)} мин ${seconds % 60} сек`
+        return `${Math.floor(duration / 60)} мин ${duration % 60} сек`
       }
     } else {
       // Часы и минуты
-      const hours = Math.floor(seconds / 3600)
-      const minutes = Math.floor((seconds % 3600) / 60)
-      const remainingSeconds = seconds % 60
+      const hours = Math.floor(duration / 3600)
+      const minutes = Math.floor((duration % 3600) / 60)
+      const remainingSeconds = duration % 60
 
       let hourText = ''
       if (hours === 1) hourText = '1 час'
@@ -187,7 +190,7 @@ export const CallMessage: React.FC<CallMessageProps> = ({ message, chat, userId 
       else if (hours === 4) hourText = '4 часа'
       else hourText = `${hours} часов`
 
-      if (seconds % 3600 === 0) {
+      if (duration % 3600 === 0) {
         // Ровно часы
         return hourText
       } else {
