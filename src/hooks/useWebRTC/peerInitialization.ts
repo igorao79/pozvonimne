@@ -1,7 +1,16 @@
 import SimplePeer from 'simple-peer'
 import type { PeerRefs, SimplePeerConfig } from './types'
 import useCallStore from '@/store/useCallStore'
-import { getPeerConfig, getOfferOptions, getAnswerOptions, getChannelConfig, getAudioConstraints } from './peerConfig'
+import { 
+  getPeerConfig, 
+  getOfferOptions, 
+  getAnswerOptions, 
+  getChannelConfig, 
+  getAudioConstraints,
+  getOptimizedPeerConfig,
+  setCompatibleCodecPreferences,
+  diagnoseCodecCompatibility
+} from './peerConfig'
 import { sendSignal } from './signalHandlers'
 import { startKeepAlive, stopKeepAlive, handleKeepAliveMessage } from './keepAlive'
 import { startConnectionMonitoring, stopConnectionMonitoring } from './connectionMonitor'
@@ -67,12 +76,16 @@ export const initializePeer = async (
 
     setLocalStream(stream)
 
-    // Создаем конфигурацию peer
+    // Диагностируем кодеки для отладки проблем
+    console.log('🔍 Running codec compatibility check...')
+    await diagnoseCodecCompatibility()
+
+    // Создаем оптимизированную конфигурацию peer для решения проблем компьютер→телефон
     const peerConfig: SimplePeerConfig = {
       initiator: isInitiator,
       trickle: true,
       stream,
-      config: getPeerConfig(),
+      config: getOptimizedPeerConfig(), // Используем оптимизированную конфигурацию
       offerOptions: getOfferOptions(),
       answerOptions: getAnswerOptions(),
       allowHalfTrickle: true,
@@ -95,12 +108,21 @@ export const initializePeer = async (
     })
 
     // Обработчик подключения
-    peer.on('connect', () => {
+    peer.on('connect', async () => {
       console.log('Peer connected!')
       setIsCallActive(true)
 
       // Регистрируем успешное соединение
       performanceMonitor.recordConnectionSuccess(userId || 'unknown')
+
+      // Устанавливаем совместимые кодеки для решения проблем компьютер→телефон
+      console.log('🎯 Setting compatible codecs after peer connection...')
+      try {
+        await setCompatibleCodecPreferences(peer)
+        console.log('🎯 Compatible codecs successfully set')
+      } catch (error) {
+        console.warn('🎯 Failed to set compatible codecs:', error)
+      }
 
       // Сбрасываем счетчик переподключений при успешном соединении
       resetReconnectionCounter(peerRefs)

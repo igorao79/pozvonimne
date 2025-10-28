@@ -74,74 +74,168 @@ export const getChannelConfig = (): RTCDataChannelInit => ({
 // Импорт мобильных утилит
 import { isMobileDevice, isIOSDevice, isAndroidDevice } from '@/utils/mobileAudioFix'
 
-// Получить конфигурацию аудио потока
+// Получить унифицированную конфигурацию аудио потока для максимальной совместимости
 export const getAudioConstraints = () => {
-  const baseConstraints = {
+  // Унифицированные настройки для всех платформ 
+  // Это исправляет проблему передачи звука компьютер → телефон
+  const unifiedConstraints = {
     video: false,
     audio: {
+      // Базовые стандартные настройки WebRTC
       echoCancellation: true,
-      noiseSuppression: true,
+      noiseSuppression: true, 
       autoGainControl: true,
-    } as any // Используем any для Google-специфичных свойств
+      
+      // Унифицированные параметры для совместимости всех устройств
+      sampleRate: 48000, // Стандартная частота дискретизации
+      sampleSize: 16,     // Стандартный размер выборки
+      channelCount: 1,    // Моно для стабильности и совместимости
+      
+      // Избегаем Google-специфичных параметров для лучшей совместимости
+      // googTypingNoiseDetection может блокировать передачу на мобильные
+      latency: 0.02, // Минимальная задержка (20ms)
+    } as any
   }
 
-  // Если это мобильное устройство, используем специализированные настройки
+  // Платформо-специфичные дополнения (без нарушения совместимости)
   if (isMobileDevice()) {
-    console.log('📱 Using mobile-optimized audio constraints')
+    console.log('📱 Applying mobile-compatible audio constraints')
     
     if (isAndroidDevice()) {
-      // Android-специфичные настройки
-      baseConstraints.audio = {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        // Android Chrome specific (не все браузеры поддерживают)
+      // Android: добавляем только безопасные Google-параметры
+      Object.assign(unifiedConstraints.audio, {
         googEchoCancellation: true,
-        googAutoGainControl: true,
+        googAutoGainControl: true, 
         googNoiseSuppression: true,
-        googHighpassFilter: true,
-        googTypingNoiseDetection: false, // Может вызывать проблемы на Android
-        sampleRate: 48000,
-        sampleSize: 16,
-        channelCount: 1, // Моно для стабильности
-      }
+        // НЕ используем googTypingNoiseDetection - может блокировать звук
+      })
     } else if (isIOSDevice()) {
-      // iOS-специфичные настройки (более консервативные)
-      baseConstraints.audio = {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        sampleRate: { ideal: 48000, min: 44100 },
-        channelCount: 1,
-        // Избегаем Google-специфичных настроек на iOS
-      }
-    } else {
-      // Общие мобильные настройки
-      baseConstraints.audio = {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        sampleRate: 48000,
-        channelCount: 1,
-      }
+      // iOS: минимальные изменения для стабильности
+      unifiedConstraints.audio.sampleRate = { ideal: 48000, min: 44100 }
     }
+    
+    // Дополнительные настройки для мобильных
+    Object.assign(unifiedConstraints.audio, {
+      volume: 1.0,
+      deviceId: 'default', // Используем устройство по умолчанию
+    })
   } else {
-    // Настройки для десктопа (оригинальные, более агрессивные)
-    baseConstraints.audio = {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
+    console.log('🖥️ Applying desktop-compatible audio constraints')
+    
+    // Десктоп: используем только совместимые параметры
+    Object.assign(unifiedConstraints.audio, {
       googEchoCancellation: true,
       googAutoGainControl: true,
       googNoiseSuppression: true,
+      // НЕ используем googTypingNoiseDetection для совместимости с мобильными
       googHighpassFilter: true,
-      googTypingNoiseDetection: true,
-      sampleRate: 48000, // Высокое качество звука
-      sampleSize: 16,
-      channelCount: 1, // Моно для экономии трафика
-    }
+    })
   }
 
-  console.log('🎧 Audio constraints configured:', baseConstraints)
-  return baseConstraints
+  console.log('🎧 Unified audio constraints for cross-platform compatibility:', unifiedConstraints)
+  return unifiedConstraints
+}
+
+// Новая функция для диагностики кодеков и совместимости
+export const diagnoseCodecCompatibility = async () => {
+  try {
+    const audioCapabilities = RTCRtpSender.getCapabilities('audio')
+    const receiverCapabilities = RTCRtpReceiver.getCapabilities('audio')
+    
+    console.log('🔍 Supported audio send codecs:', audioCapabilities?.codecs?.map(c => c.mimeType))
+    console.log('🔍 Supported audio receive codecs:', receiverCapabilities?.codecs?.map(c => c.mimeType))
+    
+    // Проверяем совместимые кодеки
+    const compatibleCodecs = audioCapabilities?.codecs?.filter(sendCodec =>
+      receiverCapabilities?.codecs?.some(recvCodec => 
+        recvCodec.mimeType === sendCodec.mimeType
+      )
+    )
+    
+    console.log('🎯 Compatible audio codecs:', compatibleCodecs?.map(c => c.mimeType))
+    
+    return {
+      sendCodecs: audioCapabilities?.codecs || [],
+      receiveCodecs: receiverCapabilities?.codecs || [],
+      compatibleCodecs: compatibleCodecs || [],
+      platform: isMobileDevice() ? 'mobile' : 'desktop',
+      deviceType: isIOSDevice() ? 'iOS' : isAndroidDevice() ? 'Android' : 'Desktop'
+    }
+  } catch (error) {
+    console.error('🔍 Codec compatibility check failed:', error)
+    return null
+  }
+}
+
+// Функция для установки предпочтительных кодеков для совместимости
+export const setCompatibleCodecPreferences = async (peer: any, transceivers?: any[]) => {
+  try {
+    console.log('🎯 Setting compatible codec preferences for cross-platform calls...')
+    
+    // Получаем поддерживаемые кодеки
+    const capabilities = RTCRtpReceiver.getCapabilities('audio')
+    if (!capabilities || !capabilities.codecs) {
+      console.warn('🎯 No audio capabilities available')
+      return
+    }
+    
+    // Приоритетные кодеки для максимальной совместимости
+    const preferredCodecOrder = [
+      'audio/opus',     // Лучший выбор для WebRTC
+      'audio/PCMU',     // G.711 μ-law - универсальный
+      'audio/PCMA',     // G.711 A-law - универсальный
+      'audio/G722',     // Хорошее качество
+      'audio/telephone-event' // Для DTMF
+    ]
+    
+    // Фильтруем и сортируем кодеки по приоритету
+    const sortedCodecs = preferredCodecOrder.flatMap(mimeType =>
+      capabilities.codecs.filter(codec => codec.mimeType === mimeType)
+    ).concat(
+      // Добавляем остальные кодеки в конце
+      capabilities.codecs.filter(codec => 
+        !preferredCodecOrder.includes(codec.mimeType)
+      )
+    )
+    
+    console.log('🎯 Preferred codec order:', sortedCodecs.map(c => c.mimeType))
+    
+    // Применяем к существующим трансиверам
+    const allTransceivers = transceivers || peer?.getTransceivers?.() || []
+    
+    for (const transceiver of allTransceivers) {
+      if (transceiver && transceiver.receiver?.track?.kind === 'audio') {
+        try {
+          transceiver.setCodecPreferences(sortedCodecs)
+          console.log('🎯 Codec preferences set for audio transceiver')
+        } catch (err) {
+          console.warn('🎯 Failed to set codec preferences:', err)
+        }
+      }
+    }
+    
+    return sortedCodecs
+    
+  } catch (error) {
+    console.error('🎯 Error setting codec preferences:', error)
+    return null
+  }
+}
+
+// Функция для создания peer connection с оптимизированными настройками
+export const getOptimizedPeerConfig = (): PeerConfig => {
+  const baseConfig = getPeerConfig()
+  
+  // Дополнительные оптимизации для решения проблем компьютер→телефон
+  return {
+    ...baseConfig,
+    // Более агрессивное собирание кандидатов
+    iceCandidatePoolSize: 15,
+    // Принудительное использование bundle для лучшей совместимости
+    bundlePolicy: 'max-bundle',
+    // Требуем RTCP multiplexing для стабильности
+    rtcpMuxPolicy: 'require',
+    // Дополнительные настройки для мобильной совместимости
+    iceTransportPolicy: 'all' // Разрешаем все типы соединений
+  }
 }

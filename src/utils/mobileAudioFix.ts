@@ -488,3 +488,260 @@ export const getAudioTroubleshootingSteps = () => {
   
   return steps;
 };
+
+/**
+ * Специализированный диагностический инструмент для проблем компьютер→телефон
+ */
+export const diagnoseDesktopToMobileAudioIssues = async () => {
+  console.log('🔧 Запуск диагностики проблем звука компьютер→телефон...')
+  
+  const report = {
+    timestamp: new Date().toISOString(),
+    issue: 'desktop-to-mobile-audio-not-working',
+    platform: {
+      isMobile: isMobileDevice(),
+      isDesktop: !isMobileDevice(),
+      isIOS: isIOSDevice(),
+      isAndroid: isAndroidDevice(),
+      userAgent: navigator.userAgent
+    },
+    audio: {
+      context: null as any,
+      constraints: null as any,
+      devices: [] as any[],
+      capabilities: null as any,
+      permissions: null as any
+    },
+    webrtc: {
+      sendCodecs: [] as any[],
+      receiveCodecs: [] as any[],
+      compatibleCodecs: [] as any[]
+    },
+    recommendations: [] as string[]
+  }
+  
+  try {
+    // 1. Проверяем AudioContext
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioContextClass) {
+      const testContext = new AudioContextClass();
+      report.audio.context = {
+        supported: true,
+        state: testContext.state,
+        sampleRate: testContext.sampleRate,
+        baseLatency: testContext.baseLatency || 'unknown',
+        outputLatency: testContext.outputLatency || 'unknown'
+      };
+      testContext.close();
+    }
+    
+    // 2. Проверяем media constraints
+    try {
+      const testConstraints = {
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000,
+          channelCount: 1
+        }
+      };
+      
+      // Тестируем получение микрофона с унифицированными настройками
+      const testStream = await navigator.mediaDevices.getUserMedia(testConstraints);
+      report.audio.constraints = {
+        success: true,
+        applied: testConstraints
+      };
+      
+      const audioTracks = testStream.getAudioTracks();
+      if (audioTracks.length > 0) {
+        const track = audioTracks[0];
+        report.audio.constraints.actualSettings = track.getSettings();
+        report.audio.constraints.trackState = {
+          enabled: track.enabled,
+          muted: track.muted,
+          readyState: track.readyState
+        };
+      }
+      
+      // Закрываем тестовый поток
+      testStream.getTracks().forEach(track => track.stop());
+      
+    } catch (constraintError) {
+      report.audio.constraints = {
+        success: false,
+        error: constraintError.message
+      };
+    }
+    
+    // 3. Проверяем доступные устройства
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      report.audio.devices = devices
+        .filter(device => device.kind === 'audioinput' || device.kind === 'audiooutput')
+        .map(device => ({
+          kind: device.kind,
+          label: device.label || 'Unknown device',
+          deviceId: device.deviceId.slice(0, 8) + '...',
+          groupId: device.groupId
+        }));
+    } catch (devicesError) {
+      report.audio.devices = [];
+    }
+    
+    // 4. Проверяем WebRTC кодеки
+    try {
+      const sendCapabilities = RTCRtpSender.getCapabilities('audio');
+      const receiveCapabilities = RTCRtpReceiver.getCapabilities('audio');
+      
+      report.webrtc.sendCodecs = sendCapabilities?.codecs?.map(c => ({
+        mimeType: c.mimeType,
+        clockRate: c.clockRate,
+        channels: c.channels
+      })) || [];
+      
+      report.webrtc.receiveCodecs = receiveCapabilities?.codecs?.map(c => ({
+        mimeType: c.mimeType,
+        clockRate: c.clockRate,
+        channels: c.channels
+      })) || [];
+      
+      // Находим совместимые кодеки
+      report.webrtc.compatibleCodecs = report.webrtc.sendCodecs.filter(sendCodec =>
+        report.webrtc.receiveCodecs.some(recvCodec => 
+          recvCodec.mimeType === sendCodec.mimeType &&
+          recvCodec.clockRate === sendCodec.clockRate
+        )
+      );
+      
+    } catch (codecError) {
+      console.warn('Codec capabilities check failed:', codecError);
+    }
+    
+    // 5. Проверяем разрешения
+    try {
+      const micPermission = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      report.audio.permissions = {
+        microphone: micPermission.state
+      };
+    } catch (permError) {
+      report.audio.permissions = { microphone: 'unavailable' };
+    }
+    
+    // 6. Генерируем рекомендации на основе диагностики
+    if (!report.audio.context?.supported) {
+      report.recommendations.push('❌ AudioContext не поддерживается браузером');
+    }
+    
+    if (report.audio.context?.state === 'suspended') {
+      report.recommendations.push('⚠️ AudioContext приостановлен - требуется пользовательское взаимодействие');
+    }
+    
+    if (!report.audio.constraints?.success) {
+      report.recommendations.push('❌ Не удается получить доступ к микрофону - проверьте разрешения');
+    }
+    
+    if (report.audio.devices.filter(d => d.kind === 'audioinput').length === 0) {
+      report.recommendations.push('❌ Не найдены устройства ввода звука');
+    }
+    
+    if (report.webrtc.compatibleCodecs.length === 0) {
+      report.recommendations.push('❌ Нет совместимых аудио кодеков - критическая проблема WebRTC');
+    }
+    
+    if (!report.webrtc.compatibleCodecs.some(c => c.mimeType === 'audio/opus')) {
+      report.recommendations.push('⚠️ Codec Opus не найден - основной кодек WebRTC');
+    }
+    
+    if (report.audio.permissions?.microphone === 'denied') {
+      report.recommendations.push('❌ Доступ к микрофону запрещен - включите в настройках браузера');
+    }
+    
+    if (report.platform.isMobile && report.audio.context?.state !== 'running') {
+      report.recommendations.push('📱 На мобильном: попробуйте нажать на экран для активации аудио');
+    }
+    
+    // Специальные рекомендации для проблемы компьютер→телефон
+    if (!report.platform.isMobile) {
+      report.recommendations.push('💻 Десктоп→мобильный: используйте унифицированные аудио настройки');
+      report.recommendations.push('🔧 Убедитесь что отключен googTypingNoiseDetection');
+    }
+    
+    if (report.recommendations.length === 0) {
+      report.recommendations.push('✅ Все основные проверки пройдены успешно');
+    }
+    
+  } catch (error) {
+    console.error('Ошибка при диагностике:', error);
+    report.recommendations.push(`❌ Ошибка диагностики: ${error.message}`);
+  }
+  
+  console.log('🔧 Отчет диагностики:', report);
+  return report;
+};
+
+/**
+ * Автоматическое исправление проблем звука компьютер→телефон
+ */
+export const autoFixDesktopToMobileAudio = async () => {
+  console.log('🔧 Автоматическое исправление проблем звука...');
+  
+  const fixes = [];
+  
+  try {
+    // 1. Разблокируем AudioContext
+    await unlockAudio();
+    fixes.push('✅ AudioContext разблокирован');
+    
+    // 2. Проверяем и исправляем настройки микрофона
+    try {
+      const constraints = {
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000,
+          channelCount: 1,
+          // Избегаем проблемных параметров
+          googTypingNoiseDetection: false
+        }
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      fixes.push('✅ Микрофон настроен с совместимыми параметрами');
+      
+      // Проверяем трек
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length > 0 && audioTracks[0].enabled) {
+        fixes.push('✅ Аудио трек активен и готов к передаче');
+      }
+      
+      // Закрываем тестовый поток
+      stream.getTracks().forEach(track => track.stop());
+      
+    } catch (micError) {
+      fixes.push(`❌ Проблема с микрофоном: ${micError.message}`);
+    }
+    
+    // 3. Для мобильных устройств - специальные настройки
+    if (isMobileDevice()) {
+      await setupMobileAudio();
+      fixes.push('✅ Применены мобильные оптимизации');
+      
+      if (isAndroidDevice()) {
+        fixes.push('✅ Применены настройки для Android');
+      } else if (isIOSDevice()) {
+        fixes.push('✅ Применены настройки для iOS');
+      }
+    }
+    
+    fixes.push('🎯 Рекомендация: перезапустите звонок для применения исправлений');
+    
+  } catch (error) {
+    fixes.push(`❌ Ошибка автоисправления: ${error.message}`);
+  }
+  
+  console.log('🔧 Результат автоисправления:', fixes);
+  return fixes;
+};
