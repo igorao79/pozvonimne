@@ -14,7 +14,9 @@ import { UserCounter } from '@/components/ui/user-counter'
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
 import { useChatListRealtime } from '@/hooks/useChatListRealtime' // 🔥 ПРЯМАЯ ПОДПИСКА
 import { useChatArchive } from '@/hooks/useChatArchive' // 🗂️ АРХИВ И УДАЛЕНИЕ
-import { Volume2, RefreshCw } from 'lucide-react'
+import { useChatSettings } from '@/hooks/useChatSettings'
+import { ChatSettingsModal } from '@/components/ui'
+import { Volume2, RefreshCw, Settings } from 'lucide-react'
 import { Chat } from '@/types/chat'
 
 interface ChatListProps {
@@ -37,13 +39,20 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
   const [hasArchivedChats, setHasArchivedChats] = useState(false)
   const [showArchiveView, setShowArchiveView] = useState(false)
   
-  // Состояние для контекстного меню
+  // Состояние для контекстного меню (fallback если нет внешнего обработчика)
   const [contextMenu, setContextMenu] = useState<{
     chatId: string
     chatName: string
     position: { x: number; y: number }
     isArchived: boolean
   } | null>(null)
+
+  // Состояние для модального окна настроек
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+
+  // Настройки чата
+  const { hideArchive, toggleHideArchive } = useChatSettings()
+
   
   const { userId } = useCallStore()
   const { supabase } = useSupabaseStore()
@@ -662,7 +671,8 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
       {/* Ультракомпактный заголовок */}
       <div className="px-2 py-1 border-b border-border bg-card flex-shrink-0">
         <div className="flex items-center justify-between min-h-[32px]">
-            <div className="flex items-center space-x-2">
+          {/* Левая часть - заголовок и индикатор */}
+          <div className="flex items-center space-x-2">
             {showArchiveView ? (
               <>
                 <button
@@ -688,32 +698,45 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
 
               {/* 🔥 ГЛОБАЛЬНЫЙ STORE: Надежная синхронизация не требует ручного переподключения */}
             </div>
-            {/* Кнопки управления звуком */}
-            <div className="flex gap-1">
-              {/* Кнопка тестирования звука */}
-              <button
-                onClick={() => {
-                  console.log('🧪 Тестирование звука по клику пользователя')
-                  testSound()
-                }}
-                className="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
-                title="Проверить звуковые уведомления"
-              >
-                <Volume2 className="w-4 h-4" />
-              </button>
-              
-
-            </div>
           </div>
-          <button
-            onClick={onCreateNewChat}
-            className="p-1 text-primary hover:bg-primary/10 rounded-md transition-colors chat-create-button"
-            title="Создать новый чат"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
+
+          {/* Правая часть - кнопки управления */}
+          <div className="flex gap-1">
+
+            {/* Кнопка тестирования звука */}
+            <button
+              onClick={() => {
+                console.log('🧪 Тестирование звука по клику пользователя')
+                testSound()
+              }}
+              className="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
+              title="Проверить звуковые уведомления"
+            >
+              <Volume2 className="w-4 h-4" />
+            </button>
+
+            {/* Кнопка настроек чата */}
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              className="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              title="Настройки чата"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+
+            
+
+            {/* Кнопка создания нового чата */}
+            <button
+              onClick={onCreateNewChat}
+              className="w-4 h-4 flex items-center justify-center text-primary hover:bg-primary/10 rounded-md transition-colors chat-create-button"
+              title="Создать новый чат"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -766,6 +789,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
               archivedChatsCount={archivedChats.length}
               onShowArchive={showArchiveView ? () => setShowArchiveView(false) : () => setShowArchiveView(true)}
               showArchiveView={showArchiveView}
+              hideArchive={hideArchive}
             />
 
             {showArchiveView ? (
@@ -798,7 +822,7 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
               </>
             )}
 
-            {/* Контекстное меню */}
+            {/* Контекстное меню (fallback если нет внешнего обработчика) */}
             {contextMenu && (
               <ChatContextMenu
                 chatId={contextMenu.chatId}
@@ -822,6 +846,14 @@ const ChatList = forwardRef<any, ChatListProps>(({ onChatSelect, onCreateNewChat
           </>
         )}
       </div>
+
+      {/* Модальное окно настроек чата */}
+      <ChatSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        hideArchive={hideArchive}
+        onToggleHideArchive={toggleHideArchive}
+      />
     </div>
   )
 })

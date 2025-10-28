@@ -35,6 +35,7 @@ interface PinnedChatsListProps {
   archivedChatsCount?: number
   onShowArchive?: () => void
   showArchiveView?: boolean
+  hideArchive?: boolean
 }
 
 export const PinnedChatsList: React.FC<PinnedChatsListProps> = ({
@@ -47,7 +48,8 @@ export const PinnedChatsList: React.FC<PinnedChatsListProps> = ({
   hasArchivedChats = false,
   archivedChatsCount = 0,
   onShowArchive,
-  showArchiveView = false
+  showArchiveView = false,
+  hideArchive = false
 }) => {
   const { pinnedChats, reorderPinnedChats, getPinnedChatsCount } = usePinnedChats()
 
@@ -175,7 +177,7 @@ export const PinnedChatsList: React.FC<PinnedChatsListProps> = ({
       )}
 
       {/* Элемент "Архив" */}
-      {((hasArchivedChats && !showArchiveView) || showArchiveView) && onShowArchive && (
+      {((hasArchivedChats && !showArchiveView && !hideArchive) || showArchiveView) && onShowArchive && (
         <div className="border-t border-border">
           <button
             onClick={onShowArchive}

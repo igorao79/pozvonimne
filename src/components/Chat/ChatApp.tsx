@@ -35,9 +35,10 @@ interface ChatAppProps {
   resetTrigger?: number // Триггер для принудительного сброса состояния
   isInCall?: boolean // Флаг, указывающий что пользователь в звонке
   onCurrentChatChange?: (chatId: string | null) => void // Callback для отслеживания активного чата
+  layout?: 'mobile' | 'desktop' // Режим отображения
 }
 
-const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurrentChatChange }: ChatAppProps = {}) => {
+const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurrentChatChange, layout = 'mobile' }: ChatAppProps = {}) => {
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isLoading, setIsLoading] = useState(!!autoOpenChatId) // Простая логика загрузки
@@ -70,6 +71,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
     setContextMenu(null)
   }
 
+
   const handleSelectChatFromContext = () => {
     if (contextMenu) {
       // Найдем чат по ID и выберем его
@@ -93,6 +95,12 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
     setSelectedChat(null)
     setShowCreateModal(false)
     setIsLoading(false)
+    
+    // Уведомляем родительский компонент
+    if (onCurrentChatChange) {
+      onCurrentChatChange(null)
+      console.log('📞 ChatApp уведомил onCurrentChatChange о сбросе состояния')
+    }
 
     // Очищаем localStorage
     try {
@@ -224,6 +232,79 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
     }
   }, [resetTrigger])
 
+  // ПРОСТОЙ слушатель удаления чата
+  useEffect(() => {
+    const handleChatDeleted = (event: any) => {
+      const { chatId } = event.detail
+      console.log('📨 ChatApp получил событие chatDeleted для ID:', chatId)
+      console.log('🔍 selectedChat.id:', selectedChat?.id)
+      console.log('🔍 selectedChat.name:', selectedChat?.name)
+      console.log('🔍 hasSelectedChat:', !!selectedChat)
+      console.log('🔍 idsMatch:', selectedChat?.id === chatId)
+      console.log('🔍 willReset:', selectedChat && selectedChat.id === chatId)
+      
+      // Если удаленный чат совпадает с выбранным - сбрасываем на главную
+      if (selectedChat && selectedChat.id === chatId) {
+        console.log('🔄 СБРАСЫВАЕМ selectedChat на null')
+        setSelectedChat(null)
+        // Очищаем localStorage
+        localStorage.removeItem('selectedChatId')
+        localStorage.removeItem('selectedChatName') 
+        localStorage.removeItem('selectedChatTimestamp')
+        // Уведомляем родительский компонент
+        if (onCurrentChatChange) {
+          onCurrentChatChange(null)
+          console.log('📞 ChatApp уведомил onCurrentChatChange о сбросе чата')
+        }
+        console.log('✅ selectedChat сброшен на главную страницу')
+      } else {
+        console.log('⏭️ Не сбрасываем - другой чат или чат не выбран')
+      }
+    }
+
+    console.log('👂 ChatApp начал слушать событие chatDeleted')
+    window.addEventListener('chatDeleted', handleChatDeleted)
+    return () => {
+      console.log('👋 ChatApp перестал слушать событие chatDeleted')
+      window.removeEventListener('chatDeleted', handleChatDeleted)
+    }
+  }, [selectedChat, onCurrentChatChange])
+
+  // СЛУШАТЕЛЬ удаления чата ДРУГИМИ пользователями (для всех)
+  useEffect(() => {
+    const handleChatDeletedForAll = (event: any) => {
+      const { chatId } = event.detail
+      console.log('💣 ChatApp получил событие chatDeletedForAll для ID:', chatId)
+      console.log('🔍 selectedChat.id:', selectedChat?.id)
+      console.log('🔍 idsMatch:', selectedChat?.id === chatId)
+      
+      // Если удаленный чат совпадает с выбранным - сбрасываем на главную
+      if (selectedChat && selectedChat.id === chatId) {
+        console.log('💣 СБРАСЫВАЕМ selectedChat на null (удален другим пользователем)')
+        setSelectedChat(null)
+        // Очищаем localStorage
+        localStorage.removeItem('selectedChatId')
+        localStorage.removeItem('selectedChatName') 
+        localStorage.removeItem('selectedChatTimestamp')
+        // Уведомляем родительский компонент
+        if (onCurrentChatChange) {
+          onCurrentChatChange(null)
+          console.log('📞 ChatApp уведомил onCurrentChatChange о сбросе чата (удален для всех)')
+        }
+        console.log('✅ selectedChat сброшен на главную страницу (чат удален для всех)')
+      } else {
+        console.log('⏭️ Не сбрасываем - другой чат или чат не выбран (для всех)')
+      }
+    }
+
+    console.log('👂 ChatApp начал слушать событие chatDeletedForAll')
+    window.addEventListener('chatDeletedForAll', handleChatDeletedForAll)
+    return () => {
+      console.log('👋 ChatApp перестал слушать событие chatDeletedForAll')
+      window.removeEventListener('chatDeletedForAll', handleChatDeletedForAll)
+    }
+  }, [selectedChat, onCurrentChatChange])
+
   // Очистка таймера при размонтировании компонента
   useEffect(() => {
     return () => {
@@ -234,6 +315,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
   }, [])
 
   const handleChatSelect = (chat: Chat) => {
+    console.log('🎯 ChatApp.handleChatSelect ВЫЗВАН для чата:', chat.id)
     console.log('💾 CHAT APP - Выбран чат для сохранения:', {
       chatId: chat.id,
       chatName: chat.name,
@@ -242,6 +324,13 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
     
     // Мгновенно обновляем UI
     setSelectedChat(chat)
+    console.log('✅ ChatApp.setSelectedChat установлен на:', chat.id)
+    
+    // Уведомляем родительский компонент
+    if (onCurrentChatChange) {
+      onCurrentChatChange(chat.id)
+      console.log('📞 ChatApp уведомил onCurrentChatChange о чате:', chat.id)
+    }
     
     // Сохраняем в localStorage с debouncing для оптимизации
     debouncedSaveToLocalStorage(chat)
@@ -260,6 +349,12 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
     }
     
     setSelectedChat(null)
+    
+    // Уведомляем родительский компонент
+    if (onCurrentChatChange) {
+      onCurrentChatChange(null)
+      console.log('📞 ChatApp уведомил onCurrentChatChange о возврате к списку')
+    }
   }
 
   // Удалили сложную логику - теперь используем простую выше
@@ -285,6 +380,11 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
         const chat = await chatListRef.current.findAndSelectChat(chatId)
         if (chat) {
           setSelectedChat(chat)
+          // Уведомляем родительский компонент
+          if (onCurrentChatChange) {
+            onCurrentChatChange(chat.id)
+            console.log('📞 ChatApp уведомил onCurrentChatChange о новом чате:', chat.id)
+          }
         }
       }
     }, 500)
@@ -303,9 +403,9 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
   }
 
   return (
-    <div className="h-full flex bg-muted overflow-hidden">
+    <div className={`${layout === 'desktop' ? 'h-full w-full' : 'h-full'} flex bg-muted overflow-hidden`}>
       {/* Мобильная версия - ChatList всегда смонтирован для получения уведомлений */}
-      <div className="flex-1 md:hidden overflow-hidden">
+      <div className={layout === 'mobile' ? "flex-1 overflow-hidden" : "hidden"}>
         {/* ChatList всегда смонтирован, но скрыт когда пользователь в чате */}
         <div className={`${selectedChat ? 'hidden' : 'block'} bg-card h-full`}>
           <ChatList
@@ -331,7 +431,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
 
 
       {/* Десктопная версия - всегда показываем оба компонента */}
-      <div className="hidden md:flex w-full overflow-hidden">
+      <div className={layout === 'desktop' ? "flex w-full overflow-hidden" : "hidden md:flex w-full overflow-hidden"}>
         {/* Левая панель - список чатов */}
         <div className="w-80 bg-card border-r border-border flex-shrink-0 overflow-hidden">
           <ChatList

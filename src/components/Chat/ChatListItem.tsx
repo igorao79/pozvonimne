@@ -67,6 +67,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+
     onContextMenu?.(chat.id, chat.name, { x: e.clientX, y: e.clientY })
   }
 

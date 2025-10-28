@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Pin, PinOff, MessageSquare, Archive, ArchiveRestore, Trash2, UserMinus } from 'lucide-react'
 import { usePinnedChats } from '@/hooks/usePinnedChats'
 import useChatActions from '@/hooks/useChatActions'
@@ -12,6 +13,7 @@ interface ChatContextMenuProps {
   position: { x: number; y: number }
   onClose: () => void
   onSelectChat?: () => void
+  onChatDeleted?: () => void // Вызывается после успешного удаления чата
   isArchived?: boolean
 }
 
@@ -21,12 +23,14 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
   position,
   onClose,
   onSelectChat,
+  onChatDeleted,
   isArchived = false
 }) => {
   const menuRef = useRef<HTMLDivElement>(null)
   const { isPinned, pinChat, unpinChat } = usePinnedChats()
   const { archiveChat, deleteChatForSelf, deleteChatForAll, isLoading } = useChatActions()
   const chatIsPinned = isPinned(chatId)
+
   
   // Состояние для модального окна подтверждения удаления
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
@@ -145,10 +149,18 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
 
   // Обработчик удаления для всех
   const handleDeleteForAll = async () => {
+    console.log('🚀 handleDeleteForAll начинает работу для chatId:', chatId.slice(0, 8))
+    console.log('🔍 deleteChatForAll функция:', typeof deleteChatForAll)
+    
     try {
+      console.log('⏳ Вызываем deleteChatForAll...')
       const success = await deleteChatForAll(chatId)
+      console.log('📊 Результат deleteChatForAll:', success)
+      
       if (success) {
         console.log('✅ Чат удален для всех')
+      } else {
+        console.log('❌ deleteChatForAll вернул false')
       }
       setShowDeleteConfirmation(false)
     } catch (error) {
@@ -157,29 +169,30 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
     onClose()
   }
 
-  // Позиционирование меню точно в координатах курсора
-  const adjustedPosition = React.useMemo(() => {
-    return { x: position.x, y: position.y }
+  // Позиционирование точно от курсора
+  const menuStyle = React.useMemo(() => {
+    if (!position) return { left: '100px', top: '100px' }
+
+    // Используем координаты напрямую без изменений
+    return {
+      left: `${position.x}px`,
+      top: `${position.y}px`
+    }
   }, [position])
 
-  return (
+  return createPortal(
     <>
       {/* Фоновая подложка для перехвата кликов */}
       <div
         className="fixed inset-0 z-[9998] bg-transparent"
         onClick={onClose}
       />
-      
+
       {/* Контекстное меню */}
       <div
         ref={menuRef}
         className="fixed z-[9999] bg-card border border-border rounded-lg shadow-lg py-1 min-w-[180px] animate-in fade-in-0 zoom-in-95 duration-150"
-        style={{
-          position: 'fixed',
-          left: `${adjustedPosition.x}px`,
-          top: `${adjustedPosition.y}px`,
-          zIndex: 9999,
-        }}
+        style={menuStyle}
       >
         {/* Заголовок меню */}
         <div className="px-3 py-1.5 border-b border-border/50">
@@ -254,7 +267,10 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
 
           {/* Удалить для всех */}
           <button
-            onClick={() => setShowDeleteConfirmation(true)}
+            onClick={() => {
+              console.log('🖱️ Клик по кнопке "Удалить для всех" для chatId:', chatId.slice(0, 8))
+              setShowDeleteConfirmation(true)
+            }}
             disabled={isLoading}
             className="w-full flex items-center px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
           >
@@ -263,7 +279,7 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
           </button>
         </div>
       </div>
-      
+
       {/* Модальное окно подтверждения удаления */}
       {showDeleteConfirmation && (
         <DeleteChatConfirmation
@@ -276,7 +292,8 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
           isDeleting={isLoading}
         />
       )}
-    </>
+    </>,
+    document.body
   )
 }
 

@@ -67,6 +67,7 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
     return () => window.removeEventListener('resize', checkIsMobile)
   }, [])
 
+
   // Используем проп isInCall если он передан, иначе из store
   const effectiveIsInCall = isInCall !== undefined ? isInCall : storeIsInCall
 

@@ -17,16 +17,26 @@ export const DeleteChatConfirmation: React.FC<DeleteChatConfirmationProps> = ({
   onCancel,
   isDeleting = false
 }) => {
+  console.log('🔥 DeleteChatConfirmation рендерится для чата:', chatName)
+  console.log('🔍 isDeleting:', isDeleting)
+  
   return (
     <>
       {/* Backdrop */}
       <div 
         className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm animate-in fade-in-0 duration-200"
-        onClick={onCancel}
+        onClick={(e) => {
+          console.log('🖱️ Клик по backdrop')
+          console.log('🖱️ Target:', e.target)
+          console.log('🖱️ CurrentTarget:', e.currentTarget)
+          if (e.target === e.currentTarget) {
+            onCancel()
+          }
+        }}
       />
       
       {/* Modal */}
-      <div className="fixed left-1/2 top-1/2 z-[101] -translate-x-1/2 -translate-y-1/2 w-full max-w-md animate-in fade-in-0 zoom-in-95 duration-200">
+      <div className="fixed left-1/2 top-1/2 z-[999999] -translate-x-1/2 -translate-y-1/2 w-full max-w-md animate-in fade-in-0 zoom-in-95 duration-200">
         <div className="bg-card border border-border rounded-lg shadow-2xl p-6 m-4">
           {/* Header */}
           <div className="flex items-start justify-between mb-4">
@@ -87,7 +97,17 @@ export const DeleteChatConfirmation: React.FC<DeleteChatConfirmationProps> = ({
               Отмена
             </Button>
             <Button
-              onClick={onConfirm}
+              onClick={(e) => {
+                console.log('🖱️ Клик по кнопке "Удалить для всех" в модальном окне')
+                e.stopPropagation()
+                e.preventDefault()
+                onConfirm()
+              }}
+              onMouseDown={(e) => {
+                console.log('🖱️ MouseDown на кнопке "Удалить для всех"')
+                e.stopPropagation()
+              }}
+              onMouseEnter={() => console.log('🖱️ MouseEnter на кнопке "Удалить для всех"')}
               disabled={isDeleting}
               variant="destructive"
               className="flex-1"

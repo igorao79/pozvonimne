@@ -366,6 +366,8 @@ const useCallStore = create<CallStore>((set, get) => ({
       isCalling: true,
       isInCall: true,
       lastCallAttempt: now,
+      callStartTime: now, // Устанавливаем время начала звонка сразу при старте
+      callDurationSeconds: 0,
       isCallInitiating: false // Разблокируем после установки состояния
     })
 

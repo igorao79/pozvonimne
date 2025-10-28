@@ -212,10 +212,10 @@ export const CallMessage: React.FC<CallMessageProps> = ({ message, chat, userId 
 
   // Определяем текст и стиль сообщения в зависимости от статуса
   const getCallMessageContent = () => {
-    // Проверяем не является ли звонок "зависшим"
+    // Проверяем не является ли звонок "зависшим" (только для активных звонков)
     const callAge = callStartTime ? Date.now() - new Date(callStartTime).getTime() : 0
     const TWO_HOURS = 2 * 60 * 60 * 1000
-    const isStaleCall = callAge > TWO_HOURS && !isCurrentActiveCall
+    const isStaleCall = callAge > TWO_HOURS && callStatus === 'active' && !isCurrentActiveCall
     
     switch (callStatus) {
       case 'started':

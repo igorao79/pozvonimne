@@ -324,7 +324,24 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
     if (prevState.isCalling && !currentState.isCalling && !currentState.isCallActive && !currentState.isInCall && 
         callMessageIdRef.current && !wasCallActiveRef.current) {
       console.log('📞 Звонок пропущен/отменен (НЕ был активным) - обновляю статус')
-      updateCallMessage('missed')
+      
+      // Рассчитываем продолжительность даже для пропущенного звонка
+      const { callStartTime } = useCallStore.getState()
+      let actualDuration = callDurationSeconds
+      
+      // Если продолжительность 0, но есть время начала звонка, рассчитываем вручную
+      if (actualDuration === 0 && callStartTime) {
+        actualDuration = Math.floor((Date.now() - callStartTime) / 1000)
+        console.log('📞 Пересчитана продолжительность пропущенного звонка:', actualDuration, 'сек')
+      }
+      
+      // Минимальная продолжительность 1 секунда для отображения
+      if (actualDuration === 0) {
+        actualDuration = 1
+        console.log('📞 Установлена минимальная продолжительность для пропущенного звонка: 1 сек')
+      }
+      
+      updateCallMessage('missed', actualDuration)
       
       // МГНОВЕННО сбрасываем состояние - больше никаких задержек!
       callMessageIdRef.current = null

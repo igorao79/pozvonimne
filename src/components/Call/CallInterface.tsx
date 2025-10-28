@@ -6,11 +6,8 @@ import { createClient } from '@/utils/supabase/client'
 import useWebRTC from '@/hooks/useWebRTC'
 import { CallControls, IncomingCall, CallScreen, DialPad } from '.'
 import { ChatApp } from '../Chat'
-import { ChatList } from '../Chat'
-import { ChatInterface } from '../Chat'
-import { CreateChatModal } from '../Chat'
-import { RandomFact } from '@/components/ui/random-fact'
-import { UserCounter } from '@/components/ui/user-counter'
+// УБРАНО: ChatList, ChatInterface, CreateChatModal теперь внутри ChatApp
+// УБРАНО: RandomFact, UserCounter теперь внутри ChatApp
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
 import { useCallMessages } from '@/hooks/useCallMessages'
 
@@ -80,10 +77,7 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
   // Состояние для автоматического восстановления чата из localStorage
   const [savedChatId, setSavedChatId] = useState<string | null>(null)
 
-  // Состояние чатов для десктопной версии
-  const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const chatListRef = useRef<any>(null)
+  // УБРАНО: selectedChat, showCreateModal, chatListRef теперь управляются в ChatApp
 
   // Состояние для отслеживания предыдущих состояний звонка
   const prevCallStateRef = useRef({
@@ -174,86 +168,15 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
   // УБРАНО: Локальная подписка на звонки теперь обрабатывается глобально
   // через useGlobalCallManager в page.tsx
 
-  // Функции управления чатами для десктопной версии
-  const handleChatSelect = (chat: Chat) => {
-    console.log('💾 CALL INTERFACE - Выбран чат:', {
-      chatId: chat.id,
-      chatName: chat.name
-    })
-    setSelectedChat(chat)
-    
-    // Уведомляем систему звуков об изменении активного чата
-    if (onCurrentChatChange) {
-      onCurrentChatChange(chat.id)
-    }
-  }
+  // УБРАНО: Функции управления чатами теперь в ChatApp
 
-  const handleBackToList = () => {
-    console.log('💾 CALL INTERFACE - Очищаем выбранный чат')
-    setSelectedChat(null)
-    
-    // Уведомляем систему звуков об очистке активного чата
-    if (onCurrentChatChange) {
-      onCurrentChatChange(null)
-    }
-  }
-
-  const handleCreateNewChat = () => {
-    setShowCreateModal(true)
-  }
-
-  const handleChatCreated = async (chatId: string) => {
-    console.log('Чат создан:', chatId)
-    setShowCreateModal(false)
-
-    // Принудительно обновляем список чатов
-    if (chatListRef.current?.refreshChats) {
-      await chatListRef.current.refreshChats()
-    }
-
-    // Автоматически выбираем созданный чат
-    setTimeout(async () => {
-      if (chatListRef.current?.findAndSelectChat) {
-        const chat = await chatListRef.current.findAndSelectChat(chatId)
-        if (chat) {
-          setSelectedChat(chat)
-        }
-      }
-    }, 500)
-  }
+  // УБРАНО: handleChatCreated теперь в ChatApp
 
   useEffect(() => {
     console.log('📞 CallInterface mounted - call listening is handled globally by useGlobalCallManager')
   }, [userId])
 
-  // Восстановление выбранного чата из localStorage
-  useEffect(() => {
-    const savedChatId = localStorage.getItem('selectedChatId')
-    const savedChatName = localStorage.getItem('selectedChatName')
-
-    if (savedChatId && chatListRef.current?.findAndSelectChat) {
-      console.log('🔄 CALL INTERFACE - Восстанавливаем чат из localStorage:', savedChatId)
-
-      chatListRef.current.findAndSelectChat(savedChatId)
-        .then((chat: Chat | null) => {
-          if (chat) {
-            console.log('✅ CALL INTERFACE - Чат успешно восстановлен:', chat.name)
-            setSelectedChat(chat)
-          } else {
-            console.log('⚠️ CALL INTERFACE - Сохраненный чат не найден')
-            localStorage.removeItem('selectedChatId')
-            localStorage.removeItem('selectedChatName')
-            localStorage.removeItem('selectedChatTimestamp')
-          }
-        })
-        .catch((error: unknown) => {
-          console.error('❌ CALL INTERFACE - Ошибка восстановления чата:', error)
-          localStorage.removeItem('selectedChatId')
-          localStorage.removeItem('selectedChatName')
-          localStorage.removeItem('selectedChatTimestamp')
-        })
-    }
-  }, [])
+  // УБРАНО: Восстановление чата теперь обрабатывается в ChatApp через autoOpenChatId
 
   // ПРАВИЛЬНО: ChatApp всегда остается смонтированным
   // Компоненты звонка показываются поверх как модальные окна
@@ -281,6 +204,7 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
           onResetChat={() => {}}
           resetTrigger={resetChatTrigger}
           onCurrentChatChange={onCurrentChatChange}
+          layout="mobile"
         />
 
         {/* Модальные окна звонков на мобильных */}
@@ -297,52 +221,22 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
         )}
       </div>
 
-      {/* Десктопная версия - звонок внутри области чата */}
-      <div className="hidden md:flex h-full w-full overflow-hidden">
-        {/* Левая панель - список чатов (всегда видна) */}
-        <div className="w-80 bg-card border-r border-border flex-shrink-0 overflow-hidden">
-          <ChatList
-            ref={chatListRef}
-            onChatSelect={handleChatSelect}
-            onCreateNewChat={handleCreateNewChat}
-            selectedChatId={selectedChat?.id}
-          />
-        </div>
+      {/* Десктопная версия - ChatApp управляет всем */}
+      <div className="hidden md:block h-full w-full relative">
+        <ChatApp
+          autoOpenChatId={savedChatId || undefined}
+          resetTrigger={resetChatTrigger}
+          onCurrentChatChange={onCurrentChatChange}
+          layout="desktop"
+          isInCall={isReceivingCall || (isInCall && isCallActive)}
+        />
 
-        {/* Правая панель - интерфейс чата с возможным звонком */}
-        <div className="flex-1 bg-background overflow-hidden flex flex-col">
-          {/* Верхняя половина - звонок (только активный звонок, входящий - модальное окно) */}
-          {isInCall && isCallActive && (
-            <div className="h-1/2 border-b border-border bg-background overflow-hidden">
-              <CallScreen />
-            </div>
-          )}
-
-          {/* Нижняя половина - интерфейс чата */}
-          <div className={`${isInCall && isCallActive ? 'h-1/2' : 'h-full'} overflow-hidden`}>
-            {selectedChat ? (
-              <ChatInterface
-                chat={selectedChat}
-                onBack={handleBackToList}
-                isInCall={isReceivingCall || (isInCall && isCallActive)}
-              />
-            ) : (
-              <div className="h-full flex items-center justify-center p-4 chat-pattern-bg">
-                <div className="text-center max-w-md">
-                  <div className="bg-card/80 backdrop-blur-sm rounded-lg p-6 border border-border/50 mb-4">
-                    <svg className="w-12 h-12 mx-auto text-muted-foreground mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                    <h3 className="text-lg font-medium text-foreground mb-2">Выберите чат</h3>
-                    <p className="text-muted-foreground text-sm">Выберите чат из списка или создайте новый</p>
-                  </div>
-                  <RandomFact />
-                  <UserCounter />
-                </div>
-              </div>
-            )}
+        {/* Звонки поверх области чата */}
+        {isInCall && isCallActive && (
+          <div className="absolute top-0 left-80 right-0 h-1/2 border-b border-border bg-background overflow-hidden z-10">
+            <CallScreen />
           </div>
-        </div>
+        )}
       </div>
 
         {/* Полноэкранное модальное окно входящего звонка (только для десктопа) */}
@@ -352,12 +246,7 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
         </div>
       )}
 
-      {/* Модал создания чата */}
-      <CreateChatModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onChatCreated={handleChatCreated}
-      />
+      {/* УБРАНО: CreateChatModal теперь в ChatApp */}
     </div>
   )
 }

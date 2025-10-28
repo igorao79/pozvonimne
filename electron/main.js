@@ -58,146 +58,74 @@ let updateRequired = false;
 
 // Удалили определение portable - обновления работают для ВСЕХ версий
 
-// Setup auto-updater - БЛОКИРУЮЩАЯ проверка при запуске
+// Setup auto-updater - УПРОЩЕННАЯ проверка при запуске
 async function checkForUpdatesOnStartup() {
   if (isDev) {
     log.info('⏭️ Skipping auto-updater in development mode');
     return true;
   }
-  
+
+  // ДЛЯ PORTABLE ВЕРСИИ - ПРОПУСКАЕМ ПРОВЕРКУ ОБНОВЛЕНИЙ
+  const isPortable = process.env.PORTABLE_EXECUTABLE_DIR ||
+                     app.getPath('exe').includes('temp') ||
+                     app.getAppPath().includes('temp');
+
+  if (isPortable) {
+    log.info('🔄 Portable version detected - skipping update check');
+    return true;
+  }
+
   log.info('🔄 Starting update check...');
-  log.info('📍 App version:', app.getVersion());
-  log.info('📦 App path:', app.getAppPath());
-  log.info('🗂️ Exe path:', app.getPath('exe'));
 
   return new Promise((resolve) => {
     try {
       // Configure logging
       log.transports.file.level = 'info';
       autoUpdater.logger = log;
-      
-      // ВАЖНО: Явно указываем GitHub как источник обновлений
+
+      // Configure electron-updater
+      autoUpdater.autoDownload = false;
+      autoUpdater.autoInstallOnAppQuit = false;
+
+      // Упрощенные настройки для надежности
       autoUpdater.setFeedURL({
         provider: 'github',
         owner: 'igorao79',
         repo: 'pozvonimne',
         private: false
       });
-      log.info('📡 Feed URL configured for GitHub releases');
-      
-      // Configure electron-updater
-      autoUpdater.autoDownload = false; // Не скачиваем автоматически
-      autoUpdater.autoInstallOnAppQuit = false;
-      autoUpdater.allowDowngrade = false;
-      autoUpdater.allowPrerelease = false;
-      autoUpdater.disableDifferentialDownload = false; // Дифференциальные обновления
-      autoUpdater.fullChangelog = true; // Полный changelog
-      
-      log.info('⚙️ AutoUpdater configured');
-      updateSplashProgress(15, 'Проверка обновлений...');
 
-      // Проверяем обновления
-      autoUpdater.on('checking-for-update', () => {
-        log.info('🔍 Checking for updates...');
-        updateSplashProgress(20, 'Поиск обновлений...');
-      });
-
+      // Обработчики событий
       autoUpdater.on('update-available', (info) => {
-        log.info('✨ ============ UPDATE AVAILABLE ============');
-        log.info('Current version:', app.getVersion());
-        log.info('New version:', info.version);
-        log.info('Release date:', info.releaseDate);
-        log.info('Files:', JSON.stringify(info.files, null, 2));
-        log.info('========================================');
-        
+        log.info('✨ Update available:', info.version);
         updateRequired = true;
-        
-        // Показываем уведомление в splash screen
-        if (splashWindow && !splashWindow.isDestroyed()) {
-          splashWindow.webContents.send('update-available', {
-            version: info.version,
-            releaseNotes: info.releaseNotes,
-            releaseDate: info.releaseDate
-          });
-        } else {
-          log.warn('⚠️ Splash window not available for update dialog');
-        }
       });
 
       autoUpdater.on('update-not-available', () => {
         log.info('✅ App is up to date');
-        updateSplashProgress(25, 'Приложение актуально');
-        updateCheckComplete = true;
-        resolve(true); // Продолжаем запуск
+        resolve(true);
       });
 
       autoUpdater.on('error', (err) => {
-        log.error('❌ ============ UPDATE ERROR ============');
-        log.error('Error message:', err.message);
-        log.error('Error stack:', err.stack);
-        log.error('Feed URL:', autoUpdater.getFeedURL());
-        log.error('========================================');
-        
-        updateSplashProgress(25, 'Ошибка проверки обновлений');
-        updateCheckComplete = true;
-        resolve(true); // Продолжаем запуск даже при ошибке
-      });
-
-      autoUpdater.on('download-progress', (progressObj) => {
-        const percent = Math.round(progressObj.percent);
-        const speed = Math.round(progressObj.bytesPerSecond / 1024);
-        const transferred = Math.round(progressObj.transferred / 1024 / 1024 * 100) / 100;
-        const total = Math.round(progressObj.total / 1024 / 1024 * 100) / 100;
-        
-        log.info(`📥 Downloading: ${percent}% (${transferred}/${total} MB) @ ${speed} KB/s`);
-        
-        // Обновляем прогресс в splash
-        if (splashWindow && !splashWindow.isDestroyed()) {
-          splashWindow.webContents.send('update-download-progress', {
-            percent,
-            speed,
-            transferred,
-            total
-          });
-        }
-      });
-
-      autoUpdater.on('update-downloaded', (info) => {
-        log.info('✅ Update downloaded:', info.version);
-        
-        // Уведомляем splash что обновление скачано
-        if (splashWindow && !splashWindow.isDestroyed()) {
-          splashWindow.webContents.send('update-downloaded', {
-            version: info.version
-          });
-        }
-        
-        // Автоматически перезапускаем через 2 секунды
-        setTimeout(() => {
-          log.info('🔄 Restarting to apply update...');
-          autoUpdater.quitAndInstall(false, true);
-        }, 2000);
+        log.error('❌ Update error:', err.message);
+        resolve(true); // Продолжаем даже при ошибке
       });
 
       // Запускаем проверку
       autoUpdater.checkForUpdates().catch((error) => {
         log.error('Failed to check for updates:', error);
-        updateCheckComplete = true;
         resolve(true);
       });
 
-      // Таймаут на проверку обновлений - 10 секунд
+      // Сокращенный таймаут - 5 секунд
       setTimeout(() => {
-        if (!updateCheckComplete && !updateRequired) {
-          log.info('⏱️ Update check timeout, continuing...');
-          updateCheckComplete = true;
-          resolve(true);
-        }
-      }, 10000);
+        log.info('⏱️ Update check timeout, continuing...');
+        resolve(true);
+      }, 5000);
 
     } catch (error) {
       log.error('Error in checkForUpdatesOnStartup:', error);
-      resolve(true); // Продолжаем запуск при ошибке
+      resolve(true);
     }
   });
 }

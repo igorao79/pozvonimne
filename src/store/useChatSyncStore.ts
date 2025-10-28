@@ -259,6 +259,35 @@ const useChatSyncStore = create<ChatSyncState>()(
             get().refreshChatList()
           }, 150) // 150мс debounce для группировки обновлений
         })
+        .on('broadcast', {
+          event: 'chat_deleted_for_all'
+        }, (payload) => {
+          console.log('🌐 Глобальное broadcast уведомление: чат удален для всех', {
+            chatId: payload.payload?.chatId?.slice(0, 8),
+            deletedBy: payload.payload?.deletedBy?.slice(0, 8),
+            timestamp: new Date().toLocaleTimeString()
+          })
+          
+          const { chatId, deletedBy } = payload.payload
+          
+          // Не обрабатываем событие если это наше собственное удаление
+          if (deletedBy === userId) {
+            console.log('🚫 Пропускаем - это наше собственное удаление чата')
+            return
+          }
+          
+          // 📨 Отправляем событие для перенаправления других пользователей на главную
+          window.dispatchEvent(new CustomEvent('chatDeletedForAll', {
+            detail: { chatId }
+          }))
+          
+          // 🔥 Обновляем списки чатов
+          clearTimeout(debounceTimeout)
+          debounceTimeout = setTimeout(() => {
+            console.log('🔥 ГЛОБАЛЬНАЯ BROADCAST ПОДПИСКА: Обновляем ChatList после удаления чата')
+            get().refreshChatList()
+          }, 150)
+        })
         .on('postgres_changes', {
           event: 'INSERT',
           schema: 'public',
