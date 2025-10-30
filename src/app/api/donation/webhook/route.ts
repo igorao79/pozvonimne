@@ -13,10 +13,7 @@ interface DonationWebhookPayload {
   shown_at: string | null
 }
 
-interface WebhookLog {
-  id: string
-  donation_id: number
-  payload: any
+interface WebhookLogData {
   processed_at: string
   status: 'success' | 'error' | 'duplicate'
   error_message?: string

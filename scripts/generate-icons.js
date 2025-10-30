@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
 // Simple script to copy existing icons for different platforms
 // In a real scenario, you'd use proper icon generation tools
@@ -18,9 +18,8 @@ const icons = [
   { src: 'logo.webp', dest: 'logo.webp' }
 ];
 
-icons.forEach(({ src, dest }) => {
+icons.forEach(({ src }) => {
   const srcPath = path.join(sourceDir, src);
-  const destPath = path.join(targetDir, dest);
 
   if (fs.existsSync(srcPath)) {
     console.log(`✓ Icon ${src} already exists`);

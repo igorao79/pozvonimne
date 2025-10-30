@@ -13,7 +13,6 @@ interface ChatContextMenuProps {
   position: { x: number; y: number }
   onClose: () => void
   onSelectChat?: () => void
-  onChatDeleted?: () => void // Вызывается после успешного удаления чата
   isArchived?: boolean
 }
 
@@ -23,7 +22,6 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
   position,
   onClose,
   onSelectChat,
-  onChatDeleted,
   isArchived = false
 }) => {
   const menuRef = useRef<HTMLDivElement>(null)

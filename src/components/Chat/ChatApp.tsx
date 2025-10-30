@@ -1,17 +1,18 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import ChatList from './ChatList'
 import ChatInterface from './ChatInterface'
+import FavoritesChat from './FavoritesChat'
 import CreateChatModal from './CreateChatModal'
 import ChatContextMenu from './ChatContextMenu'
 import { RandomFact } from '@/components/ui/random-fact'
 import { UserCounter } from '@/components/ui/user-counter'
-import useChatSyncStore from '@/store/useChatSyncStore'
+import { Chat as ChatInterfaceChat } from './ChatInterface/types'
 
 interface Chat {
   id: string
-  type: 'private' | 'group'
+  type: 'private' | 'group' | 'favorites'
   name: string
   avatar_url?: string
   last_message?: string
@@ -42,7 +43,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isLoading, setIsLoading] = useState(!!autoOpenChatId) // Простая логика загрузки
-  const [chatsUpdateTrigger, setChatsUpdateTrigger] = useState(0) // Триггер для обновления списка чатов
+  const [chatsUpdateTrigger] = useState(0) // Триггер для обновления списка чатов
 
   // Состояние для контекстного меню чатов
   const [contextMenu, setContextMenu] = useState<{
@@ -52,7 +53,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
     isArchived: boolean
   } | null>(null)
 
-  const chatListRef = useRef<any>(null)
+  const chatListRef = useRef<React.ComponentRef<typeof ChatList>>(null)
 
   // Ref для debouncing сохранения в localStorage
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -90,12 +91,12 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
   }, [selectedChat?.id, onCurrentChatChange])
 
   // Функция для сброса состояния чата
-  const resetChatState = () => {
+  const resetChatState = useCallback(() => {
     console.log('🔄 RESET CHAT STATE - Сброс состояния чата')
     setSelectedChat(null)
     setShowCreateModal(false)
     setIsLoading(false)
-    
+
     // Уведомляем родительский компонент
     if (onCurrentChatChange) {
       onCurrentChatChange(null)
@@ -116,7 +117,7 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
     if (onResetChat) {
       onResetChat()
     }
-  }
+  }, [onCurrentChatChange, onResetChat])
   
   // Debounced функция для сохранения в localStorage
   const debouncedSaveToLocalStorage = (chat: Chat) => {
@@ -230,11 +231,11 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
       console.log('🔄 EXTERNAL RESET - Триггер сброса чата активирован:', resetTrigger)
       resetChatState()
     }
-  }, [resetTrigger])
+  }, [resetTrigger, resetChatState])
 
   // ПРОСТОЙ слушатель удаления чата
   useEffect(() => {
-    const handleChatDeleted = (event: any) => {
+    const handleChatDeleted = (event: CustomEvent) => {
       const { chatId } = event.detail
       console.log('📨 ChatApp получил событие chatDeleted для ID:', chatId)
       console.log('🔍 selectedChat.id:', selectedChat?.id)
@@ -263,16 +264,16 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
     }
 
     console.log('👂 ChatApp начал слушать событие chatDeleted')
-    window.addEventListener('chatDeleted', handleChatDeleted)
+    window.addEventListener('chatDeleted', handleChatDeleted as EventListener)
     return () => {
       console.log('👋 ChatApp перестал слушать событие chatDeleted')
-      window.removeEventListener('chatDeleted', handleChatDeleted)
+      window.removeEventListener('chatDeleted', handleChatDeleted as EventListener)
     }
   }, [selectedChat, onCurrentChatChange])
 
   // СЛУШАТЕЛЬ удаления чата ДРУГИМИ пользователями (для всех)
   useEffect(() => {
-    const handleChatDeletedForAll = (event: any) => {
+    const handleChatDeletedForAll = (event: CustomEvent) => {
       const { chatId } = event.detail
       console.log('💣 ChatApp получил событие chatDeletedForAll для ID:', chatId)
       console.log('🔍 selectedChat.id:', selectedChat?.id)
@@ -298,10 +299,10 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
     }
 
     console.log('👂 ChatApp начал слушать событие chatDeletedForAll')
-    window.addEventListener('chatDeletedForAll', handleChatDeletedForAll)
+    window.addEventListener('chatDeletedForAll', handleChatDeletedForAll as EventListener)
     return () => {
       console.log('👋 ChatApp перестал слушать событие chatDeletedForAll')
-      window.removeEventListener('chatDeletedForAll', handleChatDeletedForAll)
+      window.removeEventListener('chatDeletedForAll', handleChatDeletedForAll as EventListener)
     }
   }, [selectedChat, onCurrentChatChange])
 
@@ -319,12 +320,13 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
     console.log('💾 CHAT APP - Выбран чат для сохранения:', {
       chatId: chat.id,
       chatName: chat.name,
+      chatType: chat.type,
       timestamp: new Date().toISOString()
     })
     
     // Мгновенно обновляем UI
     setSelectedChat(chat)
-    console.log('✅ ChatApp.setSelectedChat установлен на:', chat.id)
+    console.log('✅ ChatApp.setSelectedChat установлен на:', chat.id, 'тип:', chat.type)
     
     // Уведомляем родительский компонент
     if (onCurrentChatChange) {
@@ -332,8 +334,12 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
       console.log('📞 ChatApp уведомил onCurrentChatChange о чате:', chat.id)
     }
     
-    // Сохраняем в localStorage с debouncing для оптимизации
-    debouncedSaveToLocalStorage(chat)
+    // Сохраняем в localStorage с debouncing для оптимизации (кроме избранного)
+    if (chat.type !== 'favorites') {
+      debouncedSaveToLocalStorage(chat)
+    } else {
+      console.log('⭐ Избранное не сохраняется в localStorage')
+    }
   }
 
   const handleBackToList = () => {
@@ -418,14 +424,21 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
           />
         </div>
 
-        {/* ChatInterface показывается когда выбран чат */}
+        {/* ChatInterface или FavoritesChat показывается когда выбран чат */}
         {selectedChat && (
-          <ChatInterface
-            chat={selectedChat}
-            onBack={handleBackToList}
-            isInCall={isInCall}
-            hasUnreadMessages={(selectedChat.unread_count || 0) > 0}
-          />
+          selectedChat.type === 'favorites' ? (
+            <FavoritesChat
+              onBack={handleBackToList}
+              isActive={true}
+            />
+          ) : (
+            <ChatInterface
+              chat={selectedChat as ChatInterfaceChat}
+              onBack={handleBackToList}
+              isInCall={isInCall}
+              hasUnreadMessages={(selectedChat.unread_count || 0) > 0}
+            />
+          )
         )}
       </div>
 
@@ -447,12 +460,19 @@ const ChatApp = ({ autoOpenChatId, onResetChat, resetTrigger, isInCall, onCurren
         {/* Правая панель - интерфейс чата */}
         <div className="flex-1 bg-background overflow-hidden">
           {selectedChat ? (
-            <ChatInterface
-              chat={selectedChat}
-              onBack={handleBackToList}
-              isInCall={isInCall}
-              hasUnreadMessages={(selectedChat.unread_count || 0) > 0}
-            />
+            selectedChat.type === 'favorites' ? (
+              <FavoritesChat
+                onBack={handleBackToList}
+                isActive={true}
+              />
+            ) : (
+              <ChatInterface
+                chat={selectedChat as ChatInterfaceChat}
+                onBack={handleBackToList}
+                isInCall={isInCall}
+                hasUnreadMessages={(selectedChat.unread_count || 0) > 0}
+              />
+            )
           ) : (
             <div className="h-full flex items-center justify-center p-4 chat-pattern-bg">
               <div className="text-center max-w-md">

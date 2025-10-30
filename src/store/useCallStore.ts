@@ -332,7 +332,7 @@ const useCallStore = create<CallStore>((set, get) => ({
     const now = Date.now()
     
     // Очищаем предыдущее состояние перед новым звонком
-    const { peer, localStream, remoteStream } = get()
+    const { peer, localStream } = get()
     
     if (peer && !peer.destroyed) {
       console.log('🚀 StartCall: Cleaning up old peer')

@@ -5,19 +5,15 @@
  * Используем существующую глобальную синхронизацию вместо сложных прямых подписок
  */
 
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useCallback, useRef, useMemo } from 'react'
 import useChatSyncStore from '@/store/useChatSyncStore'
 import { useSoundNotifications } from './useSoundNotifications'
-
-interface Chat {
-  id: string
-  [key: string]: any
-}
+import { Chat as ChatType } from '@/types/chat'
 
 interface UseChatListRealtimeProps {
   userId?: string | null
   onChatUpdate: () => void
-  chats?: Chat[] // Список чатов пользователя для фильтрации звуковых уведомлений
+  chats?: ChatType[] // Список чатов пользователя для фильтрации звуковых уведомлений
 }
 
 export const useChatListRealtime = ({
@@ -26,20 +22,20 @@ export const useChatListRealtime = ({
   chats = []
 }: UseChatListRealtimeProps) => {
   // 🔥 РАДИКАЛЬНОЕ ИСПРАВЛЕНИЕ: Используем ГЛОБАЛЬНЫЙ STORE вместо прямых подписок!
-  const { lastMessageUpdate, registerRefreshCallback, registerMessageCallback, isGlobalSyncActive } = useChatSyncStore()
+  const { registerRefreshCallback, registerMessageCallback } = useChatSyncStore()
   const { maybePlayNotification } = useSoundNotifications()
   
   // Храним список ID чатов пользователя
   const userChatIdsRef = useRef<Set<string>>(new Set())
 
-  const stableCallback = useCallback(() => {
+  // Стабилизируем callback через useRef чтобы избежать бесконечных перерегистраций
+  const onChatUpdateRef = useRef(onChatUpdate)
+  onChatUpdateRef.current = onChatUpdate
+
+  const stableCallback = useMemo(() => () => {
     console.log('🔥 ГЛОБАЛЬНЫЙ STORE: Получен сигнал обновления ChatList')
-    onChatUpdate()
-    
-    // Обновляем список чатов пользователя после обновления
-    // (Это будет вызвано после того как ChatList загрузит чаты)
-    // Список будет обновлен в следующем эффекте
-  }, [onChatUpdate])
+    onChatUpdateRef.current()
+  }, [])
 
   // 🔥 ПОДКЛЮЧАЕМСЯ к глобальному store (ИСПРАВЛЕНО: не ждем isGlobalSyncActive!)
   useEffect(() => {
@@ -50,7 +46,6 @@ export const useChatListRealtime = ({
 
     console.log('🔥 ГЛОБАЛЬНЫЙ STORE: Регистрируем callback для ChatList (не ждем активации)')
     console.log('🔍 ГЛОБАЛЬНЫЙ STORE: userId:', userId.slice(0, 8))
-    console.log('🔍 ГЛОБАЛЬНЫЙ STORE: isGlobalSyncActive:', isGlobalSyncActive)
     
     // Регистрируем наш callback в глобальном store СРАЗУ
     const unregister = registerRefreshCallback(stableCallback)
@@ -63,48 +58,55 @@ export const useChatListRealtime = ({
     }
   }, [userId, registerRefreshCallback, stableCallback])
 
-  // 🔥 ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ при изменении lastMessageUpdate
-  useEffect(() => {
-    if (lastMessageUpdate && userId) {
-      console.log('🔥 ГЛОБАЛЬНЫЙ STORE: Принудительное обновление ChatList')
-      console.log('🔍 ГЛОБАЛЬНЫЙ STORE: lastMessageUpdate:', lastMessageUpdate)
-      stableCallback()
-    }
-  }, [lastMessageUpdate, userId, stableCallback])
+  // Убираем принудительное обновление - оно создает дублирование
+  // useEffect с lastMessageUpdate УДАЛЕН - он вызывал бесконечный цикл
+
+  // УДАЛЕНО: Принудительное обновление вызывало бесконечный цикл
+  // Обновления теперь приходят только через registerRefreshCallback
   
   // 🔊 Подписываемся на сообщения для звуковых уведомлений
+  const handleNewMessage = useCallback((messageData: { chatId?: string; senderId?: string; content?: string }) => {
+    console.log('🔊 ChatList: Получено новое сообщение:', {
+      chatId: messageData.chatId?.slice(0, 8),
+      senderId: messageData.senderId?.slice(0, 8),
+      userChatIds: Array.from(userChatIdsRef.current).map(id => id.slice(0, 8))
+    })
+    
+    // Проверяем наличие обязательных полей
+    if (!messageData.chatId || !messageData.senderId) {
+      console.log('🔇 ChatList: Неполные данные сообщения - пропускаем')
+      return
+    }
+    
+    // Проверяем, является ли пользователь участником этого чата
+    if (!userChatIdsRef.current.has(messageData.chatId)) {
+      console.log('🔇 ChatList: Это не наш чат - НЕ воспроизводим звук')
+      return
+    }
+    
+    // Проверяем, что сообщение не от нас
+    if (messageData.senderId === userId) {
+      console.log('🔇 ChatList: Сообщение от нас - НЕ воспроизводим звук')
+      return
+    }
+    
+    console.log('🔊 ChatList: Это наш чат - воспроизводим звук!')
+    maybePlayNotification({
+      chatId: messageData.chatId,
+      senderId: messageData.senderId,
+      content: messageData.content || ''
+    })
+  }, [userId, maybePlayNotification])
+
   useEffect(() => {
     if (!userId) return
-    
-    const handleNewMessage = (messageData: any) => {
-      console.log('🔊 ChatList: Получено новое сообщение:', {
-        chatId: messageData.chatId?.slice(0, 8),
-        senderId: messageData.senderId?.slice(0, 8),
-        userChatIds: Array.from(userChatIdsRef.current).map(id => id.slice(0, 8))
-      })
-      
-      // Проверяем, является ли пользователь участником этого чата
-      if (!userChatIdsRef.current.has(messageData.chatId)) {
-        console.log('🔇 ChatList: Это не наш чат - НЕ воспроизводим звук')
-        return
-      }
-      
-      // Проверяем, что сообщение не от нас
-      if (messageData.senderId === userId) {
-        console.log('🔇 ChatList: Сообщение от нас - НЕ воспроизводим звук')
-        return
-      }
-      
-      console.log('🔊 ChatList: Это наш чат - воспроизводим звук!')
-      maybePlayNotification(messageData)
-    }
     
     const unregisterMessage = registerMessageCallback(handleNewMessage)
     
     return () => {
       unregisterMessage()
     }
-  }, [userId, registerMessageCallback, maybePlayNotification])
+  }, [userId, registerMessageCallback, handleNewMessage])
   
   // Обновляем список ID чатов пользователя при изменении chats
   useEffect(() => {

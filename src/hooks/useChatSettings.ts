@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 
 interface ChatSettings {
   hideArchive: boolean
+  hidePinned: boolean
+  hideFavorites: boolean
 }
 
 const CHAT_SETTINGS_KEY = 'chat_settings'
@@ -9,7 +11,9 @@ const CHAT_SETTINGS_KEY = 'chat_settings'
 // Хук для управления настройками чата
 export const useChatSettings = () => {
   const [settings, setSettings] = useState<ChatSettings>({
-    hideArchive: false
+    hideArchive: false,
+    hidePinned: false,
+    hideFavorites: false
   })
 
   // Загружаем настройки из localStorage при монтировании
@@ -42,9 +46,23 @@ export const useChatSettings = () => {
     updateSettings({ hideArchive: hide })
   }
 
+  // Переключаем скрытие закрепленных чатов
+  const toggleHidePinned = (hide: boolean) => {
+    updateSettings({ hidePinned: hide })
+  }
+
+  // Переключаем скрытие избранного
+  const toggleHideFavorites = (hide: boolean) => {
+    updateSettings({ hideFavorites: hide })
+  }
+
   return {
     hideArchive: settings.hideArchive,
+    hidePinned: settings.hidePinned,
+    hideFavorites: settings.hideFavorites,
     updateSettings,
-    toggleHideArchive
+    toggleHideArchive,
+    toggleHidePinned,
+    toggleHideFavorites
   }
 }

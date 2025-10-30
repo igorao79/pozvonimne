@@ -1,7 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import useCallStore from '@/store/useCallStore'
 import { createClient } from '@/utils/supabase/client'
-import useChatSyncStore from '@/store/useChatSyncStore'
 
 interface UseCallMessagesProps {
   chatId?: string
@@ -10,7 +9,6 @@ interface UseCallMessagesProps {
 
 export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
   const supabase = createClient()
-  const { refreshChatList } = useChatSyncStore()
   
   const {
     isCalling,
@@ -35,7 +33,7 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
   })
 
   // Функция для получения или создания чата
-  const getOrCreateChat = async (): Promise<string | null> => {
+  const getOrCreateChat = useCallback(async (): Promise<string | null> => {
     if (chatId) return chatId
 
     // Используем сохраненный ID чата, если есть
@@ -66,8 +64,8 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
     
     if (!userId || !otherUserId) {
       console.log('📞 getOrCreateChat: Недостаточно данных для создания чата')
-          return null
-        }
+      return null
+    }
 
     try {
       const { data, error } = await supabase.rpc('create_or_get_private_chat', {
@@ -76,8 +74,8 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
       
       if (error) {
         console.error('❌ Ошибка получения чата:', error)
-          return null
-        }
+        return null
+      }
 
       // Сохраняем полученные данные для последующего использования
       lastCallChatIdRef.current = data
@@ -87,12 +85,12 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
       return data
     } catch (err) {
       console.error('❌ Ошибка создания чата:', err)
-        return null
-      }
+      return null
     }
+  }, [chatId, isCalling, isReceivingCall, targetUserId, callerId, userId, supabase])
 
   // Создание сообщения о звонке (может создать любой участник)
-  const createCallMessage = async () => {
+  const createCallMessage = useCallback(async () => {
     // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем, нет ли уже активного сообщения
     if (callMessageIdRef.current) {
       console.log('📞 createCallMessage: Уже есть активное сообщение, пропускаем создание:', callMessageIdRef.current.slice(0, 8))
@@ -152,15 +150,14 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
       
       console.log('✅ Создано сообщение о звонке:', data)
       
-      // Принудительно обновляем чат МГНОВЕННО
-      refreshChatList()
+      // Убираем мгновенное обновление - Supabase realtime сам обновит
     } catch (err) {
       console.error('❌ Ошибка при создании сообщения:', err)
     }
-  }
+  }, [userId, isCalling, isReceivingCall, callerId, targetUserId, supabase, getOrCreateChat])
 
   // Принудительное завершение всех активных сообщений о звонках
-  const forceEndAllActiveCallMessages = async () => {
+  const forceEndAllActiveCallMessages = useCallback(async () => {
     if (!userId) return
     
     try {
@@ -174,16 +171,15 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
         console.error('❌ Ошибка принудительного завершения сообщений:', error)
       } else {
         console.log('✅ Принудительно завершено сообщений:', data)
-        // Принудительно обновляем чат МГНОВЕННО
-        refreshChatList()
+        // Убираем мгновенное обновление - Supabase realtime сам обновит
       }
     } catch (err) {
       console.error('❌ Ошибка при принудительном завершении:', err)
     }
-  }
+  }, [userId, supabase])
 
   // Обновление сообщения о звонке (любой участник может обновить)
-  const updateCallMessage = async (status: string, duration: number = 0) => {
+  const updateCallMessage = useCallback(async (status: string, duration: number = 0) => {
     const callChatId = await getOrCreateChat()
     if (!callChatId || !userId) {
       console.log('📞 updateCallMessage: Нет чата или пользователя')
@@ -225,15 +221,14 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
 
       console.log('✅ Обновлено сообщение о звонке:', status, 'ID:', data?.slice(0, 8))
       
-      // Принудительно обновляем чат МГНОВЕННО
-      refreshChatList()
+      // Убираем мгновенное обновление - Supabase realtime сам обновит
       
       // НЕ сбрасываем состояние здесь - это делается в основном useEffect мгновенно
       console.log('✅ Сообщение обновлено, состояние сброшено в основном useEffect')
     } catch (err) {
       console.error('❌ Ошибка при обновлении сообщения:', err)
     }
-  }
+  }, [getOrCreateChat, userId, isCalling, callerId, supabase])
 
   // Основная логика
   useEffect(() => {
@@ -370,7 +365,7 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
     }
 
       lastCallStateRef.current = currentState
-  }, [userId, isCalling, isCallActive, isInCall, isReceivingCall, callDurationSeconds, targetUserId, callerId])
+  }, [userId, isCalling, isCallActive, isInCall, isReceivingCall, callDurationSeconds, targetUserId, callerId, chatId, createCallMessage, forceEndAllActiveCallMessages, updateCallMessage])
 
   // Сброс при размонтировании
   useEffect(() => {

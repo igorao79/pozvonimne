@@ -1,12 +1,13 @@
 'use client'
 
 import React from 'react'
-import { usePrivateChatTyping, useTypingUsersWithTypes } from '@/hooks/useTypingSelectors'
+import Image from 'next/image'
+import { useTypingUsersWithTypes } from '@/hooks/useTypingSelectors'
 import { useSinglePremiumData } from '@/hooks/usePremiumData'
 import { PremiumNickname } from '@/components/ui'
 import useCallStore from '@/store/useCallStore'
 import { TypingDots } from './TypingIndicator'
-import { Chat, ChatListItemProps } from '@/types/chat'
+import { ChatListItemProps } from '@/types/chat'
 
 export const ChatListItem: React.FC<ChatListItemProps> = ({
   chat,
@@ -38,10 +39,6 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
 
   // Определяем, есть ли пользователь, который записывает голосовое
   const isSomeoneRecordingVoice = otherTypingUsersWithTypes.some(user => user.type === 'voice')
-
-  // Определяем, есть ли пользователь, который печатает текст
-  const isSomeoneTypingText = otherTypingUsersWithTypes.some(user => user.type === 'text')
-
 
   // 🔥 ИСПРАВЛЕНИЕ: Throttled debug логи (только 5% обновлений для уменьшения спама)
   React.useEffect(() => {
@@ -107,10 +104,11 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
           {/* Ультракомпактный аватар */}
           <div className="w-8 h-8 rounded-full overflow-hidden bg-muted flex-shrink-0 chat-avatar">
             {(chat.avatar_url || chat.other_participant_avatar) ? (
-              <img
-                src={chat.avatar_url || chat.other_participant_avatar}
+              <Image
+                src={chat.avatar_url || chat.other_participant_avatar || '/logo.png'}
                 alt={chat.name}
-                className="w-full h-full object-cover select-none"
+                fill
+                className="object-cover select-none"
                 onContextMenu={(e) => e.preventDefault()}
                 onDragStart={(e) => e.preventDefault()}
                 onMouseDown={(e) => e.preventDefault()}

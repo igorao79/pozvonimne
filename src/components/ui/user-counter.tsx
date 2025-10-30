@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import useSupabaseStore from '@/store/useSupabaseStore'
 import useCallStore from '@/store/useCallStore'
-import useUsers from '@/hooks/useUsers'
+import { createClient } from '@/utils/supabase/client'
 
 // Dynamic import для анимированного компонента (избегаем SSR проблем)
 const UserCounterAnimated = dynamic(() => import('./UserCounterAnimated').then(mod => mod.UserCounterAnimated), {
@@ -32,7 +32,7 @@ export const UserCounter = () => {
   const { userId } = useCallStore()
 
 
-  const fetchUserCount = async () => {
+  const fetchUserCount = useCallback(async () => {
     if (!userId) {
       setError('Пользователь не авторизован')
       setIsLoading(false)
@@ -43,8 +43,11 @@ export const UserCounter = () => {
       setIsLoading(true)
       setError(null)
 
+      // Создаем клиент внутри функции для стабильности
+      const supabaseClient = supabase || createClient()
+      
       // Получаем количество пользователей из таблицы user_profiles
-      const { count, error: countError } = await supabase
+      const { count, error: countError } = await supabaseClient
         .from('user_profiles')
         .select('*', { count: 'exact', head: true })
 
@@ -63,7 +66,7 @@ export const UserCounter = () => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [userId, supabase])
 
 
   useEffect(() => {
@@ -73,7 +76,7 @@ export const UserCounter = () => {
     const interval = setInterval(fetchUserCount, 5 * 60 * 1000)
 
     return () => clearInterval(interval)
-  }, [userId])
+  }, [fetchUserCount]) // Используем стабильную функцию
 
   // Эффект начальной загрузки с блюром
   useEffect(() => {

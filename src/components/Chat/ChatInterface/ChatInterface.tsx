@@ -10,10 +10,9 @@ import { ChatHeader } from './ChatHeader'
 import { MessagesArea } from './MessagesArea'
 import { MessageInput } from './MessageInput'
 import { EditMessageModal } from './EditMessageModal'
-import { Chat, ChatInterfaceProps } from './types'
+import { ChatInterfaceProps } from './types'
 import { useTypingUsers } from '@/hooks/useTypingSelectors'
 import { useChatMessages } from '@/hooks/useChatMessages'
-import { useChatRealtime } from '@/hooks/useChatRealtime'
 import { useSimpleChatRealtime } from '@/hooks/useSimpleChatRealtime'
 import { useChatScroll } from '@/hooks/useChatScroll'
 import { useChatFocus } from '@/hooks/useChatFocus'
@@ -293,7 +292,7 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
 
       return () => clearTimeout(timeoutId)
     }
-  }, [users.length, loading])
+  }, [users.length, loading, totalUsersCount])
 
   // Обработчик отправки сообщения
   const handleSendMessage = useCallback(async (e: React.FormEvent) => {
@@ -322,7 +321,7 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
         // Всегда восстанавливаем фокус после отправки сообщения
         focusAfterSend()
       }
-  }, [newMessage, sending, userId, sendMessage, focusAfterSend, scrollToBottom])
+  }, [newMessage, sending, userId, sendMessage, focusAfterSend, scrollToBottom, refreshChatList])
 
   const handleVoiceSubmit = useCallback(async (audioBlob: Blob, duration: number) => {
     if (sending || !userId) return
@@ -335,7 +334,7 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
 
       // Загружаем файл в Supabase Storage
       const fileName = `voice-messages/${userId}/${Date.now()}.webm`
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('chat-files')
         .upload(fileName, audioBlob, {
           contentType: 'audio/webm',
@@ -404,7 +403,7 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
       console.error('Ошибка отправки голосового сообщения:', error)
       setError('Не удалось отправить голосовое сообщение')
     }
-  }, [sending, userId, scrollToBottom, focusAfterSend, supabase, chat.id])
+  }, [sending, userId, scrollToBottom, focusAfterSend, supabase, chat.id, refreshChatList])
 
   // Обработчик начала редактирования сообщения
   const handleEditMessage = useCallback((messageId: string, currentContent: string) => {

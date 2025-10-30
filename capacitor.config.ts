@@ -48,9 +48,6 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: 'never', // Предотвращаем автоматические insets
     limitsNavigationsToAppBoundDomains: true,
-    // Дополнительные настройки для status bar
-    scrollEnabled: true,
-    allowsBackForwardNavigationGestures: false,
   },
   // Android specific configuration
   android: {
@@ -66,16 +63,6 @@ const config: CapacitorConfig = {
     webContentsDebuggingEnabled: false,
     // Настройки для предотвращения движения status bar
     backgroundColor: '#ffffff',
-    // Отключаем некоторые оптимизации, которые могут влиять на status bar
-    webContentsDebuggingEnabled: false,
-    // Xiaomi/MIUI специфичные настройки
-    // Предотвращаем любые системные overlay эффекты
-    scrollEnabled: true,
-    // Дополнительные WebView настройки для Xiaomi
-    webView: {
-      // overScrollMode не поддерживается, но другие настройки могут помочь
-      scrollEnabled: true,
-    }
   },
 };
 

@@ -32,7 +32,7 @@ const BannedUserOverlay = ({ onUnbanned }: BannedUserOverlayProps) => {
     }, 30000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [checkBanStatus])
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null
@@ -47,7 +47,7 @@ const BannedUserOverlay = ({ onUnbanned }: BannedUserOverlayProps) => {
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [banStatus])
+  }, [banStatus, updateTimeRemaining])
 
   const checkBanStatus = async (silent = false) => {
     try {

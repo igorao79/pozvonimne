@@ -168,7 +168,7 @@ const EmailConfirmationContent = () => {
     }
 
     confirmEmail()
-  }, [searchParams, router, supabase.auth])
+  }, [searchParams, router, supabase])
 
   const handleGoHome = () => {
     router.push('/')

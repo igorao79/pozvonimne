@@ -46,7 +46,7 @@ export const useChatActions = () => {
   /**
    * Удалить чат для себя (скрыть)
    */
-  const deleteChatForSelf = async (chatId: string, onDeleted?: () => void): Promise<boolean> => {
+  const deleteChatForSelf = async (chatId: string): Promise<boolean> => {
     setIsLoading(true)
     setError(null)
     

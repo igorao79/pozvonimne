@@ -1,7 +1,8 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, globalShortcut, desktopCapturer, nativeTheme, Tray } = require('electron');
-const { autoUpdater } = require('electron-updater');
-const log = require('electron-log');
-const path = require('path');
+import { app, BrowserWindow, Menu, ipcMain, dialog, globalShortcut, desktopCapturer, nativeTheme, Tray, shell } from 'electron';
+import { autoUpdater } from 'electron-updater';
+import log from 'electron-log';
+import path from 'path';
+import fs from 'fs';
 const isDev = process.env.NODE_ENV === 'development';
 
 // Флаг для отслеживания первого запуска
@@ -17,7 +18,7 @@ if (!gotTheLock) {
   app.quit();
 } else {
   // Обрабатываем попытку запустить второй экземпляр
-  app.on('second-instance', (event, commandLine, workingDirectory) => {
+  app.on('second-instance', () => {
     log.info('🔔 Second instance attempt detected');
     // Если окно существует - показываем его
     if (mainWindow) {
@@ -50,7 +51,7 @@ nativeTheme.on('updated', () => {
 });
 
 // Import WebRTC fixes
-const { applyWebRTCFixes, getNetworkInterfaces } = require('./webrtc-fix');
+import { applyWebRTCFixes, getNetworkInterfaces } from './webrtc-fix.js';
 
 // Переменная для отслеживания статуса обновления
 let updateCheckComplete = false;
@@ -159,7 +160,6 @@ function createTray() {
 
   // Для Windows нужен .ico файл
   let iconPath;
-  const fs = require('fs');
   
   if (isDev) {
     // В dev режиме используем ico из public
@@ -199,7 +199,6 @@ function createTray() {
     }
   }
   
-  const { nativeImage } = require('electron');
   let trayIcon = null;
   
   try {
@@ -576,7 +575,7 @@ async function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     // Allow external links to open in default browser
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      require('electron').shell.openExternal(url);
+      shell.openExternal(url);
       return { action: 'deny' };
     }
     return { action: 'allow' };
@@ -588,7 +587,7 @@ async function createWindow() {
 
     if (parsedUrl.origin !== 'http://localhost:3000' && !parsedUrl.hostname.includes('pozvonimne')) {
       event.preventDefault();
-      require('electron').shell.openExternal(navigationUrl);
+      shell.openExternal(navigationUrl);
     }
   });
 
@@ -624,7 +623,7 @@ app.whenReady().then(async () => {
     updateSplashProgress(10, 'Запуск приложения...');
     
     // ВАЖНО: Проверяем обновления ДО создания главного окна
-    const canProceed = await checkForUpdatesOnStartup();
+    await checkForUpdatesOnStartup();
     
     // Если обновление найдено, ждем действия пользователя
     if (updateRequired && !isDev) {

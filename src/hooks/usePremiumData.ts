@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { PremiumUser } from '@/utils/premiumDisplay'
 
@@ -11,11 +11,14 @@ export const usePremiumData = (userIds: string[]) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const supabase = createClient()
+  // Мемоизируем массив userIds для стабильности
+  const stableUserIds = useMemo(() => userIds, [userIds.join(',')])
 
   useEffect(() => {
+    const supabase = createClient() // Создаем клиент внутри useEffect
+    
     const fetchPremiumData = async () => {
-      if (userIds.length === 0) {
+      if (stableUserIds.length === 0) {
         setLoading(false)
         return
       }
@@ -27,14 +30,14 @@ export const usePremiumData = (userIds: string[]) => {
         const { data, error } = await supabase
           .from('user_profiles')
           .select('id, is_premium, premium_color, premium_icon, premium_icon_color_match')
-          .in('id', userIds)
+          .in('id', stableUserIds)
 
         if (error) throw error
 
         const dataMap: PremiumDataMap = {}
         
         // Инициализируем всех пользователей как не премиум
-        userIds.forEach(userId => {
+        stableUserIds.forEach(userId => {
           dataMap[userId] = {
             isPremium: false,
             premiumColor: '#FFFFFF',
@@ -80,7 +83,7 @@ export const usePremiumData = (userIds: string[]) => {
           if (payload.new && typeof payload.new === 'object') {
             const newData = payload.new as any
             console.log('usePremiumData: realtime update received:', newData)
-            if (userIds.includes(newData.id)) {
+            if (stableUserIds.includes(newData.id)) {
               console.log('usePremiumData: updating premium data for user:', newData.id)
               setPremiumData(prev => ({
                 ...prev,
@@ -100,7 +103,7 @@ export const usePremiumData = (userIds: string[]) => {
     return () => {
       subscription.unsubscribe()
     }
-  }, [userIds.join(','), supabase])
+  }, [stableUserIds]) // Используем стабильный массив
 
   const getPremiumDataForUser = (userId: string): PremiumUser => {
     return premiumData[userId] || {
@@ -114,20 +117,21 @@ export const usePremiumData = (userIds: string[]) => {
   // Функция принудительного обновления данных
   const refreshPremiumData = async () => {
     console.log('usePremiumData: force refresh requested')
-    if (userIds.length === 0) return
+    if (stableUserIds.length === 0) return
 
     try {
+      const supabase = createClient() // Создаем клиент внутри функции
       const { data, error } = await supabase
         .from('user_profiles')
         .select('id, is_premium, premium_color, premium_icon, premium_icon_color_match')
-        .in('id', userIds)
+        .in('id', stableUserIds)
 
       if (error) throw error
 
       const dataMap: PremiumDataMap = {}
 
       // Инициализируем всех пользователей как не премиум
-      userIds.forEach(userId => {
+      stableUserIds.forEach(userId => {
         dataMap[userId] = {
           isPremium: false,
           premiumColor: '#FFFFFF',

@@ -18,7 +18,7 @@ export const CallMessage: React.FC<CallMessageProps> = ({ message, chat, userId 
   const isOwn = message.sender_id === userId
 
   // Отслеживание видимости сообщения для пометки как прочитанное
-  const { elementRef, isVisible, hasBeenVisible } = useMessageVisibility({
+  const { elementRef, isVisible } = useMessageVisibility({
     threshold: 0.5, // 50% сообщения должно быть видно
     rootMargin: '0px 0px -20px 0px', // Небольшой отступ снизу
     triggerOnce: true // Пометить как прочитанное только один раз
@@ -34,7 +34,14 @@ export const CallMessage: React.FC<CallMessageProps> = ({ message, chat, userId 
   })
 
   // Извлекаем информацию о звонке из метаданных
-  const metadata = message.metadata as any
+  const metadata = message.metadata as {
+    status?: string
+    duration?: number
+    startTime?: number
+    endTime?: number
+    callId?: string
+    callerName?: string
+  }
   const callStatus = metadata?.status
   const callDuration = metadata?.duration || 0
   const callerName = metadata?.callerName || message.sender_name
@@ -133,7 +140,7 @@ export const CallMessage: React.FC<CallMessageProps> = ({ message, chat, userId 
         callDurationFromStore: callDurationSeconds
       })
     }
-  }, [message.id, callStatus, isCurrentActiveCall, isCallEndedButNotUpdated, showingLiveTime, liveCallDuration])
+  }, [message.id, callStatus, callStartTime, currentCallStartTime, isCallActive, callDurationSeconds, isCurrentActiveCall, isCallEndedButNotUpdated, showingLiveTime, liveCallDuration])
 
   // Форматируем время звонка
   const formatCallTime = (timestamp: string) => {
@@ -228,7 +235,6 @@ export const CallMessage: React.FC<CallMessageProps> = ({ message, chat, userId 
       case 'active':
         // Если звонок "завис" (старше 2 часов)
         if (isStaleCall) {
-          const estimatedDuration = Math.floor(callAge / 1000)
           return {
             text: `Звонок был прерван`,
             icon: X,
@@ -285,7 +291,7 @@ export const CallMessage: React.FC<CallMessageProps> = ({ message, chat, userId 
     }
   }
 
-  const { text, icon, className, animated, showDuration } = getCallMessageContent()
+  const { text, icon, className, animated } = getCallMessageContent()
 
   const IconComponent = icon
 

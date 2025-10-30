@@ -12,8 +12,8 @@ declare global {
     electronAPI?: {
       getAppVersion: () => Promise<string>
       getPlatform: () => Promise<string>
-      showMessageBox: (options: any) => Promise<any>
-      getScreenSources: () => Promise<any[]>
+      showMessageBox: (options: { type?: string; title?: string; message: string; buttons?: string[] }) => Promise<{ response: number; checkboxChecked?: boolean }>
+      getScreenSources: () => Promise<{ id: string; name: string; thumbnail: string }[]>
       getSystemTheme: () => Promise<string>
       checkForUpdates: () => Promise<{ updateAvailable: boolean; message: string }>
       // Add other methods as needed

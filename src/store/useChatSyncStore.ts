@@ -7,8 +7,8 @@ interface ChatSyncState {
   lastMessageUpdate: number
   isGlobalSyncActive: boolean
   refreshCallbacks: Set<() => void>
-  soundNotificationCallbacks: Set<(messageData: any) => void>
-  messageCallbacks: Set<(messageData: any) => void>
+  soundNotificationCallbacks: Set<(messageData: { id?: string; chat_id?: string; sender_id?: string; content?: string }) => void>
+  messageCallbacks: Set<(messageData: { id?: string; chat_id?: string; sender_id?: string; content?: string }) => void>
   userRefreshCallbacks: Set<() => void>
   reconnectAttempts: number
   keepAliveInterval: NodeJS.Timeout | null
@@ -17,8 +17,8 @@ interface ChatSyncState {
   // Actions
   refreshChatList: () => void
   registerRefreshCallback: (callback: () => void) => () => void
-  registerSoundNotificationCallback: (callback: (messageData: any) => void) => () => void
-  registerMessageCallback: (callback: (messageData: any) => void) => () => void
+  registerSoundNotificationCallback: (callback: (messageData: { id?: string; chat_id?: string; sender_id?: string; content?: string }) => void) => () => void
+  registerMessageCallback: (callback: (messageData: { id?: string; chat_id?: string; sender_id?: string; content?: string }) => void) => () => void
   registerUserRefreshCallback: (callback: () => void) => () => void
   startGlobalSync: () => void
   stopGlobalSync: () => void
@@ -94,7 +94,7 @@ const useChatSyncStore = create<ChatSyncState>()(
       }
     },
 
-    registerSoundNotificationCallback: (callback: (messageData: any) => void) => {
+    registerSoundNotificationCallback: (callback: (messageData: { id?: string; chat_id?: string; sender_id?: string; content?: string }) => void) => {
       const callStack = new Error().stack?.split('\n').slice(1, 4).map(line => line.trim()).join(' -> ')
       const { soundNotificationCallbacks } = get()
       const newCallbacks = new Set(soundNotificationCallbacks)
@@ -116,7 +116,7 @@ const useChatSyncStore = create<ChatSyncState>()(
       }
     },
 
-    registerMessageCallback: (callback: (messageData: any) => void) => {
+    registerMessageCallback: (callback: (messageData: { id?: string; chat_id?: string; sender_id?: string; content?: string }) => void) => {
       const { messageCallbacks } = get()
       const newCallbacks = new Set(messageCallbacks)
       newCallbacks.add(callback)
@@ -316,7 +316,7 @@ const useChatSyncStore = create<ChatSyncState>()(
 
           // Звуковые уведомления - ТОЛЬКО для участников чата!
           const { soundNotificationCallbacks, messageCallbacks } = get()
-          soundNotificationCallbacks.forEach(callback => {
+          soundNotificationCallbacks.forEach(() => {
             try {
               // НЕ вызываем callback из глобальной подписки
               // Звуки будут воспроизводиться только из локальных подписок ChatList
@@ -445,7 +445,7 @@ const useChatSyncStore = create<ChatSyncState>()(
           event: 'UPDATE',
           schema: 'public',
           table: 'user_profiles'
-        }, (payload) => {
+        }, () => {
 
           // Вызываем refresh для обновления списка пользователей
           const { userRefreshCallbacks } = get()
@@ -559,7 +559,7 @@ const useChatSyncStore = create<ChatSyncState>()(
       }
 
       // Сохраняем функцию очистки в store
-      ;(globalChannel as any).cleanup = cleanup
+      ;(globalChannel as { cleanup?: () => void }).cleanup = cleanup
     },
 
     stopGlobalSync: () => {
@@ -579,8 +579,9 @@ const useChatSyncStore = create<ChatSyncState>()(
       channels.forEach(channel => {
         if (channel.topic.includes('global_chat_sync') || channel.topic.includes('global_chat_notifications')) {
           console.log('🗑️ Удаление канала:', channel.topic)
-          if ((channel as any).cleanup) {
-            ;(channel as any).cleanup()
+          const cleanupFn = (channel as { cleanup?: () => void }).cleanup
+          if (cleanupFn) {
+            cleanupFn()
           } else {
             supabase.removeChannel(channel)
           }

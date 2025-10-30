@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { X, Users, Shield, Crown, Ban, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { X, Users, Shield, Ban, AlertTriangle } from 'lucide-react'
 import useSupabaseStore from '@/store/useSupabaseStore'
-import useCallStore from '@/store/useCallStore'
 import UsersList from './UsersList'
 import UserActionModal from './UserActionModal'
 
@@ -41,13 +40,25 @@ const AdminPanel = ({ onClose }: AdminPanelProps) => {
   const [isAdmin, setIsAdmin] = useState(false)
 
   const { supabase } = useSupabaseStore()
-  const { user } = useCallStore()
 
-  useEffect(() => {
-    initializeAdminPanel()
-  }, [])
+  const loadUsers = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
 
-  const initializeAdminPanel = async () => {
+      const { data, error } = await supabase.rpc('admin_get_all_users')
+      if (error) throw error
+
+      setUsers(data || [])
+    } catch (err) {
+      console.error('Error loading users:', err)
+      setError('Ошибка загрузки пользователей: ' + (err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }, [supabase])
+
+  const initializeAdminPanel = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -70,7 +81,11 @@ const AdminPanel = ({ onClose }: AdminPanelProps) => {
       setLoading(false)
       setIsAdmin(false)
     }
-  }
+  }, [supabase, loadUsers])
+
+  useEffect(() => {
+    initializeAdminPanel()
+  }, [initializeAdminPanel])
 
   const checkAdminRights = async () => {
     try {
@@ -86,29 +101,12 @@ const AdminPanel = ({ onClose }: AdminPanelProps) => {
     }
   }
 
-  const loadUsers = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const { data, error } = await supabase.rpc('admin_get_all_users')
-      if (error) throw error
-
-      setUsers(data || [])
-    } catch (err) {
-      console.error('Error loading users:', err)
-      setError('Ошибка загрузки пользователей: ' + (err as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleUserAction = (user: User, action: 'ban' | 'unban' | 'premium' | 'revoke_premium') => {
     setSelectedUser(user)
     setModalAction(action)
   }
 
-  const executeUserAction = async (actionData: any) => {
+  const executeUserAction = async (actionData: { reason?: string; duration?: number; duration_hours?: number; duration_days?: number }) => {
     if (!selectedUser || !modalAction) return
 
     try {
@@ -276,13 +274,15 @@ const AdminPanel = ({ onClose }: AdminPanelProps) => {
               </h3>
             </div>
 
-            <UsersList
-              users={users}
-              loading={loading && isAdmin && !error}
-              hasError={!!error}
-              onUserAction={handleUserAction}
-              onRefresh={loadUsers}
-            />
+            <div className="h-96"> {/* Фиксированная высота для скроллинга */}
+              <UsersList
+                users={users}
+                loading={loading && isAdmin && !error}
+                hasError={!!error}
+                onUserAction={handleUserAction}
+                onRefresh={loadUsers}
+              />
+            </div>
           </div>
         </div>
 

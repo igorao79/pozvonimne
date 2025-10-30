@@ -19,7 +19,7 @@ interface User {
 interface UserActionModalProps {
   user: User
   action: 'ban' | 'unban' | 'premium' | 'revoke_premium'
-  onExecute: (actionData: any) => Promise<void>
+  onExecute: (actionData: { reason?: string; duration?: number; duration_hours?: number; duration_days?: number }) => Promise<void>
   onClose: () => void
 }
 

@@ -2,24 +2,13 @@
 
 import { useEffect, useState, useRef } from 'react'
 import useCallStore from '@/store/useCallStore'
-import { createClient } from '@/utils/supabase/client'
 import useWebRTC from '@/hooks/useWebRTC'
-import { CallControls, IncomingCall, CallScreen, DialPad } from '.'
+import { IncomingCall, CallScreen } from '.'
 import { ChatApp } from '../Chat'
 // УБРАНО: ChatList, ChatInterface, CreateChatModal теперь внутри ChatApp
 // УБРАНО: RandomFact, UserCounter теперь внутри ChatApp
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
 import { useCallMessages } from '@/hooks/useCallMessages'
-
-interface Chat {
-  id: string
-  type: 'private' | 'group'
-  name: string
-  avatar_url?: string
-  other_participant_id?: string
-  other_participant_name?: string
-  other_participant_avatar?: string
-}
 
 interface CallInterfaceProps {
   resetChatTrigger?: number
@@ -33,11 +22,6 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
     isCalling,
     isReceivingCall,
     isCallActive,
-    remoteStream,
-    setIsReceivingCall,
-    setIsCallActive,
-    setError,
-    endCall,
     targetUserId,
     callDurationSeconds,
     callerId,
@@ -68,14 +52,13 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
     return () => window.removeEventListener('resize', checkIsMobile)
   }, [])
 
-  const supabase = createClient()
 
   // Состояние переподключения теперь обрабатывается глобально
 
   // УБРАНО: Больше не открываем чат автоматически после звонка
 
   // Состояние для автоматического восстановления чата из localStorage
-  const [savedChatId, setSavedChatId] = useState<string | null>(null)
+  const [savedChatId] = useState<string | null>(null)
 
   // УБРАНО: selectedChat, showCreateModal, chatListRef теперь управляются в ChatApp
 
@@ -124,13 +107,13 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
     // Обработка пропущенного звонка
     if (prev.isCalling && !current.isCalling && !current.isCallActive && !current.isInCall && prev.targetUserId) {
       console.log('📞 Missed call detected - caller hung up before answer')
-      setTimeout(() => handleMissedCall(prev.targetUserId, 'Вы'), 1000)
+      setTimeout(() => handleMissedCall(), 1000)
     }
 
     // Обработка отклонения входящего звонка (звонящий сбросил)
     if (prev.isReceivingCall && !current.isReceivingCall && !current.isCallActive && !current.isInCall && prev.callerId) {
       console.log('📞 Incoming call cancelled - caller hung up before answer')
-      setTimeout(() => handleMissedCall(prev.callerId, prev.callerName || 'Пользователь'), 1000)
+      setTimeout(() => handleMissedCall(), 1000)
     }
 
     // Обработка завершения активного звонка
@@ -143,21 +126,21 @@ const CallInterface = ({ resetChatTrigger, onCurrentChatChange }: CallInterfaceP
       }, 500) // Небольшая задержка, чтобы звук не пересекался с голосом
 
       if (otherUserId) {
-        setTimeout(() => handleCallEnded(otherUserId, callDurationSeconds), 1000)
+        setTimeout(() => handleCallEnded(), 1000)
       }
     }
 
     // Обновляем предыдущее состояние
     prevCallStateRef.current = current
-  }, [isInCall, isCallActive, isCalling, isReceivingCall, targetUserId, callerId, callerName, callDurationSeconds])
+  }, [isInCall, isCallActive, isCalling, isReceivingCall, targetUserId, callerId, callerName, callDurationSeconds, playEndCallSound])
 
   // ВРЕМЕННО ОТКЛЮЧИЛИ системные сообщения - они вызывают 400 ошибки
-  const handleMissedCall = async (userId: string, userName: string) => {
+  const handleMissedCall = async () => {
     console.log('🚨 СИСТЕМНЫЕ СООБЩЕНИЯ ОТКЛЮЧЕНЫ - Пропускаем пропущенный звонок')
     // Системные сообщения временно отключены из-за ошибок с несуществующими столбцами
   }
 
-  const handleCallEnded = async (userId: string, duration: number) => {
+  const handleCallEnded = async () => {
     console.log('🚨 СИСТЕМНЫЕ СООБЩЕНИЯ ОТКЛЮЧЕНЫ - Пропускаем завершение звонка')
     // Системные сообщения временно отключены из-за ошибок с несуществующими столбцами
   }

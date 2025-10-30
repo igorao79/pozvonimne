@@ -110,7 +110,7 @@ const AuthCallbackContent = () => {
     }
 
     handleAuthCallback()
-  }, [searchParams, router, supabase.auth])
+  }, [searchParams, router, supabase])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">

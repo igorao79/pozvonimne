@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
 exports.default = async function(context) {
   console.log('🧹 Cleaning electron build...');

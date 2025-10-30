@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, PluginListenerHandle } from '@capacitor/core'
 import { StatusBar, Style } from '@capacitor/status-bar'
 import { App } from '@capacitor/app'
 
@@ -81,7 +81,7 @@ export default function CapacitorSetup() {
     }, 100)
     
     // Показываем когда приложение возвращается на передний план
-    let listenerHandle: any = null
+    let listenerHandle: PluginListenerHandle | null = null
     App.addListener('appStateChange', async ({ isActive }) => {
       if (isActive) {
         await setupStatusBar()

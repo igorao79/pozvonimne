@@ -10,26 +10,54 @@ interface ChatSettingsModalProps {
   onClose: () => void
   hideArchive: boolean
   onToggleHideArchive: (hide: boolean) => void
+  hidePinned: boolean
+  onToggleHidePinned: (hide: boolean) => void
+  hideFavorites: boolean
+  onToggleHideFavorites: (hide: boolean) => void
 }
 
 const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
   isOpen,
   onClose,
   hideArchive,
-  onToggleHideArchive
+  onToggleHideArchive,
+  hidePinned,
+  onToggleHidePinned,
+  hideFavorites,
+  onToggleHideFavorites
 }) => {
   const { theme: currentTheme } = useThemeStore()
   const [localHideArchive, setLocalHideArchive] = useState(hideArchive)
+  const [localHidePinned, setLocalHidePinned] = useState(hidePinned)
+  const [localHideFavorites, setLocalHideFavorites] = useState(hideFavorites)
 
   // Синхронизируем локальное состояние с пропсами
   useEffect(() => {
     setLocalHideArchive(hideArchive)
   }, [hideArchive])
 
+  useEffect(() => {
+    setLocalHidePinned(hidePinned)
+  }, [hidePinned])
+
+  useEffect(() => {
+    setLocalHideFavorites(hideFavorites)
+  }, [hideFavorites])
+
   // Обработчик изменения чекбокса
   const handleToggleHideArchive = (checked: boolean) => {
     setLocalHideArchive(checked)
     onToggleHideArchive(checked)
+  }
+
+  const handleToggleHidePinned = (checked: boolean) => {
+    setLocalHidePinned(checked)
+    onToggleHidePinned(checked)
+  }
+
+  const handleToggleHideFavorites = (checked: boolean) => {
+    setLocalHideFavorites(checked)
+    onToggleHideFavorites(checked)
   }
 
   if (!isOpen) return null
@@ -110,10 +138,48 @@ const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
               </label>
             </div>
 
+            {/* Настройка скрытия закрепленных чатов */}
+            <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border border-border">
+              <input
+                type="checkbox"
+                id="hidePinned"
+                checked={localHidePinned}
+                onChange={(e) => handleToggleHidePinned(e.target.checked)}
+                className="w-5 h-5 text-primary bg-background border-2 border-border rounded focus:ring-primary focus:ring-2 transition-colors cursor-pointer
+                         checked:bg-primary checked:border-primary
+                         dark:ring-offset-gray-800"
+              />
+              <label
+                htmlFor="hidePinned"
+                className="text-sm font-medium text-foreground cursor-pointer select-none"
+              >
+                Скрыть закрепленные чаты
+              </label>
+            </div>
+
+            {/* Настройка скрытия избранного */}
+            <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border border-border">
+              <input
+                type="checkbox"
+                id="hideFavorites"
+                checked={localHideFavorites}
+                onChange={(e) => handleToggleHideFavorites(e.target.checked)}
+                className="w-5 h-5 text-primary bg-background border-2 border-border rounded focus:ring-primary focus:ring-2 transition-colors cursor-pointer
+                         checked:bg-primary checked:border-primary
+                         dark:ring-offset-gray-800"
+              />
+              <label
+                htmlFor="hideFavorites"
+                className="text-sm font-medium text-foreground cursor-pointer select-none"
+              >
+                Скрыть избранное
+              </label>
+            </div>
+
             {/* Описание */}
             <div className="text-xs text-muted-foreground">
-              При включении этой опции архивные чаты будут скрыты из списка чатов.
-              Вы сможете вернуться к ним, отключив эту настройку.
+              При включении этих опций архивные, закрепленные чаты и избранное будут скрыты из списка чатов.
+              Вы сможете вернуться к ним, отключив соответствующие настройки.
             </div>
 
             {/* Кнопка закрытия */}

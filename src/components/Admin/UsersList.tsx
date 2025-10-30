@@ -4,7 +4,6 @@ import { useState } from 'react'
 import {
   Ban,
   Crown,
-  Shield,
   ShieldOff,
   User,
   Clock,
@@ -132,9 +131,9 @@ const UsersList = ({ users, loading, hasError = false, onUserAction, onRefresh }
 
 
   return (
-    <div className="overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Search and Filter Bar */}
-      <div className="p-4 border-b border-border bg-secondary/10">
+      <div className="p-4 border-b border-border bg-secondary/10 flex-shrink-0">
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Search */}
           <div className="relative flex-1">
@@ -147,7 +146,7 @@ const UsersList = ({ users, loading, hasError = false, onUserAction, onRefresh }
               className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary text-sm"
             />
           </div>
-          
+
           {/* Filter */}
           <div className="relative">
             <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -172,180 +171,182 @@ const UsersList = ({ users, loading, hasError = false, onUserAction, onRefresh }
             Обновить
           </button>
         </div>
-        
+
         {/* Results count */}
         <div className="mt-2 text-sm text-muted-foreground">
           Показано {filteredUsers.length} из {users.length} пользователей
         </div>
       </div>
 
-      {/* Users Table */}
-      <div className="overflow-x-auto">
-        {loading ? (
-          <div className="flex items-center justify-center p-8">
-            <div className="flex items-center text-muted-foreground">
-              <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
-              Загрузка пользователей...
+      {/* Users Table - теперь с вертикальным скроллингом */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="flex items-center text-muted-foreground">
+                <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                Загрузка пользователей...
+              </div>
             </div>
-          </div>
-        ) : filteredUsers.length === 0 ? (
-          <div className="flex items-center justify-center p-8 text-muted-foreground">
-            <User className="h-8 w-8 mr-2" />
-            {searchQuery || filter !== 'all' ? 'Пользователи не найдены' : hasError ? 'Ошибка загрузки пользователей' : 'Нет пользователей'}
-          </div>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-secondary/20">
-              <tr>
-                <th className="text-left p-3 font-medium text-sm text-muted-foreground">Пользователь</th>
-                <th className="text-left p-3 font-medium text-sm text-muted-foreground">Статус</th>
-                <th className="text-left p-3 font-medium text-sm text-muted-foreground hidden sm:table-cell">Последняя активность</th>
-                <th className="text-left p-3 font-medium text-sm text-muted-foreground hidden lg:table-cell">Дата регистрации</th>
-                <th className="text-right p-3 font-medium text-sm text-muted-foreground">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="border-b border-border hover:bg-secondary/10 transition-colors">
-                  {/* User Info */}
-                  <td className="p-3">
-                    <div className="flex items-center">
-                      <div className="relative">
-                        {user.avatar_url ? (
-                          <OptimizedImage
-                            src={user.avatar_url}
-                            alt={user.display_name || user.username}
-                            width={40}
-                            height={40}
-                            className="rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                            <User className="h-5 w-5 text-muted-foreground" />
+          ) : filteredUsers.length === 0 ? (
+            <div className="flex items-center justify-center p-8 text-muted-foreground">
+              <User className="h-8 w-8 mr-2" />
+              {searchQuery || filter !== 'all' ? 'Пользователи не найдены' : hasError ? 'Ошибка загрузки пользователей' : 'Нет пользователей'}
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-secondary/20 sticky top-0 z-10">
+                <tr>
+                  <th className="text-left p-3 font-medium text-sm text-muted-foreground">Пользователь</th>
+                  <th className="text-left p-3 font-medium text-sm text-muted-foreground">Статус</th>
+                  <th className="text-left p-3 font-medium text-sm text-muted-foreground hidden sm:table-cell">Последняя активность</th>
+                  <th className="text-left p-3 font-medium text-sm text-muted-foreground hidden lg:table-cell">Дата регистрации</th>
+                  <th className="text-right p-3 font-medium text-sm text-muted-foreground">Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map((user) => (
+                  <tr key={user.id} className="border-b border-border hover:bg-secondary/10 transition-colors">
+                    {/* User Info */}
+                    <td className="p-3">
+                      <div className="flex items-center">
+                        <div className="relative">
+                          {user.avatar_url ? (
+                            <OptimizedImage
+                              src={user.avatar_url}
+                              alt={user.display_name || user.username}
+                              width={40}
+                              height={40}
+                              className="rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+                              <User className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                          )}
+                          {user.is_premium && (
+                            <Crown className="absolute -top-1 -right-1 h-4 w-4 text-yellow-500" />
+                          )}
+                        </div>
+                        <div className="ml-3">
+                          <div className="font-medium text-foreground text-sm">
+                            {user.display_name || user.username || 'Без имени'}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            @{user.username || 'no-username'}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {user.email}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Status */}
+                    <td className="p-3">
+                      <div className="flex flex-col gap-1">
+                        {getUserStatus(user)}
+                        {user.is_banned && (
+                          <div className="text-xs text-destructive">
+                            {formatBanDuration(user.ban_until) === 'Истек'
+                              ? 'Истек'
+                              : `на ${formatBanDuration(user.ban_until)}`
+                            }
                           </div>
                         )}
                         {user.is_premium && (
-                          <Crown className="absolute -top-1 -right-1 h-4 w-4 text-yellow-500" />
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-500/20 text-yellow-700 dark:text-yellow-400">
+                            <Crown className="h-3 w-3 mr-1" />
+                            Премиум
+                          </span>
                         )}
                       </div>
-                      <div className="ml-3">
-                        <div className="font-medium text-foreground text-sm">
-                          {user.display_name || user.username || 'Без имени'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          @{user.username || 'no-username'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {user.email}
-                        </div>
+                    </td>
+
+                    {/* Last Activity */}
+                    <td className="p-3 hidden sm:table-cell">
+                      <div className="text-sm text-muted-foreground">
+                        <Clock className="h-3 w-3 inline mr-1" />
+                        {user.last_seen ? formatDate(user.last_seen) : 'Никогда'}
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Status */}
-                  <td className="p-3">
-                    <div className="flex flex-col gap-1">
-                      {getUserStatus(user)}
-                      {user.is_banned && (
-                        <div className="text-xs text-destructive">
-                          {formatBanDuration(user.ban_until) === 'Истек'
-                            ? 'Истек'
-                            : `на ${formatBanDuration(user.ban_until)}`
-                          }
-                        </div>
-                      )}
-                      {user.is_premium && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-500/20 text-yellow-700 dark:text-yellow-400">
-                          <Crown className="h-3 w-3 mr-1" />
-                          Премиум
-                        </span>
-                      )}
-                    </div>
-                  </td>
+                    {/* Registration Date */}
+                    <td className="p-3 hidden lg:table-cell">
+                      <div className="text-sm text-muted-foreground">
+                        {formatDate(user.created_at)}
+                      </div>
+                    </td>
 
-                  {/* Last Activity */}
-                  <td className="p-3 hidden sm:table-cell">
-                    <div className="text-sm text-muted-foreground">
-                      <Clock className="h-3 w-3 inline mr-1" />
-                      {user.last_seen ? formatDate(user.last_seen) : 'Никогда'}
-                    </div>
-                  </td>
+                    {/* Actions */}
+                    <td className="p-3 text-right">
+                      <div className="relative">
+                        <button
+                          onClick={() => toggleUserActions(user.id)}
+                          className="p-1 rounded-md hover:bg-secondary transition-colors"
+                        >
+                          <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                        </button>
 
-                  {/* Registration Date */}
-                  <td className="p-3 hidden lg:table-cell">
-                    <div className="text-sm text-muted-foreground">
-                      {formatDate(user.created_at)}
-                    </div>
-                  </td>
+                        {selectedUserId === user.id && (
+                          <div className="absolute right-0 top-8 mt-1 bg-card border border-border rounded-md shadow-lg z-10 min-w-[200px]">
+                            {user.is_banned ? (
+                              <button
+                                onClick={() => {
+                                  onUserAction(user, 'unban')
+                                  setSelectedUserId(null)
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors flex items-center text-green-600"
+                              >
+                                <ShieldOff className="h-4 w-4 mr-2" />
+                                Разбанить
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  onUserAction(user, 'ban')
+                                  setSelectedUserId(null)
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors flex items-center text-destructive"
+                              >
+                                <Ban className="h-4 w-4 mr-2" />
+                                Забанить
+                              </button>
+                            )}
 
-                  {/* Actions */}
-                  <td className="p-3 text-right">
-                    <div className="relative">
-                      <button
-                        onClick={() => toggleUserActions(user.id)}
-                        className="p-1 rounded-md hover:bg-secondary transition-colors"
-                      >
-                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                      </button>
-
-                      {selectedUserId === user.id && (
-                        <div className="absolute right-0 top-8 mt-1 bg-card border border-border rounded-md shadow-lg z-10 min-w-[200px]">
-                          {user.is_banned ? (
-                            <button
-                              onClick={() => {
-                                onUserAction(user, 'unban')
-                                setSelectedUserId(null)
-                              }}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors flex items-center text-green-600"
-                            >
-                              <ShieldOff className="h-4 w-4 mr-2" />
-                              Разбанить
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                onUserAction(user, 'ban')
-                                setSelectedUserId(null)
-                              }}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors flex items-center text-destructive"
-                            >
-                              <Ban className="h-4 w-4 mr-2" />
-                              Забанить
-                            </button>
-                          )}
-
-                          {user.is_premium ? (
-                            <button
-                              onClick={() => {
-                                onUserAction(user, 'revoke_premium')
-                                setSelectedUserId(null)
-                              }}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors flex items-center text-yellow-600"
-                            >
-                              <Crown className="h-4 w-4 mr-2" />
-                              Снять премиум
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                onUserAction(user, 'premium')
-                                setSelectedUserId(null)
-                              }}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors flex items-center text-yellow-600"
-                            >
-                              <Crown className="h-4 w-4 mr-2" />
-                              Выдать премиум
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+                            {user.is_premium ? (
+                              <button
+                                onClick={() => {
+                                  onUserAction(user, 'revoke_premium')
+                                  setSelectedUserId(null)
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors flex items-center text-yellow-600"
+                              >
+                                <Crown className="h-4 w-4 mr-2" />
+                                Снять премиум
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  onUserAction(user, 'premium')
+                                  setSelectedUserId(null)
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors flex items-center text-yellow-600"
+                              >
+                                <Crown className="h-4 w-4 mr-2" />
+                                Выдать премиум
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   )

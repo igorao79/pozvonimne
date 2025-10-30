@@ -2,7 +2,7 @@
 
 export interface Chat {
   id: string
-  type: 'private' | 'group'
+  type: 'private' | 'group' | 'favorites'
   name: string
   avatar_url?: string
   last_message?: string
