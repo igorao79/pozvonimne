@@ -115,7 +115,7 @@ const VideoQualityControl = ({ peer, className = '' }: VideoQualityControlProps)
         className={`p-2 rounded-lg ${getButtonStyles()} flex items-center space-x-2`}
         title="Настройки качества видео"
       >
-        <Settings className="w-4 h-4" />
+        <Settings className="preserve-icon-color w-4 h-4" />
         <div className={`w-2 h-2 rounded-full bg-${qualityIndicator.color}-500`} />
       </button>
 

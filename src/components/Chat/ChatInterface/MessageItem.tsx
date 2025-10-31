@@ -35,7 +35,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   )
 
   // Отслеживание видимости сообщения для пометки как прочитанное
-  const { elementRef, isVisible, hasBeenVisible } = useMessageVisibility({
+  const { elementRef, isVisible } = useMessageVisibility({
     threshold: 0.5, // 50% сообщения должно быть видно
     rootMargin: '0px 0px -20px 0px', // Небольшой отступ снизу
     triggerOnce: true // Пометить как прочитанное только один раз
@@ -111,8 +111,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const messageContent = (
     <div className={`max-w-[70vw] min-w-[120px] px-4 py-2 rounded-lg break-words overflow-hidden ${
       isOwn
-        ? 'bg-primary text-primary-foreground'
-        : 'bg-card text-foreground border border-border'
+        ? 'self-message-bg bg-primary text-primary-foreground'
+        : 'other-message-bg bg-card text-foreground border border-border'
     }`}>
       {!isOwn && chat.type === 'group' && (
         <div className="mb-1">

@@ -14,6 +14,7 @@ import EmailSection from './EmailSection'
 import PasswordResetSection from './PasswordResetSection'
 import DonationSection from './DonationSection'
 import PremiumSettingsSection from './PremiumSettingsSection'
+import CustomizationSection from './CustomizationSection'
 import DeleteAccountSection from './DeleteAccountSection'
 import { UserProfileProps } from './types'
 
@@ -114,6 +115,8 @@ const UserProfile = ({ onClose }: UserProfileProps) => {
           <div className="animate-in slide-in-from-bottom-2 duration-300 delay-450">
             <PremiumSettingsSection userId={userId || ''} isPremium={isPremium} />
           </div>
+
+          <CustomizationSection />
 
           <div className="animate-in slide-in-from-bottom-2 duration-300 delay-525">
             <PasswordResetSection

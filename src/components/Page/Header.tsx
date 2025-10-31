@@ -114,28 +114,24 @@ export default function Header({
               disabled={isDownloading}
               className={`p-2 rounded-md download-button transition-all duration-200 border border-border h-9 ${
                 isDownloading
-                  ? 'bg-blue-100 dark:bg-blue-900/50 cursor-wait animate-pulse'
-                  : 'hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-600 cursor-pointer'
+                  ? 'bg-primary/20 cursor-wait animate-pulse'
+                  : 'hover:bg-primary/10 hover:ring-2 hover:ring-primary cursor-pointer'
               }`}
               aria-label={isDownloading ? "Скачивание..." : "Скачать приложение"}
               title={isDownloading ? "Скачивание установщика..." : "Скачать последнюю версию приложения"}
             >
-              <Download className={`h-5 w-5 transition-all duration-200 ${
-                isDownloading
-                  ? 'text-blue-400 dark:text-blue-500'
-                  : 'text-blue-600 dark:text-blue-400'
-              }`} />
+              <Download className="download-icon h-5 w-5 transition-all duration-200" />
             </button>
 
             {/* Admin Button - только для администраторов */}
             {isAdmin && (
               <button
                 onClick={onAdminClick}
-                className="p-2 rounded-md admin-button hover:bg-yellow-100 dark:hover:bg-yellow-900/30 hover:ring-2 hover:ring-yellow-300 dark:hover:ring-yellow-600 transition-all duration-200 border border-border cursor-pointer h-9"
+                className="p-2 rounded-md admin-button hover:bg-destructive/10 hover:ring-2 hover:ring-destructive transition-all duration-200 border border-border cursor-pointer h-9"
                 aria-label="Открыть админку"
                 title="Административная панель"
               >
-                <Shield className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                <Shield className="admin-icon h-5 w-5" />
               </button>
             )}
             <button
@@ -166,7 +162,7 @@ export default function Header({
               aria-label="Меню"
               title="Открыть меню"
             >
-              <Settings className={`h-5 w-5 transition-transform duration-200 ${
+              <Settings className={`preserve-icon-color h-5 w-5 transition-transform duration-200 ${
                 isMobileMenuOpen ? 'rotate-90' : ''
               }`} />
             </button>
@@ -208,15 +204,11 @@ export default function Header({
           disabled={isDownloading}
           className={`w-full text-left px-3 py-2 flex items-center space-x-3 transition-colors duration-200 ${
             isDownloading
-              ? 'bg-blue-100 dark:bg-blue-900/50 cursor-wait'
+              ? 'bg-primary/20 cursor-wait'
               : 'hover:bg-secondary/80 cursor-pointer'
           }`}
         >
-          <Download className={`h-5 w-5 ${
-            isDownloading
-              ? 'text-blue-400 dark:text-blue-500'
-              : 'text-blue-600 dark:text-blue-400'
-          }`} />
+          <Download className="download-icon h-5 w-5" />
           <span className="text-sm">
             {isDownloading ? 'Скачивание...' : 'Скачать приложение'}
           </span>
@@ -228,7 +220,7 @@ export default function Header({
             onClick={() => handleMenuItemClick(onAdminClick)}
             className="w-full text-left px-3 py-2 flex items-center space-x-3 hover:bg-secondary/80 transition-colors duration-200 cursor-pointer"
           >
-            <Shield className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+            <Shield className="admin-icon h-5 w-5" />
             <span className="text-sm">Админка</span>
           </button>
         )}

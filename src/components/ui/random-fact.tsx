@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import useCallStore from '@/store/useCallStore'
 
 interface Fact {
@@ -15,7 +15,7 @@ export const RandomFact = () => {
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const { userId } = useCallStore()
 
-  const fetchRandomFact = async () => {
+  const fetchRandomFact = useCallback(async () => {
     if (!userId) {
       setError('Пользователь не авторизован')
       setIsLoading(false)
@@ -40,11 +40,11 @@ export const RandomFact = () => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [userId])
 
   useEffect(() => {
     fetchRandomFact()
-  }, [userId])
+  }, [userId, fetchRandomFact])
 
   // Эффект начальной загрузки с блюром
   useEffect(() => {
@@ -62,13 +62,13 @@ export const RandomFact = () => {
         <div className="flex-shrink-0">
           <div className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center">
             {isLoading ? (
-              <div className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-b-2 border-primary"></div>
+              <div className="random-fact-spinner animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-b-2"></div>
             ) : error ? (
               <svg className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             ) : (
-              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="random-fact-icon w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             )}
@@ -93,7 +93,7 @@ export const RandomFact = () => {
                   <p className="text-xs sm:text-sm text-muted-foreground mb-1">{error}</p>
                   <button
                     onClick={fetchRandomFact}
-                    className="text-xs text-primary hover:text-primary/80 transition-colors"
+                    className="random-fact-icon text-xs hover:opacity-80 transition-colors"
                   >
                     Попробовать снова
                   </button>

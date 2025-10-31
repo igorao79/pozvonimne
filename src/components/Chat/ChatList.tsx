@@ -749,14 +749,7 @@ const ChatList = forwardRef<ChatListRef, ChatListProps>(({ onChatSelect, onCreat
             )}
 
             {/* 🔥 ГЛОБАЛЬНЫЙ STORE ИНДИКАТОР: Показываем статус глобальной синхронизации */}
-            <div className="flex items-center space-x-1">
-              <div
-                className="w-2 h-2 rounded-full bg-blue-500 animate-pulse transition-colors"
-                title="Глобальная синхронизация активна • Обновления через надежный store"
-              />
-
-              {/* 🔥 ГЛОБАЛЬНЫЙ STORE: Надежная синхронизация не требует ручного переподключения */}
-            </div>
+            
           </div>
 
           {/* Правая часть - кнопки управления */}
@@ -780,7 +773,7 @@ const ChatList = forwardRef<ChatListRef, ChatListProps>(({ onChatSelect, onCreat
               className="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
               title="Настройки чата"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="preserve-icon-color w-4 h-4" />
             </button>
 
             

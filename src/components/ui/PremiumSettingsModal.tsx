@@ -1,13 +1,15 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import Image from 'next/image'
 import {
   X, Palette, Award, Save, Check, RotateCcw,
   Crown, Star, Diamond, Flame, Zap, Heart, Rocket, Trophy, Sparkles, Shield
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { usePremiumData } from '@/hooks/usePremiumData'
-import { _getBrightness, _getContrastColor } from '@/utils/premiumDisplay'
+import { _getBrightness } from '@/utils/premiumDisplay'
 import useThemeStore from '@/store/useThemeStore'
 import useCallStore from '@/store/useCallStore'
 
@@ -37,14 +39,13 @@ const PremiumSettingsModal: React.FC<PremiumSettingsModalProps> = ({
   onClose,
   userId
 }) => {
-  const { theme } = useThemeStore()
-  const { user, userId: currentUserId } = useCallStore()
+  const { user } = useCallStore()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [dataLoaded, setDataLoaded] = useState(false)
   const [currentColor, setCurrentColor] = useState('#FFFFFF')
   const [currentIcon, setCurrentIcon] = useState('')
-  const [customColor, setCustomColor] = useState('#FFFFFF')
+  const [_customColor, setCustomColor] = useState('#FFFFFF')
   const [iconColorMatch, setIconColorMatch] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
@@ -116,7 +117,7 @@ const PremiumSettingsModal: React.FC<PremiumSettingsModalProps> = ({
     }
 
     loadPremiumSettings()
-  }, [userId, isOpen]) // Убрали supabase из зависимостей чтобы избежать лишних вызовов
+  }, [userId, isOpen, supabase])
 
   const handleSaveSettings = async () => {
     if (!userId) return
@@ -202,51 +203,33 @@ const PremiumSettingsModal: React.FC<PremiumSettingsModalProps> = ({
     }
   }
 
-  return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+  const modalContent = (
+    <div
+      className="fixed inset-0 z-50 flex items-stretch bg-black/50"
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
       aria-labelledby="premium-settings-title"
     >
-      <div       className={`
-        relative w-full max-w-lg mx-auto rounded-lg shadow-xl max-h-[90vh] overflow-y-auto
-        ${currentTheme === 'dark'
-          ? 'bg-gray-800 border border-gray-700'
-          : 'bg-white border border-gray-200'
-        }
-        transform transition-all duration-200 ease-out
-        animate-in zoom-in-95 fade-in-0
-      `}>
-        {/* Заголовок */}
-        <div className={`
-          flex items-center justify-between p-6 pb-4
-          ${currentTheme === 'dark' ? 'border-gray-700' : 'border-gray-200'}
-        `}>
-          <h2 id="premium-settings-title" className={`
-            text-xl font-bold
-            ${currentTheme === 'dark' ? 'text-white' : 'text-gray-900'}
-          `}>
+      <div className="bg-card w-full h-full overflow-hidden animate-in fade-in duration-300">
+        <div className="h-full flex flex-col">
+          {/* Заголовок */}
+          <div className="flex items-center justify-between p-6 border-b border-border">
+          <h2 id="premium-settings-title" className="text-2xl font-bold text-foreground">
             Настройки премиум
           </h2>
 
           <button
             onClick={onClose}
-            className={`
-              p-2 rounded-full transition-colors duration-200
-              ${currentTheme === 'dark'
-                ? 'hover:bg-gray-700 text-gray-400 hover:text-white'
-                : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700'
-              }
-            `}
+            className="h-10 w-10 p-0 hover:bg-accent rounded-lg transition-colors"
+            aria-label="Закрыть"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Контент */}
-        <div className="px-6 pb-6">
+        <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="space-y-4">
               <div className="animate-pulse space-y-3">
@@ -336,10 +319,11 @@ const PremiumSettingsModal: React.FC<PremiumSettingsModalProps> = ({
                     {/* Аватарка */}
                     <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
                       {userAvatar ? (
-                        <img
+                        <Image
                           src={userAvatar}
                           alt="Ваш аватар"
-                          className="w-full h-full object-cover"
+                          fill
+                          className="object-cover"
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
@@ -503,9 +487,12 @@ const PremiumSettingsModal: React.FC<PremiumSettingsModalProps> = ({
             </div>
           )}
         </div>
+        </div>
       </div>
     </div>
   )
+
+  return createPortal(modalContent, document.body)
 }
 
 export default PremiumSettingsModal

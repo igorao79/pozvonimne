@@ -6,6 +6,7 @@ import { flushSync } from "react-dom"
 
 import { cn } from "@/lib/utils"
 import useThemeStore from "@/store/useThemeStore"
+import useCustomThemeStore from "@/store/useCustomThemeStore"
 
 type Props = {
   className?: string
@@ -13,6 +14,7 @@ type Props = {
 
 export const AnimatedThemeToggler = ({ className }: Props) => {
   const { theme, toggleTheme: storeToggleTheme } = useThemeStore()
+  const { isCustomThemeActive } = useCustomThemeStore()
   const [mounted, setMounted] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
 
@@ -72,30 +74,41 @@ export const AnimatedThemeToggler = ({ className }: Props) => {
   }
 
   return (
-    <button 
-      ref={buttonRef} 
-      onClick={toggleTheme} 
+    <button
+      ref={buttonRef}
+      onClick={toggleTheme}
+      disabled={isCustomThemeActive}
       className={cn(
         "group relative inline-flex h-10 w-10 items-center justify-center rounded-lg border border-input bg-background transition-all duration-300 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        isCustomThemeActive && "cursor-not-allowed opacity-50",
         className
       )}
-      aria-label={theme === 'dark' ? 'Переключить на светлую тему' : 'Переключить на тёмную тему'}
+      aria-label={
+        isCustomThemeActive
+          ? 'Переключение тем отключено при активной кастомной теме'
+          : theme === 'dark' ? 'Переключить на светлую тему' : 'Переключить на тёмную тему'
+      }
+      title={
+        isCustomThemeActive
+          ? 'Переключение тем отключено при активной кастомной теме. Сбросьте настройки в профиле, чтобы включить.'
+          : undefined
+      }
     >
       <div className="relative h-4 w-4">
         {/* Солнце */}
         <Sun
           className={cn(
-            "absolute inset-0 h-4 w-4 transition-all duration-500 ease-in-out",
+            "preserve-icon-color absolute inset-0 h-4 w-4 transition-all duration-500 ease-in-out",
             theme === 'dark'
               ? "rotate-90 scale-0 opacity-0"
               : "rotate-0 scale-100 opacity-100"
           )}
         />
-        
+
         {/* Луна */}
         <Moon
           className={cn(
-            "absolute inset-0 h-4 w-4 transition-all duration-500 ease-in-out",
+            "preserve-icon-color absolute inset-0 h-4 w-4 transition-all duration-500 ease-in-out",
             theme === 'dark'
               ? "rotate-0 scale-100 opacity-100"
               : "-rotate-90 scale-0 opacity-0"

@@ -12,7 +12,7 @@ export const usePremiumData = (userIds: string[]) => {
   const [error, setError] = useState<string | null>(null)
 
   // Мемоизируем массив userIds для стабильности
-  const stableUserIds = useMemo(() => userIds, [userIds.join(',')])
+  const stableUserIds = useMemo(() => userIds, [userIds])
 
   useEffect(() => {
     const supabase = createClient() // Создаем клиент внутри useEffect
@@ -81,7 +81,7 @@ export const usePremiumData = (userIds: string[]) => {
         },
         (payload) => {
           if (payload.new && typeof payload.new === 'object') {
-            const newData = payload.new as any
+            const newData = payload.new as { id: string; is_premium?: boolean; premium_until?: string; premium_color?: string; premium_icon?: string; premium_icon_color_match?: boolean }
             console.log('usePremiumData: realtime update received:', newData)
             if (stableUserIds.includes(newData.id)) {
               console.log('usePremiumData: updating premium data for user:', newData.id)
@@ -170,7 +170,7 @@ export const usePremiumData = (userIds: string[]) => {
 
 // Хук для получения премиум данных одного пользователя
 export const useSinglePremiumData = (userId: string | null) => {
-  const { premiumData, loading, error, getPremiumDataForUser } = usePremiumData(
+  const { loading, error, getPremiumDataForUser } = usePremiumData(
     userId ? [userId] : []
   )
 

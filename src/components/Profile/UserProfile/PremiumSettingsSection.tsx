@@ -42,7 +42,7 @@ const PremiumSettingsSection = ({ userId, isPremium }: PremiumSettingsSectionPro
                            dark:focus:ring-offset-gray-800
                            flex gap-2"
                 >
-                  <Settings className="w-4 h-4" />
+                  <Settings className="preserve-icon-color w-4 h-4" />
                   Настроить
                 </button>
               </div>

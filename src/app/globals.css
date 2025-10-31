@@ -347,6 +347,98 @@ input:focus-visible {
 .border-input { border-color: var(--color-input); }
 .ring-ring { --tw-ring-color: var(--color-ring); }
 
+/* Custom theme support */
+.custom-theme-active {
+  --color-primary: var(--custom-secondary, #f1f5f9);    /* Вторичный цвет для акцентов */
+  --color-secondary: var(--custom-primary, #0f172a);   /* Основной цвет для фона */
+  --color-background: var(--custom-primary, #0f172a);  /* Основной цвет для фона страницы */
+  --color-card: var(--custom-primary, #0f172a);        /* Основной цвет для карточек */
+  --color-foreground: var(--custom-text, #0f172a);
+  --color-card-foreground: var(--custom-text, #0f172a);
+  --color-muted-foreground: hsl(from var(--custom-text, #0f172a) h s calc(l * 0.6));
+  --color-accent-foreground: var(--custom-text, #0f172a);
+  --color-destructive-foreground: var(--custom-text, #0f172a);
+  --color-ring: var(--custom-secondary, #f1f5f9);       /* Вторичный цвет для фокуса */
+}
+
+/* Кастомный цвет текста - только для текстовых элементов */
+.custom-theme-active h1,
+.custom-theme-active h2,
+.custom-theme-active h3,
+.custom-theme-active h4,
+.custom-theme-active h5,
+.custom-theme-active h6,
+.custom-theme-active p,
+.custom-theme-active span,
+.custom-theme-active div:not(.preserve-icon-color),
+.custom-theme-active label,
+.custom-theme-active button:not(.preserve-icon-color) {
+  color: var(--custom-text, #0f172a) !important;
+}
+
+.custom-theme-active input,
+.custom-theme-active textarea,
+.custom-theme-active select {
+  color: var(--custom-text, #0f172a) !important;
+  border-color: hsl(from var(--custom-text, #0f172a) h s calc(l * 0.2)) !important;
+}
+
+.custom-theme-active input::placeholder,
+.custom-theme-active textarea::placeholder {
+  color: hsl(from var(--custom-text, #0f172a) h s calc(l * 0.5)) !important;
+}
+
+/* SVG иконки оставляем без изменений - предотвращаем переопределение цветов */
+.custom-theme-active svg,
+.custom-theme-active svg * {
+  /* SVG элементы наследуют цвет от родителя */
+  color: inherit;
+}
+
+/* Специфичные правила для компонентов с собственными классами цветов */
+.custom-theme-active .text-foreground,
+.custom-theme-active .text-card-foreground,
+.custom-theme-active .text-muted-foreground {
+  color: var(--custom-text, #0f172a) !important;
+}
+
+
+/* Custom message colors for chat */
+.custom-theme-active .self-message-bg {
+  background-color: var(--custom-self-message, #3b82f6);
+}
+
+.custom-theme-active .other-message-bg {
+  background-color: var(--custom-other-message, #e5e7eb);
+}
+
+/* Специальные классы для иконок в шапке */
+.custom-theme-active .download-icon,
+.custom-theme-active .admin-icon {
+  color: var(--custom-text, #0f172a) !important;
+}
+
+/* Специальные классы для иконки оформления */
+.custom-theme-active .customization-icon {
+  color: var(--custom-secondary, #f1f5f9) !important;
+}
+
+.custom-theme-active .customization-icon-bg {
+  background-color: var(--custom-secondary, #f1f5f9) !important;
+  opacity: 0.1 !important;
+}
+
+/* Специальные правила для RandomFact компонента */
+.custom-theme-active .random-fact-icon,
+.custom-theme-active .random-fact-spinner {
+  color: var(--custom-text, #0f172a) !important;
+  border-color: var(--custom-text, #0f172a) !important;
+}
+
+.custom-theme-active .random-fact-icon:hover {
+  opacity: 0.8 !important;
+}
+
 /* Additional utility classes */
 .hover\:bg-primary\/90:hover { background-color: hsl(from var(--color-primary) h s calc(l * 0.9)); }
 .hover\:bg-secondary:hover { background-color: var(--color-secondary); }

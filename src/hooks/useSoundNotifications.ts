@@ -215,7 +215,7 @@ export const useSoundNotifications = () => {
             })
 
             // Детальная диагностика загрузки
-            let loadTimeout = setTimeout(() => {
+            const loadTimeout = setTimeout(() => {
               console.warn('⚠️ Таймаут загрузки звука (5 сек), возможно файл недоступен')
               globalSoundCache.isLoading = false
             }, 5000)

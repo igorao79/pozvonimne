@@ -98,7 +98,7 @@ const ChatSettingsModal: React.FC<ChatSettingsModalProps> = ({
             text-xl font-bold flex items-center gap-2
             ${currentTheme === 'dark' ? 'text-white' : 'text-gray-900'}
           `}>
-            <Settings className="w-5 h-5" />
+            <Settings className="preserve-icon-color w-5 h-5" />
             Настройки чата
           </h2>
 
