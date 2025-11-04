@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { usePremiumData } from '@/hooks/usePremiumData'
 import { PremiumNickname } from '@/components/ui'
@@ -33,7 +33,7 @@ const CreateChatModal = ({ isOpen, onClose, onChatCreated }: CreateChatModalProp
   const supabase = createClient()
   
   // Получаем премиум данные для всех пользователей
-  const userIds = users.map(user => user.id)
+  const userIds = useMemo(() => users.map(user => user.id), [users])
   const { getPremiumDataForUser } = usePremiumData(userIds)
 
   // Сброс состояния при открытии/закрытии модала

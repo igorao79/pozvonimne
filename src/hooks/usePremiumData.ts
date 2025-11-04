@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { PremiumUser } from '@/utils/premiumDisplay'
 
@@ -10,12 +10,28 @@ export const usePremiumData = (userIds: string[]) => {
   const [premiumData, setPremiumData] = useState<PremiumDataMap>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Refs для контроля запросов
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // Мемоизируем массив userIds для стабильности
-  const stableUserIds = useMemo(() => userIds, [userIds])
+  const stableUserIds = useMemo(() => {
+    return userIds.slice().sort() // Создаем копию и сортируем для стабильного порядка
+  }, [userIds])
 
   useEffect(() => {
-    const supabase = createClient() // Создаем клиент внутри useEffect
+    // Отменяем предыдущий timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+    
+    // Отменяем предыдущий запрос
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    const supabase = createClient()
     
     const fetchPremiumData = async () => {
       if (stableUserIds.length === 0) {
@@ -27,10 +43,14 @@ export const usePremiumData = (userIds: string[]) => {
         setLoading(true)
         setError(null)
 
+        // Создаем новый AbortController для этого запроса
+        abortControllerRef.current = new AbortController()
+
         const { data, error } = await supabase
           .from('user_profiles')
           .select('id, is_premium, premium_color, premium_icon, premium_icon_color_match')
           .in('id', stableUserIds)
+          .abortSignal(abortControllerRef.current.signal)
 
         if (error) throw error
 
@@ -59,7 +79,13 @@ export const usePremiumData = (userIds: string[]) => {
         }
 
         setPremiumData(dataMap)
-      } catch (error) {
+      } catch (error: unknown) {
+        // Игнорируем ошибки отмены запроса
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.log('Запрос премиум данных отменен')
+          return
+        }
+        
         console.error('Ошибка получения премиум данных:', error)
         setError('Не удалось загрузить премиум данные')
       } finally {
@@ -67,7 +93,10 @@ export const usePremiumData = (userIds: string[]) => {
       }
     }
 
-    fetchPremiumData()
+    // Добавляем debounce для запросов
+    timeoutRef.current = setTimeout(() => {
+      fetchPremiumData()
+    }, 300)
 
     // Подписываемся на изменения в реальном времени
     const subscription = supabase
@@ -101,6 +130,16 @@ export const usePremiumData = (userIds: string[]) => {
       .subscribe()
 
     return () => {
+      // Отменяем timeout при размонтировании
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      
+      // Отменяем активные запросы
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+      
       subscription.unsubscribe()
     }
   }, [stableUserIds]) // Используем стабильный массив
@@ -170,9 +209,12 @@ export const usePremiumData = (userIds: string[]) => {
 
 // Хук для получения премиум данных одного пользователя
 export const useSinglePremiumData = (userId: string | null) => {
-  const { loading, error, getPremiumDataForUser } = usePremiumData(
-    userId ? [userId] : []
-  )
+  // Мемоизируем массив для предотвращения лишних вызовов
+  const userIdArray = useMemo(() => {
+    return userId ? [userId] : []
+  }, [userId])
+  
+  const { loading, error, getPremiumDataForUser } = usePremiumData(userIdArray)
 
   return {
     premiumData: userId ? getPremiumDataForUser(userId) : null,

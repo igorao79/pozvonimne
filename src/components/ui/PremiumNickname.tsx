@@ -35,11 +35,14 @@ const PremiumNickname: React.FC<PremiumNicknameProps> = ({
   const shouldShowIcon = isPremium && showIcon && premiumData?.premiumIcon && premiumData.premiumIcon !== ''
 
   const baseStyle = isPremium && premiumData ? getPremiumNicknameStyle(premiumData, isDarkTheme) : {}
-  const combinedStyle = { ...baseStyle }
+  const combinedStyle = { 
+    ...baseStyle,
+    ...(showGlow && isPremium ? { filter: 'drop-shadow(0 0 4px currentColor)' } : {})
+  }
 
   // Получить компонент иконки
   const getIconComponent = (iconId: string) => {
-    const iconMap: Record<string, { component: any, color: string }> = {
+    const iconMap: Record<string, { component: React.ComponentType<{ className?: string }>, color: string }> = {
       crown: { component: Crown, color: 'text-yellow-500' },
       star: { component: Star, color: 'text-yellow-400' },
       diamond: { component: Diamond, color: 'text-blue-400' },
@@ -61,7 +64,7 @@ const PremiumNickname: React.FC<PremiumNicknameProps> = ({
       className={`inline-flex items-center gap-1 ${className}`}
       style={combinedStyle}
     >
-      {isPremium && showIcon && premiumData?.premiumIcon && premiumData.premiumIcon !== '' && (
+      {shouldShowIcon && (
         <span
           className="leading-none"
           title="Премиум пользователь"

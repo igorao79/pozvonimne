@@ -63,6 +63,7 @@ let updateRequired = false;
 async function checkForUpdatesOnStartup() {
   if (isDev) {
     log.info('⏭️ Skipping auto-updater in development mode');
+    updateCheckComplete = true; // ИСПРАВЛЕНО: в dev режиме помечаем проверку как завершенную
     return true;
   }
 
@@ -73,6 +74,7 @@ async function checkForUpdatesOnStartup() {
 
   if (isPortable) {
     log.info('🔄 Portable version detected - skipping update check');
+    updateCheckComplete = true; // ИСПРАВЛЕНО: для portable версии помечаем проверку как завершенную
     return true;
   }
 
@@ -100,32 +102,39 @@ async function checkForUpdatesOnStartup() {
       autoUpdater.on('update-available', (info) => {
         log.info('✨ Update available:', info.version);
         updateRequired = true;
+        updateCheckComplete = true; // ИСПРАВЛЕНО: помечаем проверку как завершенную
+        resolve(true); // ИСПРАВЛЕНО: завершаем проверку даже если обновление найдено
       });
 
       autoUpdater.on('update-not-available', () => {
         log.info('✅ App is up to date');
+        updateCheckComplete = true;
         resolve(true);
       });
 
       autoUpdater.on('error', (err) => {
         log.error('❌ Update error:', err.message);
+        updateCheckComplete = true; // ИСПРАВЛЕНО: помечаем проверку как завершенную при ошибке
         resolve(true); // Продолжаем даже при ошибке
       });
 
       // Запускаем проверку
       autoUpdater.checkForUpdates().catch((error) => {
         log.error('Failed to check for updates:', error);
+        updateCheckComplete = true; // ИСПРАВЛЕНО: помечаем проверку как завершенную при ошибке
         resolve(true);
       });
 
       // Сокращенный таймаут - 5 секунд
       setTimeout(() => {
         log.info('⏱️ Update check timeout, continuing...');
+        updateCheckComplete = true; // ИСПРАВЛЕНО: помечаем проверку как завершенную по таймауту
         resolve(true);
       }, 5000);
 
     } catch (error) {
       log.error('Error in checkForUpdatesOnStartup:', error);
+      updateCheckComplete = true; // ИСПРАВЛЕНО: помечаем проверку как завершенную при исключении
       resolve(true);
     }
   });
@@ -623,15 +632,27 @@ app.whenReady().then(async () => {
     updateSplashProgress(10, 'Запуск приложения...');
     
     // ВАЖНО: Проверяем обновления ДО создания главного окна
+    log.info('🔍 Starting update check...');
     await checkForUpdatesOnStartup();
+    log.info('✅ Update check completed, updateCheckComplete:', updateCheckComplete, 'updateRequired:', updateRequired);
     
-    // Если обновление найдено, ждем действия пользователя
+    // Если обновление найдено, ждем действия пользователя (с таймаутом)
     if (updateRequired && !isDev) {
       log.info('⏸️ Waiting for user to handle update...');
-      // Ждем пока пользователь не нажмет кнопку в splash
+      // Ждем пока пользователь не нажмет кнопку в splash (максимум 30 секунд)
       await new Promise(resolve => {
+        let attempts = 0;
+        const maxAttempts = 60; // 60 * 500ms = 30 секунд
+        
         const checkInterval = setInterval(() => {
+          attempts++;
+          
           if (!updateRequired || updateCheckComplete) {
+            clearInterval(checkInterval);
+            resolve();
+          } else if (attempts >= maxAttempts) {
+            log.warn('⏰ Timeout waiting for user update decision, continuing...');
+            updateCheckComplete = true; // Принудительно завершаем ожидание
             clearInterval(checkInterval);
             resolve();
           }
@@ -639,8 +660,8 @@ app.whenReady().then(async () => {
       });
     }
     
-    // Продолжаем только если проверка завершена
-    if (updateCheckComplete || isDev) {
+    // Продолжаем только если проверка завершена (должна быть всегда true после исправлений)
+    if (updateCheckComplete) {
       // Add delay to show splash
       await new Promise(resolve => setTimeout(resolve, 500));
       
@@ -648,6 +669,11 @@ app.whenReady().then(async () => {
       await createWindow();
       
       // Сбрасываем флаг первого запуска после создания окна
+      isFirstLaunch = false;
+    } else {
+      // Этого не должно происходить после наших исправлений, но на всякий случай
+      log.error('❌ Update check not completed - this should not happen!');
+      await createWindow();
       isFirstLaunch = false;
     }
   } else {
