@@ -13,7 +13,7 @@ export const usePremiumData = (userIds: string[]) => {
   
   // Refs для контроля запросов
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
+  const isActiveRef = useRef(true) // Флаг активности компонента
 
   // Мемоизируем массив userIds для стабильности
   const stableUserIds = useMemo(() => {
@@ -26,10 +26,10 @@ export const usePremiumData = (userIds: string[]) => {
       clearTimeout(timeoutRef.current)
     }
     
-    // Отменяем предыдущий запрос
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-    }
+    // Сбрасываем флаг активности для отмены предыдущих запросов
+    isActiveRef.current = false
+    // Сразу устанавливаем новый флаг активности
+    isActiveRef.current = true
 
     const supabase = createClient()
     
@@ -43,16 +43,15 @@ export const usePremiumData = (userIds: string[]) => {
         setLoading(true)
         setError(null)
 
-        // Создаем новый AbortController для этого запроса
-        abortControllerRef.current = new AbortController()
-
         const { data, error } = await supabase
           .from('user_profiles')
           .select('id, is_premium, premium_color, premium_icon, premium_icon_color_match')
           .in('id', stableUserIds)
-          .abortSignal(abortControllerRef.current.signal)
 
         if (error) throw error
+        
+        // Проверяем, что компонент еще активен перед обновлением состояния
+        if (!isActiveRef.current) return
 
         const dataMap: PremiumDataMap = {}
         
@@ -78,18 +77,26 @@ export const usePremiumData = (userIds: string[]) => {
           })
         }
 
-        setPremiumData(dataMap)
+        // Проверяем активность компонента перед обновлением состояния
+        if (isActiveRef.current) {
+          setPremiumData(dataMap)
+        }
       } catch (error: unknown) {
-        // Игнорируем ошибки отмены запроса
-        if (error instanceof Error && error.name === 'AbortError') {
-          console.log('Запрос премиум данных отменен')
+        // Проверяем активность компонента перед обработкой ошибок
+        if (!isActiveRef.current) {
+          console.log('Компонент неактивен - игнорируем ошибку')
           return
         }
         
         console.error('Ошибка получения премиум данных:', error)
-        setError('Не удалось загрузить премиум данные')
+        if (isActiveRef.current) {
+          setError('Не удалось загрузить премиум данные')
+        }
       } finally {
-        setLoading(false)
+        // Обновляем loading только если компонент активен
+        if (isActiveRef.current) {
+          setLoading(false)
+        }
       }
     }
 
@@ -130,14 +137,12 @@ export const usePremiumData = (userIds: string[]) => {
       .subscribe()
 
     return () => {
+      // Помечаем компонент как неактивный для отмены обновлений состояния
+      isActiveRef.current = false
+      
       // Отменяем timeout при размонтировании
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
-      }
-      
-      // Отменяем активные запросы
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
       }
       
       subscription.unsubscribe()

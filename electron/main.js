@@ -1,8 +1,8 @@
-import { app, BrowserWindow, Menu, ipcMain, dialog, globalShortcut, desktopCapturer, nativeTheme, Tray, shell } from 'electron';
-import { autoUpdater } from 'electron-updater';
-import log from 'electron-log';
-import path from 'path';
-import fs from 'fs';
+const { app, BrowserWindow, Menu, ipcMain, dialog, globalShortcut, desktopCapturer, nativeTheme, Tray, shell } = require('electron');
+const { autoUpdater } = require('electron-updater');
+const log = require('electron-log');
+const path = require('path');
+const fs = require('fs');
 const isDev = process.env.NODE_ENV === 'development';
 
 // Флаг для отслеживания первого запуска
@@ -51,7 +51,7 @@ nativeTheme.on('updated', () => {
 });
 
 // Import WebRTC fixes
-import { applyWebRTCFixes, getNetworkInterfaces } from './webrtc-fix.js';
+const { applyWebRTCFixes, getNetworkInterfaces } = require('./webrtc-fix.js');
 
 // Переменная для отслеживания статуса обновления
 let updateCheckComplete = false;
