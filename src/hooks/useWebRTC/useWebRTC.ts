@@ -117,6 +117,32 @@ const useWebRTC = (): WebRTCHooks => {
     const handleBeforeUnload = async () => {
       console.log('🚨 Page unloading - checking for active call')
 
+      // КРИТИЧНО: Сначала принудительно останавливаем все локальные стримы
+      const { localStream, screenStream } = useCallStore.getState()
+      
+      if (localStream) {
+        console.log('🚨 Stopping local stream tracks on page unload')
+        localStream.getTracks().forEach(track => {
+          try {
+            track.stop()
+            console.log('🚨 Stopped track:', track.kind, track.label)
+          } catch (err) {
+            console.warn('🚨 Error stopping track:', err)
+          }
+        })
+      }
+
+      if (screenStream) {
+        console.log('🚨 Stopping screen stream tracks on page unload')
+        screenStream.getTracks().forEach(track => {
+          try {
+            track.stop()
+          } catch (err) {
+            console.warn('🚨 Error stopping screen track:', err)
+          }
+        })
+      }
+
       // Если есть активный звонок, отправляем сигнал завершения
       if (isInCall && targetUserId) {
         console.log('🚨 Active call detected, sending end call signal before unload')
@@ -149,6 +175,10 @@ const useWebRTC = (): WebRTCHooks => {
           console.warn('Error destroying peer on page unload:', err)
         }
       }
+
+      // Принудительно вызываем endCall для полной очистки состояния
+      console.log('🚨 Calling endCall() for complete cleanup on page unload')
+      useCallStore.getState().endCall()
     }
 
     window.addEventListener('beforeunload', handleBeforeUnload)

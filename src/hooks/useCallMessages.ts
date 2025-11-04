@@ -31,6 +31,11 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
     isInCall: false,
     isReceivingCall: false
   })
+  
+  // Debounce refs для предотвращения дублирования обновлений
+  const createMessageTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const updateMessageTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastUpdateTimeRef = useRef<number>(0)
 
   // Функция для получения или создания чата
   const getOrCreateChat = useCallback(async (): Promise<string | null> => {
@@ -96,6 +101,16 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
       console.log('📞 createCallMessage: Уже есть активное сообщение, пропускаем создание:', callMessageIdRef.current.slice(0, 8))
       return
     }
+
+    // Debounce для предотвращения дублирования создания
+    if (createMessageTimeoutRef.current) {
+      console.log('📞 createCallMessage: Debounce - пропускаем дублированное создание')
+      return
+    }
+
+    createMessageTimeoutRef.current = setTimeout(() => {
+      createMessageTimeoutRef.current = null
+    }, 1000) // 1 секунда защиты от дублирования
     
     // Определяем кто звонит и кому
     const actualCallerId = isCalling ? userId : callerId
@@ -180,6 +195,16 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
 
   // Обновление сообщения о звонке (любой участник может обновить)
   const updateCallMessage = useCallback(async (status: string, duration: number = 0) => {
+    const now = Date.now()
+    
+    // Debounce для частых обновлений (кроме финального 'ended')
+    if (status !== 'ended' && now - lastUpdateTimeRef.current < 500) {
+      console.log('📞 updateCallMessage: Debounce - слишком частые обновления, пропускаем')
+      return
+    }
+    
+    lastUpdateTimeRef.current = now
+    
     const callChatId = await getOrCreateChat()
     if (!callChatId || !userId) {
       console.log('📞 updateCallMessage: Нет чата или пользователя')
@@ -229,6 +254,76 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
       console.error('❌ Ошибка при обновлении сообщения:', err)
     }
   }, [getOrCreateChat, userId, isCalling, callerId, supabase])
+
+  // Real-time подписка на изменения call messages
+  useEffect(() => {
+    if (!userId) return
+
+    console.log('📞🔄 Настраиваем real-time подписку на call messages для пользователя:', userId.slice(0, 8))
+
+    const messagesChannel = supabase
+      .channel(`call_messages_${userId}`)
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `type=eq.call`
+        }, 
+        (payload) => {
+          const newData = payload.new as Record<string, unknown> | null
+          const oldData = payload.old as Record<string, unknown> | null
+          
+          console.log('📞🔄 Real-time изменение call message:', {
+            event: payload.eventType,
+            messageId: (newData?.id as string)?.slice(0, 8) || (oldData?.id as string)?.slice(0, 8),
+            chatId: (newData?.chat_id as string)?.slice(0, 8) || (oldData?.chat_id as string)?.slice(0, 8),
+            senderId: (newData?.sender_id as string)?.slice(0, 8) || (oldData?.sender_id as string)?.slice(0, 8),
+            metadata: newData?.metadata || oldData?.metadata,
+            currentUserId: userId.slice(0, 8)
+          })
+          
+          // Проверяем, относится ли это изменение к нам
+          const messageData = newData || oldData
+          if (!messageData) return
+          
+          // Проверяем, участвует ли текущий пользователь в этом чате
+          const isOurMessage = messageData.sender_id === userId
+          const chatId = messageData.chat_id as string
+          const metadata = messageData.metadata as Record<string, unknown> | null
+          
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            console.log('📞🔄 Call message создано/обновлено:', {
+              isOurMessage,
+              status: metadata?.status,
+              duration: metadata?.duration
+            })
+            
+            // Если сообщение не наше, сохраняем его ID для синхронизации
+            if (!isOurMessage && metadata?.status) {
+              console.log('📞🔄 Обновляем callMessageId с real-time данными:', (messageData.id as string)?.slice(0, 8))
+              callMessageIdRef.current = messageData.id as string
+              lastCallChatIdRef.current = chatId
+            }
+          }
+        })
+      .subscribe()
+
+    return () => {
+      console.log('📞🔄 Отписываемся от real-time call messages')
+      messagesChannel.unsubscribe()
+      
+      // Очищаем debounce таймеры
+      if (createMessageTimeoutRef.current) {
+        clearTimeout(createMessageTimeoutRef.current)
+        createMessageTimeoutRef.current = null
+      }
+      if (updateMessageTimeoutRef.current) {
+        clearTimeout(updateMessageTimeoutRef.current)
+        updateMessageTimeoutRef.current = null
+      }
+    }
+  }, [userId, supabase])
 
   // Основная логика
   useEffect(() => {
@@ -283,19 +378,33 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
     // 3. Звонок завершен после активного разговора (любой участник)
     if (prevState.isCallActive && !currentState.isCallActive && !currentState.isInCall) {
       // Рассчитываем реальную продолжительность звонка из useCallStore
-      const { callStartTime } = useCallStore.getState()
+      const { callStartTime, callDurationSeconds: storeDuration } = useCallStore.getState()
       let actualDuration = callDurationSeconds
       
-      // Если продолжительность 0, но есть время начала звонка, рассчитываем вручную
-      if (actualDuration === 0 && callStartTime) {
+      console.log('📞 Debug длительности:', {
+        callDurationSeconds: callDurationSeconds,
+        storeDuration: storeDuration,
+        callStartTime: callStartTime,
+        now: Date.now()
+      })
+      
+      // Приоритет: берем максимальную из доступных длительностей
+      if (storeDuration > 0) {
+        actualDuration = storeDuration
+        console.log('📞 Используем длительность из store:', actualDuration, 'сек')
+      } else if (actualDuration === 0 && callStartTime) {
         actualDuration = Math.floor((Date.now() - callStartTime) / 1000)
         console.log('📞 Пересчитана продолжительность звонка:', actualDuration, 'сек')
       }
       
-      // Минимальная продолжительность 1 секунда для отображения
-      if (actualDuration === 0) {
+      // Минимальная продолжительность 1 секунда для отображения ТОЛЬКО если звонок действительно был коротким
+      if (actualDuration === 0 && callStartTime) {
+        // Если есть время начала, но длительность 0 - вероятно ошибка, ставим 1 сек
         actualDuration = 1
-        console.log('📞 Установлена минимальная продолжительность: 1 сек')
+        console.log('📞 Установлена минимальная продолжительность: 1 сек (была ошибка подсчета)')
+      } else if (actualDuration === 0) {
+        // Если нет времени начала и длительность 0 - звонок не состоялся
+        console.log('📞 Звонок не состоялся (нет времени начала и длительности)')
       }
       
       console.log('📞 Активный звонок завершен - обновляю статус с продолжительностью:', actualDuration)
@@ -372,6 +481,17 @@ export const useCallMessages = ({ chatId, userId }: UseCallMessagesProps) => {
     return () => {
       // Просто очищаем состояние без принудительного завершения
       console.log('🔥 РАЗМОНТИРОВАНИЕ: Очищаем состояние useCallMessages')
+      
+      // Очищаем debounce таймеры
+      if (createMessageTimeoutRef.current) {
+        clearTimeout(createMessageTimeoutRef.current)
+        createMessageTimeoutRef.current = null
+      }
+      if (updateMessageTimeoutRef.current) {
+        clearTimeout(updateMessageTimeoutRef.current)
+        updateMessageTimeoutRef.current = null
+      }
+      
       callMessageIdRef.current = null
       lastCallChatIdRef.current = null
       lastOtherUserIdRef.current = null

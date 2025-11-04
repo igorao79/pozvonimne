@@ -79,7 +79,7 @@ export const usePremiumData = (userIds: string[]) => {
 
         // Проверяем активность компонента перед обновлением состояния
         if (isActiveRef.current) {
-          setPremiumData(dataMap)
+        setPremiumData(dataMap)
         }
       } catch (error: unknown) {
         // Проверяем активность компонента перед обработкой ошибок
@@ -90,19 +90,19 @@ export const usePremiumData = (userIds: string[]) => {
         
         console.error('Ошибка получения премиум данных:', error)
         if (isActiveRef.current) {
-          setError('Не удалось загрузить премиум данные')
+        setError('Не удалось загрузить премиум данные')
         }
       } finally {
         // Обновляем loading только если компонент активен
         if (isActiveRef.current) {
-          setLoading(false)
+        setLoading(false)
         }
       }
     }
 
     // Добавляем debounce для запросов
     timeoutRef.current = setTimeout(() => {
-      fetchPremiumData()
+    fetchPremiumData()
     }, 300)
 
     // Подписываемся на изменения в реальном времени

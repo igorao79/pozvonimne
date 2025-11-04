@@ -438,20 +438,16 @@ const useCallStore = create<CallStore>((set, get) => ({
     
     // Вычисляем продолжительность звонка
     let callDurationSeconds = 0
-    if (callStartTime && isCallActive) {
+    if (callStartTime) {
       callDurationSeconds = Math.floor((Date.now() - callStartTime) / 1000)
-      console.log('🔚 EndCall: Call duration was:', callDurationSeconds, 'seconds')
-    } else if (callStartTime) {
-      // Даже если isCallActive false, но есть время начала, рассчитываем продолжительность
-      callDurationSeconds = Math.floor((Date.now() - callStartTime) / 1000)
-      console.log('🔚 EndCall: Call duration calculated from start time:', callDurationSeconds, 'seconds')
+      console.log('🔚 EndCall: Call duration calculated:', callDurationSeconds, 'seconds')
+      console.log('🔚 EndCall: Call was active:', isCallActive)
+      console.log('🔚 EndCall: Start time:', new Date(callStartTime).toLocaleTimeString())
+      console.log('🔚 EndCall: End time:', new Date().toLocaleTimeString())
     }
     
-    // Минимальная продолжительность 1 секунда если звонок был активным
-    if (callDurationSeconds === 0 && callStartTime) {
-      callDurationSeconds = 1
-      console.log('🔚 EndCall: Set minimum duration to 1 second')
-    }
+    // УБИРАЕМ принудительное установление минимума - пусть реальная длительность сохраняется
+    // Логика минимума теперь только в useCallMessages.ts для отображения
 
     // Close peer connection safely
     if (peer && !peer.destroyed) {
