@@ -51,7 +51,7 @@ nativeTheme.on('updated', () => {
 });
 
 // Import WebRTC fixes
-const { applyWebRTCFixes, getNetworkInterfaces } = require('./webrtc-fix.js');
+const { applyWebRTCFixes, getNetworkInterfaces } = require('./webrtc-fix');
 
 // Переменная для отслеживания статуса обновления
 let updateCheckComplete = false;
