@@ -168,6 +168,8 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
                 )}
                 {chat.last_message_type === 'voice'
                   ? 'Голосовое сообщение'
+                  : chat.last_message_type === 'image'
+                  ? 'Фото'
                   : chat.last_message_type === 'call'
                   ? 'Звонок'
                   : chat.last_message

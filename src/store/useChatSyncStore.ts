@@ -5,6 +5,7 @@ import useCallStore from './useCallStore'
 
 interface ChatSyncState {
   lastMessageUpdate: number
+  lastUserUpdate: number
   isGlobalSyncActive: boolean
   refreshCallbacks: Set<() => void>
   soundNotificationCallbacks: Set<(messageData: { id?: string; chat_id?: string; sender_id?: string; content?: string }) => void>
@@ -28,6 +29,7 @@ interface ChatSyncState {
 const useChatSyncStore = create<ChatSyncState>()(
   subscribeWithSelector((set, get) => ({
     lastMessageUpdate: Date.now(),
+    lastUserUpdate: Date.now(),
     isGlobalSyncActive: false,
     refreshCallbacks: new Set(),
     soundNotificationCallbacks: new Set(),
@@ -441,30 +443,42 @@ const useChatSyncStore = create<ChatSyncState>()(
             }, 300) // 300мс debounce для участников чата
           }
         })
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'user_profiles'
-        }, () => {
-
-          // Вызываем refresh для обновления списка пользователей
-          const { userRefreshCallbacks } = get()
-          if (userRefreshCallbacks && userRefreshCallbacks.size > 0) {
-          
-            userRefreshCallbacks.forEach(callback => {
-              try {
-                callback()
-              } catch (error) {
-                console.error('Ошибка при вызове user refresh callback:', error)
-              }
-            })
-          } else {
-            console.log('⚠️ Нет подписчиков на обновление пользователей')
-          }
-
-          // 🔥 ИСПРАВЛЕНИЕ: НЕ обновляем чаты при каждом изменении статуса пользователя
-          // Это создавало каскадные обновления! Статусы пользователей обновляются отдельно.
-        })
+        // 🔥 ВРЕМЕННО ОТКЛЮЧАЕМ realtime обновления пользователей из-за перегрузки
+        // .on('postgres_changes', {
+        //   event: 'UPDATE',
+        //   schema: 'public',
+        //   table: 'user_profiles'
+        // }, () => {
+        //
+        //   // 🔥 ОПТИМИЗАЦИЯ: Добавляем throttling для обновлений пользователей
+        //   // Обновляем не чаще чем раз в 30 секунд
+        //   const now = Date.now()
+        //   const lastUserUpdate = get().lastUserUpdate || 0
+        //
+        //   if (now - lastUserUpdate > 30000) { // 30 секунд
+        //     set({ lastUserUpdate: now })
+        //
+        //     // Вызываем refresh для обновления списка пользователей
+        //     const { userRefreshCallbacks } = get()
+        //     if (userRefreshCallbacks && userRefreshCallbacks.size > 0) {
+        //
+        //       userRefreshCallbacks.forEach(callback => {
+        //         try {
+        //           callback()
+        //         } catch (error) {
+        //           console.error('Ошибка при вызове user refresh callback:', error)
+        //         }
+        //       })
+        //     } else {
+        //       console.log('⚠️ Нет подписчиков на обновление пользователей')
+        //     }
+        //   } else {
+        //     console.log('⏰ Пропускаем обновление пользователей - слишком частое обновление')
+        //   }
+        //
+        //   // 🔥 ИСПРАВЛЕНИЕ: НЕ обновляем чаты при каждом изменении статуса пользователя
+        //   // Это создавало каскадные обновления! Статусы пользователей обновляются отдельно.
+        // })
         .subscribe((status, err) => {
           console.log('🌐 Статус глобальной синхронизации чатов:', status, err ? `Ошибка: ${err}` : '')
 

@@ -360,17 +360,25 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
 
   // Обработка новых сообщений из realtime
   const handleNewMessage = useCallback((messageData: RealtimeMessagePayload & { _isUpdate?: boolean, _oldRecord?: any }) => {
+    console.log('📡 [useChatMessages] Получено новое сообщение:', {
+      id: messageData.id?.slice(0, 8),
+      chatId: messageData.chat_id?.slice(0, 8),
+      type: messageData.type,
+      currentChatId: chatId.slice(0, 8),
+      senderId: messageData.sender_id?.slice(0, 8)
+    })
+
     // Уведомляем монитор соединения о получении сообщения
     updateMessageReceived()
-    
+
     // 🔥 УБРАНО: Принудительное обновление больше не нужно - прямые подписки сами обновляют
     // ChatList теперь получает обновления через прямую подписку на изменения messages
-    
+
     // Очищаем ошибки при получении сообщений
     if (error) {
       setError(undefined)
     }
-    
+
     if (!messageData.id || !messageData.chat_id) {
       console.warn('📡 Неполные данные сообщения:', messageData)
       return
@@ -495,6 +503,8 @@ export const useChatMessages = ({ chatId, userId, isActive = true }: UseChatMess
     sendMessage,
     handleNewMessage,
     setError,
+    setSending,
+    setMessages,
     // Дополнительные диагностические данные
     connectionHealth: {
       isHealthy: isConnectionHealthy(),

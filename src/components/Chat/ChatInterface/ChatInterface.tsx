@@ -10,7 +10,7 @@ import { ChatHeader } from './ChatHeader'
 import { MessagesArea } from './MessagesArea'
 import { MessageInput } from './MessageInput'
 import { EditMessageModal } from './EditMessageModal'
-import { ChatInterfaceProps } from './types'
+import { ChatInterfaceProps, Message } from './types'
 import { useTypingUsers } from '@/hooks/useTypingSelectors'
 import { useChatMessages } from '@/hooks/useChatMessages'
 import { useSimpleChatRealtime } from '@/hooks/useSimpleChatRealtime'
@@ -21,6 +21,12 @@ import { useMessageActions } from '@/hooks/useMessageActions'
 
 
 const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterfaceProps) => {
+  console.log('🎯 [ChatInterface] Рендер компонента:', {
+    chatId: chat.id.slice(0, 8),
+    isInCall,
+    hasUnreadMessages
+  })
+
   const [newMessage, setNewMessage] = useState('')
   const [error, setError] = useState<string | undefined>(undefined)
   const [isMobile, setIsMobile] = useState(false)
@@ -83,7 +89,9 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
     loadMessages,
     loadMoreMessages,
     sendMessage,
-    handleNewMessage
+    handleNewMessage,
+    setSending,
+    setMessages
   } = useChatMessages({ chatId: chat.id, userId, isActive: true })
 
   const { messagesEndRef, scrollToBottom, scrollToElement, hasInitialScrolled } = useChatScroll({
@@ -405,6 +413,110 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
     }
   }, [sending, userId, scrollToBottom, focusAfterSend, supabase, chat.id, refreshChatList])
 
+  const handleImageSubmit = useCallback(async (imageUrl: string, publicId: string, fileName: string) => {
+    console.log('🖼️ [handleImageSubmit] Начинаем отправку изображения:', {
+      chatId: chat.id.slice(0, 8),
+      isInCall,
+      sending
+    })
+
+    if (sending || !userId) return
+
+    setSending(true)
+
+    try {
+      // Создаем временное сообщение для немедленного отображения
+      const tempMessageId = `temp_image_${Date.now()}`
+      const tempMessage: Message = {
+        id: tempMessageId,
+        chat_id: chat.id,
+        sender_id: userId,
+        sender_name: 'Вы',
+        sender_avatar: undefined,
+        content: '',
+        type: 'image',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        edited_at: undefined,
+        is_deleted: false,
+        reply_to_id: undefined,
+        reply_to_content: undefined,
+        reply_to_sender_name: undefined,
+        metadata: {
+          image_url: imageUrl,
+          public_id: publicId,
+          file_name: fileName
+        },
+        delivered_at: undefined,
+        read_at: undefined
+      }
+
+      // Добавляем временное сообщение в список сообщений
+      // Используем setMessages напрямую для немедленного отображения
+      setMessages((prev: Message[]) => [...prev, tempMessage])
+
+      // Отправляем изображение на сервер
+      console.log('📤 Отправляем изображение на сервер...')
+      const { data: messageId, error: sendError } = await supabase.rpc('send_message', {
+        chat_uuid: chat.id,
+        message_content: '',
+        message_type: 'image',
+        reply_to_uuid: null,
+        metadata: {
+          image_url: imageUrl,
+          public_id: publicId,
+          file_name: fileName
+        }
+      })
+
+      if (sendError) {
+        console.error('Ошибка отправки изображения:', sendError)
+        // Удаляем временное сообщение при ошибке
+        setMessages((prev: Message[]) => prev.filter(msg => msg.id !== tempMessageId))
+        setError('Не удалось отправить изображение')
+      } else {
+        console.log('✅ Изображение отправлено:', messageId)
+
+        // Обновляем временное сообщение реальным ID
+        setMessages((prev: Message[]) => prev.map((msg: Message) =>
+          msg.id === tempMessageId
+            ? { ...msg, id: messageId }
+            : msg
+        ))
+
+        // 🔥 ЯВНОЕ ОБНОВЛЕНИЕ СПИСКА ЧАТОВ после отправки изображения
+        console.log('🖼️ Изображение отправлено - обновляем список чатов')
+        refreshChatList()
+
+        // 📡 ДОПОЛНИТЕЛЬНО: Отправляем broadcast уведомление для всех клиентов
+        console.log('📡 Отправляем broadcast уведомление об изображении')
+        supabase.channel('global_chat_notifications').send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: {
+            messageId: messageId,
+            chatId: chat.id,
+            senderId: userId,
+            content: '📷 Фото',
+            type: 'image',
+            timestamp: new Date().toISOString()
+          }
+        }).catch(error => {
+          console.error('Ошибка отправки broadcast уведомления:', error)
+        })
+
+        // Автоматическая прокрутка вниз при успешной отправке
+        scrollToBottom()
+        focusAfterSend()
+      }
+    } catch (error) {
+      console.error('Ошибка отправки изображения:', error)
+      setError('Не удалось отправить изображение')
+    } finally {
+      setSending(false)
+    }
+  }, [sending, userId, scrollToBottom, focusAfterSend, supabase, chat.id, refreshChatList, handleNewMessage, setMessages, isInCall])
+
   // Обработчик начала редактирования сообщения
   const handleEditMessage = useCallback((messageId: string, currentContent: string) => {
     setEditModal({
@@ -502,6 +614,7 @@ const ChatInterface = ({ chat, onBack, isInCall, hasUnreadMessages }: ChatInterf
         onChange={setNewMessage}
         onSubmit={handleSendMessage}
         onVoiceSubmit={handleVoiceSubmit}
+        onImageSubmit={handleImageSubmit}
         sending={sending}
         chatId={chat.id}
       />

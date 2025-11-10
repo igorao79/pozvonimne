@@ -3,12 +3,14 @@ import { EmojiPicker } from './EmojiPicker'
 import { EmojiAutocomplete } from './EmojiAutocomplete'
 import { useTyping } from '@/hooks/useTyping'
 import { VoiceMessageInput } from '@/components/Chat/ChatInterface/VoiceMessageInput'
+import { ImageMessageInput } from '@/components/Chat/ChatInterface/ImageMessageInput'
 
 interface MessageInputProps {
   value: string
   onChange: (value: string) => void
   onSubmit: (e: React.FormEvent) => void
   onVoiceSubmit?: (audioBlob: Blob, duration: number) => void
+  onImageSubmit?: (imageUrl: string, publicId: string, fileName: string) => void
   sending: boolean
   disabled?: boolean
   chatId: string
@@ -23,12 +25,14 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
   onChange,
   onSubmit,
   onVoiceSubmit,
+  onImageSubmit,
   sending,
   disabled = false,
   chatId
 }, ref) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [isVoiceMode, setIsVoiceMode] = useState(false)
+  const [isImageMode, setIsImageMode] = useState(false)
 
   // 🚀 МГНОВЕННЫЙ ОТКЛИК: Локальное состояние для UI
   const [localValue, setLocalValue] = useState(value)
@@ -177,8 +181,15 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
 
   const toggleVoiceMode = useCallback(() => {
     setIsVoiceMode(!isVoiceMode)
+    setIsImageMode(false) // Выключаем режим изображений
     setShowEmojiPicker(false) // Закрываем emoji picker при переключении
   }, [isVoiceMode])
+
+  const toggleImageMode = useCallback(() => {
+    setIsImageMode(!isImageMode)
+    setIsVoiceMode(false) // Выключаем голосовой режим
+    setShowEmojiPicker(false) // Закрываем emoji picker при переключении
+  }, [isImageMode])
 
 
   return (
@@ -189,6 +200,17 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
             if (onVoiceSubmit) {
               onVoiceSubmit(audioBlob, duration)
               setIsVoiceMode(false) // Возвращаемся в текстовый режим после отправки
+            }
+          }}
+          disabled={inputDisabled}
+          chatId={chatId}
+        />
+      ) : isImageMode && onImageSubmit ? (
+        <ImageMessageInput
+          onImageSubmit={(imageUrl: string, publicId: string, fileName: string) => {
+            if (onImageSubmit) {
+              onImageSubmit(imageUrl, publicId, fileName)
+              setIsImageMode(false) // Возвращаемся в текстовый режим после отправки
             }
           }}
           disabled={inputDisabled}
@@ -220,12 +242,33 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({
           </button>
         </div>
 
-        {/* Кнопка переключения режима */}
+        {/* Кнопка переключения режима изображений */}
+        <button
+          type="button"
+          onClick={toggleImageMode}
+          disabled={inputDisabled}
+          className={`px-3 py-2 transition-all duration-200 rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+            isImageMode
+              ? 'text-primary bg-primary/10'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+          }`}
+          title={isImageMode ? "Переключить на текстовый режим" : "Отправить изображение"}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </button>
+
+        {/* Кнопка переключения режима голосовых сообщений */}
         <button
           type="button"
           onClick={toggleVoiceMode}
           disabled={inputDisabled}
-          className="px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all duration-200 rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`px-3 py-2 transition-all duration-200 rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+            isVoiceMode
+              ? 'text-primary bg-primary/10'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+          }`}
           title={isVoiceMode ? "Переключить на текстовый режим" : "Переключить на голосовой режим"}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

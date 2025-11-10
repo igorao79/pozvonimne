@@ -83,6 +83,13 @@ const MessagesAreaComponent: React.FC<MessagesAreaProps> = ({
   isAutoScrolling = false,
   hasUnreadMessages = false
 }) => {
+  console.log('📜 [MessagesArea] Рендер компонента:', {
+    messagesCount: messages.length,
+    chatId: chat.id.slice(0, 8),
+    lastMessageId: messages[messages.length - 1]?.id?.slice(0, 8),
+    hasUnreadMessages
+  })
+
   const [showScrollButton, setShowScrollButton] = useState(false)
   
   // Простая логика плашки: показываем если есть непрочитанные сообщения и пользователь не скроллил активно

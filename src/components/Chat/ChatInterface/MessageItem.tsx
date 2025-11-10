@@ -1,13 +1,15 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Message, Chat } from './types'
 import { formatMessageTime } from './utils'
 import { MessageContextMenu } from './MessageContextMenu'
 import { SimpleMessageStatus } from './SimpleMessageStatus'
 import { VoiceMessageItem } from './VoiceMessageItem'
+import { ImageModal } from './ImageModal'
 import { useMessageVisibility, useMessageReadTracking } from '@/hooks/useMessageVisibility'
 import { useSinglePremiumData } from '@/hooks/usePremiumData'
 import { PremiumNickname } from '@/components/ui'
 import LinkRenderer from '../MessageContent/LinkRenderer'
+import { CldImage } from 'next-cloudinary'
 // CallMessage импортируется в MessagesArea, а не здесь
 
 interface MessageItemProps {
@@ -27,6 +29,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onEdit,
   onDelete
 }) => {
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false)
   const isOwn = message.sender_id === userId
   
   // Получаем премиум данные для отправителя сообщения
@@ -133,6 +136,26 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           duration={message.metadata?.duration || 0}
           isOwn={isOwn}
         />
+      ) : message.type === 'image' ? (
+        <div className="space-y-1">
+          <div className="relative max-w-sm">
+            <CldImage
+              src={message.metadata?.public_id || message.metadata?.image_url || ''}
+              width={400}
+              height={300}
+              alt="Фото"
+              className="rounded-lg object-cover cursor-pointer hover:opacity-95 transition-all duration-200 hover:scale-[1.02]"
+              onClick={() => setIsImageModalOpen(true)}
+              crop={{
+                type: 'auto',
+                source: true
+              }}
+              quality="auto"
+              format="webp"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            />
+          </div>
+        </div>
       ) : (
         <LinkRenderer
           content={message.content}
@@ -164,22 +187,33 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   )
 
   return (
-    <MessageContextMenu
-      key={message.id}
-      message={message}
-      userId={userId}
-      onEdit={onEdit}
-      onDelete={onDelete}
-    >
-      <div
-        ref={elementRef}
-        id={message.id} // Добавляем ID для отладки
-        className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-        onClick={onClick}
+    <>
+      <MessageContextMenu
+        key={message.id}
+        message={message}
+        userId={userId}
+        onEdit={onEdit}
+        onDelete={onDelete}
       >
-        {messageContent}
-      </div>
-    </MessageContextMenu>
+        <div
+          ref={elementRef}
+          id={message.id} // Добавляем ID для отладки
+          className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+          onClick={onClick}
+        >
+          {messageContent}
+        </div>
+      </MessageContextMenu>
+
+      {/* Модальное окно для просмотра изображений */}
+      <ImageModal
+        isOpen={isImageModalOpen}
+        onClose={() => setIsImageModalOpen(false)}
+        imageUrl={message.metadata?.image_url || ''}
+        publicId={message.metadata?.public_id}
+        alt="Фото"
+      />
+    </>
   )
 }
 
