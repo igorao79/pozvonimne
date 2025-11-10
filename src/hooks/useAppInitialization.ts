@@ -7,6 +7,7 @@ import { useGlobalTypingManager } from '@/hooks/useGlobalTypingManager'
 import { useGlobalCallManager } from '@/hooks/useGlobalCallManager'
 import useCallStateSynchronizer from '@/hooks/useCallStateSynchronizer'
 import { useSoundNotifications } from '@/hooks/useSoundNotifications'
+import { useThemeInitialization } from '@/hooks/useThemeInitialization'
 import { logEnvironment, validateSupabaseConfig } from '@/utils/debug'
 
 export function useAppInitialization() {
@@ -30,6 +31,9 @@ export function useAppInitialization() {
 
   // Инициализируем систему звуковых уведомлений
   const { maybePlayNotification, soundLoaded, userHasInteracted } = useSoundNotifications()
+
+  // Инициализируем кастомную тему пользователя
+  useThemeInitialization()
 
   // Интегрируем звуковые уведомления с глобальной системой
   useEffect(() => {

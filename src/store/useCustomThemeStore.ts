@@ -26,11 +26,15 @@ interface CustomThemeState {
   saveCustomTheme: (userId: string) => Promise<boolean>
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
+  startRealtimeSync: (userId: string) => void
+  stopRealtimeSync: () => void
 }
 
-const useCustomThemeStore = create<CustomThemeState>()(
-  persist(
-    (set, get) => ({
+const useCustomThemeStore = create<CustomThemeState>(
+  (set, get) => {
+    let realtimeSubscription: any = null
+
+    return {
       customSettings: null,
       isCustomThemeActive: false,
       isLoading: false,
@@ -165,25 +169,67 @@ const useCustomThemeStore = create<CustomThemeState>()(
       },
 
       setLoading: (loading: boolean) => set({ isLoading: loading }),
-      setError: (error: string | null) => set({ error })
-    }),
-    {
-      name: 'custom-theme-storage',
-      // Не сохраняем loading и error в localStorage
-      partialize: (state) => ({
-        customSettings: state.customSettings,
-        isCustomThemeActive: state.isCustomThemeActive
-      }),
-      onRehydrateStorage: () => (state) => {
-        // Применяем тему при гидратации
-        if (state?.isCustomThemeActive && state?.customSettings) {
-          setTimeout(() => {
-            state.applyCustomTheme()
-          }, 0)
+      setError: (error: string | null) => set({ error }),
+
+      startRealtimeSync: async (userId: string) => {
+        if (realtimeSubscription) {
+          console.log('🎨 Realtime sync уже активен')
+          return
+        }
+
+        try {
+          // Импорт здесь, чтобы избежать циклических зависимостей
+          const { createClient } = await import('@/utils/supabase/client')
+          const supabase = createClient()
+
+          console.log('🎨 Запуск realtime синхронизации темы для пользователя:', userId.slice(0, 8))
+
+          realtimeSubscription = supabase
+            .channel('user_custom_themes_sync')
+            .on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: 'user_custom_themes',
+                filter: `user_id=eq.${userId}`
+              },
+              (payload) => {
+                console.log('🎨 Получено обновление кастомной темы:', payload)
+
+                if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                  const newSettings = payload.new.settings as CustomThemeSettings
+                  console.log('🎨 Применяем новую тему:', newSettings)
+
+                  set({
+                    customSettings: newSettings,
+                    isCustomThemeActive: true,
+                    error: null
+                  })
+                  get().applyCustomTheme()
+                } else if (payload.eventType === 'DELETE') {
+                  console.log('🎨 Тема удалена, сбрасываем к дефолтным настройкам')
+                  get().resetToDefaults()
+                }
+              }
+            )
+            .subscribe()
+
+          console.log('🎨 Realtime синхронизация темы запущена')
+        } catch (error) {
+          console.error('❌ Ошибка запуска realtime синхронизации темы:', error)
+        }
+      },
+
+      stopRealtimeSync: () => {
+        if (realtimeSubscription) {
+          console.log('🎨 Останавливаем realtime синхронизацию темы')
+          realtimeSubscription.unsubscribe()
+          realtimeSubscription = null
         }
       }
     }
-  )
+  }
 )
 
 export default useCustomThemeStore
